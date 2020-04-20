@@ -37,6 +37,9 @@ tos_ZkrTracking::tos_ZkrTracking(QObject *parent, m_RC_Gor_ZKR *rc_zkr, m_Otceps
 
         }
     rc_zkr->setSIGNAL_ROSPUSK(rc_zkr->SIGNAL_ROSPUSK().innerUse());
+    rc_zkr->setSIGNAL_STATE_ERROR_RTDS(rc_zkr->SIGNAL_STATE_ERROR_RTDS().innerUse());
+    rc_zkr->setSIGNAL_STATE_ERROR_NERASCEP(rc_zkr->SIGNAL_STATE_ERROR_NERASCEP().innerUse());
+    rc_zkr->setSIGNAL_STATE_ERROR_OSYCOUNT(rc_zkr->SIGNAL_STATE_ERROR_OSYCOUNT().innerUse());
 }
 void tos_ZkrTracking::state2buffer()
 {
@@ -44,7 +47,10 @@ void tos_ZkrTracking::state2buffer()
         for (int j=0;j<2;j++){
             dsot[d][j]->state2buffer();
         }
-   rc_zkr->SIGNAL_ROSPUSK().setValue_1bit(rc_zkr->STATE_ROSPUSK());
+    rc_zkr->SIGNAL_ROSPUSK().setValue_1bit(rc_zkr->STATE_ROSPUSK());
+    rc_zkr->SIGNAL_STATE_ERROR_RTDS().setValue_1bit(rc_zkr->STATE_ERROR_RTDS());
+    rc_zkr->SIGNAL_STATE_ERROR_NERASCEP().setValue_1bit(rc_zkr->STATE_ERROR_NERASCEP());
+    rc_zkr->SIGNAL_STATE_ERROR_OSYCOUNT().setValue_1bit(rc_zkr->STATE_ERROR_OSYCOUNT());
 }
 
 void tos_ZkrTracking::resetStates()
@@ -139,11 +145,18 @@ void tos_ZkrTracking::work(const QDateTime &T)
 
     // собираем текущую пару состояний
     int rtds=prev_state_zkr.rtds;
-    if ((rc_zkr->rtds_1()->STATE_SRAB()==1) && (rc_zkr->rtds_2()->STATE_SRAB()==1)) rtds=1;
+    if (rc_zkr->RTDS_USL_OR()){
+        if ((rc_zkr->rtds_1()->STATE_SRAB()==1) || (rc_zkr->rtds_2()->STATE_SRAB()==1)) rtds=1;
+    } else {
+        if ((rc_zkr->rtds_1()->STATE_SRAB()==1) && (rc_zkr->rtds_2()->STATE_SRAB()==1)) rtds=1;
+    }
     if ((rc_zkr->rtds_1()->STATE_SRAB()==0) && (rc_zkr->rtds_2()->STATE_SRAB()==0)) rtds=0;
-    curr_state_zkr.rcos[0]=busyOtcepState(rc_next,rc_zkr);
-    curr_state_zkr.rcos[1]=busyOtcepState(rc_zkr,rc_zkr);
-    curr_state_zkr.rcos[2]=busyOtcepState(rc_prev,rc_zkr);
+    // снимем ошибку РТДС
+    if (rtds==1) rc_zkr->setSTATE_ERROR_RTDS(false);
+
+    curr_state_zkr.rcstate[0]=busyOtcepState(rc_next,rc_zkr);
+    curr_state_zkr.rcstate[1]=busyOtcepState(rc_zkr,rc_zkr);
+    curr_state_zkr.rcstate[2]=busyOtcepState(rc_prev,rc_zkr);
     curr_state_zkr.rtds=rtds;
 
 
@@ -179,6 +192,8 @@ void tos_ZkrTracking::work(const QDateTime &T)
             otcep->setSTATE_DIRECTION(0);
             otcep->setSTATE_OSY_CNT(osy_count[1]);
             otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
+            otcep->setSTATE_ZKR_PROGRESS(false);
+            checkNeRascep();
             reset_dso();
             otcep->tos->rc_tracking_comleted[1]=true;
             break;
@@ -188,6 +203,8 @@ void tos_ZkrTracking::work(const QDateTime &T)
             otcep->tos->rc_tracking_comleted[1]=true;
             otcep->setSTATE_OSY_CNT(osy_count[1]);
             otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
+            otcep->setSTATE_ZKR_PROGRESS(false);
+            checkNeRascep();
             reset_dso();
             dsot[1][0]->dso->setSTATE_OSY_COUNT(osy_count[1]-osy_count[0]);
             dsot[1][1]->dso->setSTATE_OSY_COUNT(osy_count[1]-osy_count[0]);
@@ -200,13 +217,21 @@ void tos_ZkrTracking::work(const QDateTime &T)
             // именно толкаем
             m_Otcep *prev_otcep=rc_next->rcs->l_otceps.last();
             prev_otcep->tos->setOtcepSF(prev_otcep->RCS,rc_next->next_rc[0],T);
+            otcep->tos->setOtcepSF(rc_next,rc_next,T);
+            otcep->setSTATE_DIRECTION(0);
+            otcep->setSTATE_OSY_CNT(osy_count[1]);
+            otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
+            otcep->setSTATE_ZKR_PROGRESS(false);
+            checkNeRascep();
+            otcep->tos->rc_tracking_comleted[1]=true;
         }
             break;
         case _resetOtcepOnZKR:
         {
             // надо проверить что в топе рееально предыдущий
             auto *arrivingOtcep=otceps->topOtcep();
-            if ((arrivingOtcep==nullptr) || (otcep->NUM()==arrivingOtcep->NUM()-1)) {
+            if ((arrivingOtcep==nullptr) && (otcep->NUM()==arrivingOtcep->NUM()-1)&&
+                    (dso_pair.d==1)) {
                 otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
                 otcep->tos->setOtcepSF(nullptr,nullptr,T);
             } else {
@@ -215,6 +240,7 @@ void tos_ZkrTracking::work(const QDateTime &T)
         }
             break;
         case _error_rtds:
+            rc_zkr->setSTATE_ERROR_RTDS(true);
             break;
 
         case _baza:
@@ -239,6 +265,8 @@ void tos_ZkrTracking::newOtcep(const QDateTime &T)
     if (modelGorka->STATE_REGIM()==ModelGroupGorka::regimRospusk){
         auto *otcep=otceps->topOtcep();
         if (otcep!=nullptr){
+            rc_zkr->setSTATE_ERROR_NERASCEP(false);
+            rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
             otcep->tos->setOtcepSF(rc_zkr,rc_zkr,T);
             otcep->setSTATE_DIRECTION(0);
             otcep->setSTATE_LOCATION(m_Otcep::locationOnSpusk);
@@ -251,6 +279,35 @@ void tos_ZkrTracking::newOtcep(const QDateTime &T)
             otcep->tos->rc_tracking_comleted[1]=true;
         }
     }
+}
+
+void tos_ZkrTracking::checkNeRascep()
+{
+    // если оси у предыдущего подозрительно равны своему + следующему
+    auto *otcep=otceps->topOtcep();
+    if (otcep!=nullptr){
+        int N=otcep->NUM();
+        if ((N>1)&&(otceps->otcepByNum(N)!=nullptr)){
+            auto *prev_otcep=otceps->otcepByNum(N);
+            if ((prev_otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)&&
+                    (prev_otcep->STATE_SL_OSY_CNT()>=4)&& (otcep->STATE_SL_OSY_CNT()>=4) &&
+                    (prev_otcep->STATE_ZKR_OSY_CNT()>=prev_otcep->STATE_SL_OSY_CNT()+4) &&
+                    (prev_otcep->STATE_ZKR_OSY_CNT()==prev_otcep->STATE_SL_OSY_CNT()+otcep->STATE_SL_OSY_CNT())){
+                rc_zkr->setSTATE_ERROR_NERASCEP(true);
+                otcep->tos->resetStates();
+            }
+        }
+
+    }
+}
+
+void tos_ZkrTracking::checkOsyCount(m_Otcep *otcep)
+{
+    // проверяем что оси не ушли за заданные
+    if ((otcep->STATE_SL_OSY_CNT()>=4)&&
+            (otcep->STATE_ZKR_OSY_CNT()>=otcep->STATE_SL_OSY_CNT()+4))
+        rc_zkr->setSTATE_ERROR_OSYCOUNT(true); else
+        rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
 }
 
 
@@ -293,45 +350,45 @@ void tos_ZkrTracking::work_dso(const QDateTime &T)
     if (dsot[0][0]->dso->STATE_ERROR()==0) wdso[0]=dsot[0][0]; else wdso[0]=dsot[0][1];
     if (dsot[1][0]->dso->STATE_ERROR()==0) wdso[1]=dsot[1][0]; else wdso[0]=dsot[1][1];
 
-//    if ((wdso[0]->dso->STATE_OSY_COUNT()!=osy_count[0]) || (wdso[0]->dso->STATE_OSY_COUNT()!=osy_count[1])){
-        osy_count[0]=wdso[0]->dso->STATE_OSY_COUNT();
-        osy_count[1]=wdso[1]->dso->STATE_OSY_COUNT();
+    //    if ((wdso[0]->dso->STATE_OSY_COUNT()!=osy_count[0]) || (wdso[0]->dso->STATE_OSY_COUNT()!=osy_count[1])){
+    osy_count[0]=wdso[0]->dso->STATE_OSY_COUNT();
+    osy_count[1]=wdso[1]->dso->STATE_OSY_COUNT();
 
-        dso_pair.updateStates(osy_count[1],osy_count[0]);
+    dso_pair.updateStates(osy_count[1],osy_count[0]);
 
-        setSTATE_LT_OSY_CNT(dso_pair.c.tlg_os);
-        setSTATE_LT_OSY_S(dso_pair.c.os_start);
-        setSTATE_TLG_CNT(dso_pair.tlg_cnt);
-        setSTATE_TLG_SOST(dso_pair.sost);
-        setSTATE_TLG_D(dso_pair.d);
+    setSTATE_LT_OSY_CNT(dso_pair.c.tlg_os);
+    setSTATE_LT_OSY_S(dso_pair.c.os_start);
+    setSTATE_TLG_CNT(dso_pair.tlg_cnt);
+    setSTATE_TLG_SOST(dso_pair.sost);
+    setSTATE_TLG_D(dso_pair.d);
 
-        // вычисляем скорость по ДСО
-        if (wdso[0]->dso->STATE_DIRECT()==0){
-            tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[1]);
-            tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[1]);
-            if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
-                qint64 ms=s0.T.msecsTo(s1.T);
-                if (ms!=0){
-                    qreal len=wdso[1]->dso->RC_OFFSET()-wdso[0]->dso->RC_OFFSET();
-                    Vdso=1.*3600*len/ms;
-                    VdsoTime=T;
-                }
+    // вычисляем скорость по ДСО
+    if (wdso[0]->dso->STATE_DIRECT()==0){
+        tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[1]);
+        tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[1]);
+        if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
+            qint64 ms=s0.T.msecsTo(s1.T);
+            if (ms!=0){
+                qreal len=wdso[1]->dso->RC_OFFSET()-wdso[0]->dso->RC_OFFSET();
+                Vdso=1.*3600*len/ms;
+                VdsoTime=T;
             }
         }
+    }
 
-        if (wdso[1]->dso->STATE_DIRECT()==1){
-            tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[0]);
-            tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[0]);
-            if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
-                qint64 ms=s0.T.msecsTo(s1.T);
-                if (ms!=0){
-                    qreal len=wdso[0]->dso->RC_OFFSET()-wdso[1]->dso->RC_OFFSET();
-                    Vdso=1.*3600*len/ms;
-                    VdsoTime=T;
-                }
+    if (wdso[1]->dso->STATE_DIRECT()==1){
+        tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[0]);
+        tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[0]);
+        if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
+            qint64 ms=s0.T.msecsTo(s1.T);
+            if (ms!=0){
+                qreal len=wdso[0]->dso->RC_OFFSET()-wdso[1]->dso->RC_OFFSET();
+                Vdso=1.*3600*len/ms;
+                VdsoTime=T;
             }
         }
-//    }
+    }
+    //    }
     // тут надо плясать от текущей скорости и растоянию между датчиками
     if ((Vdso!=_undefV_)&&(VdsoTime.isValid()) && (VdsoTime.msecsTo(T)>5000)) Vdso=_undefV_;
     setSTATE_V_DSO(Vdso);

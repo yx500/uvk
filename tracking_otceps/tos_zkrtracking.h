@@ -27,11 +27,11 @@ class tos_ZkrTracking : public tos_RcTracking
     Q_OBJECT
 public:
     struct t_zkr_state {
-        T_BusyOtcepState rcos[3];
+        T_BusyOtcepState rcstate[3];
         int rtds;
         bool likeTable(const t_zkr_state &ts) const{
             for (int j=0;j<3;j++){
-                if (!busyOtcepStateLike(ts.rcos[j],rcos[j])) return false;
+                if (!busyOtcepStateLike(ts.rcstate[j],rcstate[j])) return false;
             }
             if (ts.rtds!=rtds) return false;
             return true;
@@ -78,6 +78,8 @@ protected:
     t_zkr_state prev_state_zkr;
 
     void newOtcep(const QDateTime &T);
+    void checkNeRascep();
+    void checkOsyCount(m_Otcep *otcep);
 
     int prev_base_os;
     int baza_count;

@@ -2,13 +2,14 @@
 
 #include "trackingotcepsystem.h"
 #include "tos_speedcalc.h"
+#include <QMetaProperty>
 
 tos_OtcepData::tos_OtcepData(TrackingOtcepSystem *parent, m_Otcep *otcep) : BaseObject(parent)
 {
     this->TOS=parent;
     this->otcep=otcep;
     otcep->tos=this;
-    otcep->setSIGNAL_ADDR( otcep->SIGNAL_ADDR().innerUse());
+    otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
     setObjectName(QString("OtcepData %1").arg(otcep->NUM()));
 }
 
@@ -119,8 +120,8 @@ void tos_OtcepData::calcLenByRc()
                 (rc->rcs->useRcTracking)&&
                 (rc->next_rc[0]->rcs->useRcTracking)
                 /*(qobject_cast<m_RC_Gor_Park*>(rc)==nullptr) &&
-                (qobject_cast<m_RC_Gor_Park*>(rc->next_rc[0])==nullptr) &&
-                (qobject_cast<m_RC_Gor_ZKR*>(rc)==nullptr)*/)
+                        (qobject_cast<m_RC_Gor_Park*>(rc->next_rc[0])==nullptr) &&
+                        (qobject_cast<m_RC_Gor_ZKR*>(rc)==nullptr)*/)
         {
             l=l+rc->LEN();
         } else
@@ -136,61 +137,76 @@ void tos_OtcepData::calcLenByRc()
 
 void tos_OtcepData::state2buffer()
 {
-    t_Descr stored_Descr;
-    memset(&stored_Descr,0,sizeof(stored_Descr));
-    stored_Descr.num=   otcep->NUM();                   ; // Номер отцепа 1-255 Живет в течении роспуска одного
-    stored_Descr.mar=otcep->STATE_MAR();         ;
-    stored_Descr.mar_f=otcep->STATE_MAR_F();
-    if (otcep->RCS) stored_Descr.start=otcep->RCS->SIGNAL_BUSY().chanelOffset()+1;else stored_Descr.start=0;
-    if (otcep->RCF) stored_Descr.end=otcep->RCF->SIGNAL_BUSY().chanelOffset()+1;else stored_Descr.end=0;
-    stored_Descr.ves=otcep->STATE_VES();              ; // Вес отцепа в тоннах
-    stored_Descr.osy=otcep->STATE_OSY_CNT();         ; // Длинна ( в осях)
-    stored_Descr.len=otcep->STATE_VAGON_CNT();        ; // Длинна ( в вагонах)
-    stored_Descr.baza=otcep->STATE_BAZA();           ; // Признак длиннобазности
-    stored_Descr.nagon=otcep->STATE_NAGON();          ; // Признак нагона
-    if (otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk)
-        stored_Descr.end_slg=0; else
-        stored_Descr.end_slg=1;// Признак конца слежения (по последней РЦ на путях)
+    if (otcep->SIGNAL_DATA().chanelType()==9){
+        t_Descr stored_Descr;
+        memset(&stored_Descr,0,sizeof(stored_Descr));
+        stored_Descr.num=   otcep->NUM();                   ; // Номер отцепа 1-255 Живет в течении роспуска одного
+        stored_Descr.mar=otcep->STATE_MAR();         ;
+        stored_Descr.mar_f=otcep->STATE_MAR_F();
+        if (otcep->RCS) stored_Descr.start=otcep->RCS->SIGNAL_BUSY().chanelOffset()+1;else stored_Descr.start=0;
+        if (otcep->RCF) stored_Descr.end=otcep->RCF->SIGNAL_BUSY().chanelOffset()+1;else stored_Descr.end=0;
+        stored_Descr.ves=otcep->STATE_VES();              ; // Вес отцепа в тоннах
+        stored_Descr.osy=otcep->STATE_OSY_CNT();         ; // Длинна ( в осях)
+        stored_Descr.len=otcep->STATE_VAGON_CNT();        ; // Длинна ( в вагонах)
+        stored_Descr.baza=otcep->STATE_BAZA();           ; // Признак длиннобазности
+        stored_Descr.nagon=otcep->STATE_NAGON();          ; // Признак нагона
+        if (otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk)
+            stored_Descr.end_slg=0; else
+            stored_Descr.end_slg=1;// Признак конца слежения (по последней РЦ на путях)
 
-    stored_Descr.err=otcep->STATE_ERROR();           ; // Признак неперевода стрелки
-    stored_Descr.dir=otcep->STATE_DIRECTION();        ; // Направление
-    stored_Descr.V_rc=otcep->STATE_V_RC()*10;      ; // Скорость по РЦ
-//            stored_Descr.V_zad  ; // Скорость заданная
-//            stored_Descr.Stupen ; // Ступень торможения
-//            stored_Descr.osy1   ; // Длинна ( в осях)
-//            stored_Descr.osy2   ; // Длинна ( в осях)
-//            stored_Descr.V_zad2 ; // Скорость заданная 2TP
-//            stored_Descr.V_zad3 ; // Скорость заданная  3TP
-//            stored_Descr.pricel ;
-//            stored_Descr.old_num;
-//            stored_Descr.old_mar;
-//            stored_Descr.U_len  ;
-    stored_Descr.vagon=otcep->STATE_SL_VAGON_CNT();   ;
-    stored_Descr.V_out=otcep->STATE_V_OUT_1()*10 ;
-    stored_Descr.V_out=otcep->STATE_V_IN_2()*10 ;
-    stored_Descr.V_out2=otcep->STATE_V_OUT_2()*10 ;
-    stored_Descr.V_in3=otcep->STATE_V_IN_3()*10  ;
-    stored_Descr.V_out3=otcep->STATE_V_OUT_3()*10 ;
-    stored_Descr.Id=otcep->STATE_ID_ROSP();
-//            stored_Descr.st     ;
-    stored_Descr.ves_sl=otcep->STATE_SL_VES();
-//            stored_Descr.r_mar  ;
-//            stored_Descr.t_ot[3]; // 0- растарможка 1-4 ступени максимал ступень работы замедлителя
-//            stored_Descr.r_a[3] ; // 0-автомат режим ручного вмешательсва
-    stored_Descr.V_in=otcep->STATE_V_IN_1()*10 ; // Cкорость входа 1 ТП
-//            stored_Descr.Kzp    ; // КЗП по расчету Антона
-//            stored_Descr.v_rosp ; // Скорость расформирования   - норма/быстро/медленно - 0/1/2
-//            stored_Descr.flag_ves; // Работоспособность весомера - да/нет/ - 0/1
-//            stored_Descr.flag_r  ; // Признак ручной установки скорости
-//            stored_Descr.FirstVK ;
-//            stored_Descr.LastVK  ;
-//            stored_Descr.addr_tp[3]; // Занятый замедлитель
-//            stored_Descr.v_rosp1 ; // Скорость расформирования   - норма/быстро/медленно - 0/1/2
-//            stored_Descr.p_rzp   ; // Признак выше ПТП
-//                   stored_Descr.VrospZ;
-//                   stored_Descr.VrospF;
-//                   stored_Descr.V_zad2_S ; // Скорость заданная 2TP
-    otcep->SIGNAL_ADDR().setBufferData(&stored_Descr,sizeof(stored_Descr));
+        stored_Descr.err=otcep->STATE_ERROR();           ; // Признак неперевода стрелки
+        stored_Descr.dir=otcep->STATE_DIRECTION();        ; // Направление
+        stored_Descr.V_rc=otcep->STATE_V_RC()*10;      ; // Скорость по РЦ
+        //            stored_Descr.V_zad  ; // Скорость заданная
+        //            stored_Descr.Stupen ; // Ступень торможения
+        //            stored_Descr.osy1   ; // Длинна ( в осях)
+        //            stored_Descr.osy2   ; // Длинна ( в осях)
+        //            stored_Descr.V_zad2 ; // Скорость заданная 2TP
+        //            stored_Descr.V_zad3 ; // Скорость заданная  3TP
+        //            stored_Descr.pricel ;
+        //            stored_Descr.old_num;
+        //            stored_Descr.old_mar;
+        //            stored_Descr.U_len  ;
+        stored_Descr.vagon=otcep->STATE_SL_VAGON_CNT();   ;
+        stored_Descr.V_out=otcep->STATE_V_OUT_1()*10 ;
+        stored_Descr.V_out=otcep->STATE_V_IN_2()*10 ;
+        stored_Descr.V_out2=otcep->STATE_V_OUT_2()*10 ;
+        stored_Descr.V_in3=otcep->STATE_V_IN_3()*10  ;
+        stored_Descr.V_out3=otcep->STATE_V_OUT_3()*10 ;
+        stored_Descr.Id=otcep->STATE_ID_ROSP();
+        //            stored_Descr.st     ;
+        stored_Descr.ves_sl=otcep->STATE_SL_VES();
+        //            stored_Descr.r_mar  ;
+        //            stored_Descr.t_ot[3]; // 0- растарможка 1-4 ступени максимал ступень работы замедлителя
+        //            stored_Descr.r_a[3] ; // 0-автомат режим ручного вмешательсва
+        stored_Descr.V_in=otcep->STATE_V_IN_1()*10 ; // Cкорость входа 1 ТП
+        //            stored_Descr.Kzp    ; // КЗП по расчету Антона
+        //            stored_Descr.v_rosp ; // Скорость расформирования   - норма/быстро/медленно - 0/1/2
+        //            stored_Descr.flag_ves; // Работоспособность весомера - да/нет/ - 0/1
+        //            stored_Descr.flag_r  ; // Признак ручной установки скорости
+        //            stored_Descr.FirstVK ;
+        //            stored_Descr.LastVK  ;
+        //            stored_Descr.addr_tp[3]; // Занятый замедлитель
+        //            stored_Descr.v_rosp1 ; // Скорость расформирования   - норма/быстро/медленно - 0/1/2
+        //            stored_Descr.p_rzp   ; // Признак выше ПТП
+        //                   stored_Descr.VrospZ;
+        //                   stored_Descr.VrospF;
+        //                   stored_Descr.V_zad2_S ; // Скорость заданная 2TP
+        otcep->SIGNAL_DATA().setBufferData(&stored_Descr,sizeof(stored_Descr));
+    }
+    QString S;
+    if (otcep->SIGNAL_DATA().chanelType()==109){
+        for (int idx = 0; idx < otcep->metaObject()->propertyCount(); idx++) {
+            QMetaProperty metaProperty = otcep->metaObject()->property(idx);
+            QString stateName=metaProperty.name();
+            if (stateName.indexOf("STATE_")!=0) continue;
+            if (!S.isEmpty()) S=S+";";
+            stateName.remove(0,6);
+            QVariant V=metaProperty.read(otcep);
+            S=stateName+"="+V.toString();
+        }
+        otcep->SIGNAL_DATA().getBuffer()->A=S.toUtf8();
+    }
 }
 
 
