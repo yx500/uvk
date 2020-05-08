@@ -19,12 +19,14 @@ tos_KzpTracking::tos_KzpTracking(QObject *parent, m_RC_Gor_Park * rc_park) : tos
 
 void tos_KzpTracking::resetStates()
 {
-    tos_RcTracking::resetStates();
+
     foreach (m_Otcep *otcep, l_otceps) {
         if (otcep->STATE_KZP_OS()==m_Otcep::kzpMoving) otcep->setSTATE_KZP_OS(m_Otcep::kzpUnknow);
         rc_park->rcs->removeOtcep(otcep);
         if (otcep->STATE_LOCATION()==m_Otcep::locationOnPark) otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
     }
+    tos_RcTracking::resetStates();
+
 
     memset(&curr_state_kzp,0,sizeof(curr_state_kzp));
     memset(&prev_state_kzp,0,sizeof(prev_state_kzp));
@@ -214,7 +216,14 @@ void tos_KzpTracking::work(const QDateTime &T)
         break;
     }
 
-
+    // выставляем свойства отцепа
+    if (!rc_park->rcs->l_otceps.isEmpty()){
+        rc_park->rcs->l_otceps.last()->setSTATE_KZP_D(rc_park->STATE_KZP_D());
+    }
+    for (int i=rc_park->rcs->l_otceps.size()-2;i>=0;i--){
+        m_Otcep * otcep=rc_park->rcs->l_otceps[i];
+        if (otcep->STATE_KZP_OS()==m_Otcep::kzpMoving) otcep->setSTATE_KZP_OS(m_Otcep::kzpClosed);
+    }
 
     // запоминаем
     prev_kzp=rc_park->STATE_KZP_D();

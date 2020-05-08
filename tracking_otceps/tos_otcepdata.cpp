@@ -9,7 +9,7 @@ tos_OtcepData::tos_OtcepData(TrackingOtcepSystem *parent, m_Otcep *otcep) : Base
     this->TOS=parent;
     this->otcep=otcep;
     otcep->tos=this;
-    otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
+
     setObjectName(QString("OtcepData %1").arg(otcep->NUM()));
 }
 
@@ -58,11 +58,25 @@ void tos_OtcepData::resetStates()
     otcep->RCS=nullptr;
     otcep->RCF=nullptr;
     otcep->vBusyRc.clear();
+
+    dos_RCS=nullptr;
+    dos_RCF=nullptr;
+    _stat_kzp_d=0;
+    _stat_kzp_t=QDateTime();
+    out_tp_t=QDateTime();;
+    out_tp_rc=nullptr;
+    out_tp_v=_undefV_;
+
+    setSTATE_V_RCF_IN(_undefV_);
+    setSTATE_V_RCF_OUT(_undefV_);
+
 }
 
 void tos_OtcepData::setOtcepSF(m_RC *rcs, m_RC *rcf,const QDateTime &T)
 {
     if ((otcep->RCS!=rcs)&&(otcep->RCF!=rcf)){
+        emit TOS->otcep_rcsf_change(otcep,0,otcep->RCS,rcs,T,QDateTime());
+        emit TOS->otcep_rcsf_change(otcep,1,otcep->RCF,rcf,T,QDateTime());
         otcep->RCS=rcs;
         otcep->RCF=rcf;
         dtRCS=QDateTime();
@@ -76,10 +90,12 @@ void tos_OtcepData::setOtcepSF(m_RC *rcs, m_RC *rcf,const QDateTime &T)
                 qint64 ms=dtRCS.msecsTo(T);
                 qreal V=tos_SpeedCalc::calcV(ms,otcep->RCS->LEN());
                 otcep->setSTATE_V_RC(V);
+                emit TOS->otcep_rcsf_change(otcep,0,otcep->RCS,rcs,T,dtRCS);
                 dtRCS=T;
             } else {
                 dtRCS=QDateTime();
                 otcep->setSTATE_V_RC(_undefV_);
+                emit TOS->otcep_rcsf_change(otcep,0,otcep->RCS,rcs,T,dtRCS);
             }
             otcep->RCS=rcs;
             otcep->setBusyRC();
@@ -90,9 +106,11 @@ void tos_OtcepData::setOtcepSF(m_RC *rcs, m_RC *rcf,const QDateTime &T)
                     qint64 ms=dtRCF.msecsTo(T);
                     qreal V=tos_SpeedCalc::calcV(ms,otcep->RCF->LEN());
                     otcep->setSTATE_V_RC(V);
+                    emit TOS->otcep_rcsf_change(otcep,1,otcep->RCF,rcf,T,dtRCF);
                     dtRCF=T;
                 } else {
                     dtRCF=QDateTime();
+                    emit TOS->otcep_rcsf_change(otcep,1,otcep->RCF,rcf,T,dtRCF);
                 }
                 otcep->RCF=rcf;
                 otcep->setBusyRC();

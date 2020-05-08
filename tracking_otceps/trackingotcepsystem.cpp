@@ -9,11 +9,18 @@
 #include "m_zam.h"
 
 
-TrackingOtcepSystem::TrackingOtcepSystem(QObject *parent,ModelGroupGorka *modelGorka) :
+TrackingOtcepSystem::TrackingOtcepSystem(QObject *parent,ModelGroupGorka *modelGorka,int trackingType) :
     BaseWorker(parent)
 {
     this->modelGorka=modelGorka;
+    this->trackingType=trackingType;
     makeWorkers(modelGorka);
+}
+void TrackingOtcepSystem::disableBuffers()
+{
+    foreach (auto *otcep, lo) {
+        otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
+    }
 }
 
 QList<BaseWorker *> TrackingOtcepSystem::makeWorkers(ModelGroupGorka *O)
@@ -101,11 +108,11 @@ void TrackingOtcepSystem::state2buffer()
 }
 
 
+
 void TrackingOtcepSystem::work(const QDateTime &T)
 {
     if (!FSTATE_ENABLED) return;
-    bool self=true;
-    if (self){
+    if (trackingType==0){
         // механизм таблицы переходов
         foreach (auto rct, l_rct) {
             rct->setCurrState();
@@ -149,84 +156,98 @@ void TrackingOtcepSystem::work(const QDateTime &T)
 
 
 
+        // финализируем скорость отцепов +V ARS
+        foreach (auto otcep, lo) {
+            if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
+                updateV_RC(otcep,T);
+        }
+
+
+        // выставляем параметра отцепа
+        foreach (auto otcep, lo) {
+            if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
+                updateOtcepParams(otcep,T);
+        }
 
     } else {
+        if ((_regim==ModelGroupGorka::regimStop)&&(modelGorka->STATE_REGIM()==ModelGroupGorka::regimRospusk)){
+            foreach (auto otcep, lo) {
+                if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+                otcep->setSTATE_ENABLED(false);
+                otcep->tos->setOtcepSF(nullptr,nullptr,T);
+            }
+        }
+        _regim=modelGorka->STATE_REGIM();
 
-        //        foreach (auto w, lw) {
-        //            // сброс при след роспуске
-        //            if (w->otcep->stored_Descr.Id!=w->Descr_Id) {
-        //                w->resetStates();
-        //                w->Descr_Id=w->otcep->stored_Descr.Id;
-        //                foreach (tos_KzpTracking *kzpt, l_kzpt) {
-        //                    kzpt->rc_park->removeOtcep(w->otcep);
-        //                }
+        // следим по дескр +кзп
+        foreach (auto otcep, lo) {
+            otcep->update_descr();
+        }
 
-        //            }
-        //        }
-        //        foreach (auto w, lw) {
-        //            // запоминаем пред
-        //            w->_RCS=w->otcep->RCS;
-        //            w->_RCF=w->otcep->RCF;
 
-        //            auto otcep=w->otcep;
-        //            bool s_in_park=(qobject_cast<m_RC_Gor_Park *>(otcep->RCS)!=nullptr);
-        //            bool f_in_park=(qobject_cast<m_RC_Gor_Park *>(otcep->RCF)!=nullptr);
-        //            // за парк отвечает tos_KzpTracking
 
-        //            if (!s_in_park || !f_in_park) {
-        //                otcep->setSTATE_V_KZP(_undefV_);
+        // убираем заброшенные
+        int idrosp=0;
+        if (lo.first()->STATE_ENABLED()){
+            idrosp=lo.first()->STATE_ID_ROSP();
+        }
+        foreach (auto otcep, lo) {
+            if ((!otcep->STATE_ENABLED())||(otcep->STATE_ID_ROSP()!=idrosp)){
+                otcep->setSTATE_ENABLED(false);
+                otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+                otcep->tos->setOtcepSF(nullptr,nullptr,T);
+            }
+        }
 
-        //                if ((otcep->stored_Descr.num==0)||(otcep->stored_Descr.end_slg!=0)){
-        //                    otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
-        //                    w->resetStates();
-        //                    continue;
-        //                }
-        //            }
-        //            if (!s_in_park){
-        //                otcep->setSTATE_LOCATION(m_Otcep::locationOnSpusk);
-        //                otcep->setOtcepSF(otcep->descr_RCS,otcep->RCF);
-        //            }
-        //            if (!f_in_park) {
-        //                otcep->setSTATE_LOCATION(m_Otcep::locationOnSpusk);
-        //                otcep->setOtcepSF(w->otcep->RCS,w->otcep->descr_RCF);
-        //            }
 
-        //            if (w->_RCS!=w->otcep->RCS) {
-        //                if ((w->_RCS) && (w->otcep->RCS) && (w->otcep->RCS==w->_RCS->next_rc[1])) w->otcep->setSTATE_DIRECTION(1); else w->otcep->setSTATE_DIRECTION(0);
-        //                if (w->otcep->STATE_DIRECTION()==0) w->otcep->setSTATE_RCS_XOFFSET(0); else w->otcep->setSTATE_RCS_XOFFSET(w->otcep->RCS->LEN());
-        //                w->dtSTATE_RCS_XOFFSET_C=T;
-        //                w->add_route(_pOtcepStart,w->otcep->RCS,T);
-        //                w->setSTATE_V_RCS(tos_SpeedCalc::calcOtcepV_RC(w,_pOtcepStart));
-        //                w->otcep->setSTATE_V_RC(w->STATE_V_RCS());
-        //            }
-        //            if (w->_RCF!=w->otcep->RCF) {
-        //                if ((w->_RCF) && (w->otcep->RCF) && (w->otcep->RCF==w->_RCF->next_rc[1])) w->otcep->setSTATE_DIRECTION(1); else w->otcep->setSTATE_DIRECTION(0);
-        //                if (w->otcep->STATE_DIRECTION()==0) w->otcep->setSTATE_RCF_XOFFSET(0); else w->otcep->setSTATE_RCF_XOFFSET(w->otcep->RCS->LEN());
-        //                w->dtSTATE_RCF_XOFFSET_C=T;
-        //                w->add_route(_pOtcepEnd,w->otcep->RCF,T);
-        //                w->setSTATE_V_RCF(tos_SpeedCalc::calcOtcepV_RC(w,_pOtcepEnd));
-        //                w->otcep->setSTATE_V_RC(w->STATE_V_RCF());
-        //                calcLenByRc(w->otcep);
-        //            }
-        //        }
+        foreach (auto otcep, lo) {
+            if (!otcep->STATE_ENABLED()) continue;
+            bool s_in_park=(qobject_cast<m_RC_Gor_Park *>(otcep->RCS)!=nullptr);
+            bool f_in_park=(qobject_cast<m_RC_Gor_Park *>(otcep->RCF)!=nullptr);
+            if (!s_in_park) otcep->tos->setOtcepSF(otcep->descr_RCS,otcep->RCF,T);
+            if (!f_in_park) otcep->tos->setOtcepSF(otcep->RCS,otcep->descr_RCF,T);
+            if (f_in_park){
+                if ((otcep->descr_RCF==nullptr) || (otcep->RCF==nullptr)||(otcep->descr_RCF!=otcep->RCF->next_rc[1])){
+                    otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+                    otcep->tos->setOtcepSF(nullptr,nullptr,T);
+                    continue;
+                }
+            }
+            if (s_in_park){
+                if ((otcep->descr_RCS==nullptr) || (otcep->RCS==nullptr)||(otcep->descr_RCS!=otcep->RCS->next_rc[1])){
+                    otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+                    otcep->tos->setOtcepSF(nullptr,nullptr,T);
+                    continue;
+                }
+            }
+            m_Otcep::TOtcepLocation l=m_Otcep::locationUnknow;
+            if (f_in_park) l=m_Otcep::locationOnPark;else
+                if (s_in_park)l=m_Otcep::locationOnSpusk; else
+                    if (otcep->stored_Descr.end_slg==0) {
+                        if ((otcep->RCS!=nullptr)&&(otcep->RCF!=nullptr)) l=m_Otcep::locationOnSpusk;
+                    }
+            otcep->setSTATE_LOCATION(l);
+
+        }
+        // кзп
+        foreach (tos_KzpTracking *kzpt, l_kzpt) {
+            kzpt->work(T);
+        }
+
+
+
+        // финализируем скорость отцепов +V ARS
+        foreach (auto otcep, lo) {
+            if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
+                updateV_RC(otcep,T);
+        }
+        // выставляем параметра отцепа
+        foreach (auto otcep, lo) {
+            if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
+                updateOtcepParams(otcep,T);
+        }
+
     }
-
-
-    // финализируем скорость отцепов +V ARS
-    foreach (auto otcep, lo) {
-        if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
-            updateV_RC(otcep,T);
-    }
-
-
-    // выставляемпараметра отцепа
-    foreach (auto otcep, lo) {
-        if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
-            updateOtcepParams(otcep);
-    }
-
-
-
 }
 
 
@@ -285,26 +306,32 @@ void TrackingOtcepSystem::checkOtcepComplete(m_Otcep *otcep)
     }
 }
 
-void TrackingOtcepSystem::updateOtcepParams(m_Otcep *otcep)
+void TrackingOtcepSystem::updateOtcepParams(m_Otcep *otcep, const QDateTime &T)
 {
     if (mRc2Zam.contains(otcep->RCS)){
         m_Zam *zam=mRc2Zam[otcep->RCS];
-        if ((zam->NTP()==1) &&(otcep->STATE_V_IN_1()==_undefV_)) otcep->setSTATE_V_IN_1(zam->ris()->STATE_V());
-        if ((zam->NTP()==2) &&(otcep->STATE_V_IN_2()==_undefV_)) otcep->setSTATE_V_IN_2(zam->ris()->STATE_V());
-        if ((zam->NTP()==3) &&(otcep->STATE_V_IN_3()==_undefV_)) otcep->setSTATE_V_IN_3(zam->ris()->STATE_V());
+        if ((zam->NTP()==1) &&(otcep->STATE_V_IN_1()==_undefV_)) {otcep->setSTATE_V_IN_1(zam->ris()->STATE_V());}
+        if ((zam->NTP()==2) &&(otcep->STATE_V_IN_2()==_undefV_)) {otcep->setSTATE_V_IN_2(zam->ris()->STATE_V());}
+        if ((zam->NTP()==3) &&(otcep->STATE_V_IN_3()==_undefV_)) {otcep->setSTATE_V_IN_3(zam->ris()->STATE_V());}
     }
     if (mRc2Zam.contains(otcep->RCF)){
         m_Zam *zam=mRc2Zam[otcep->RCF];
-        if ((zam->NTP()==1) &&(otcep->STATE_V_OUT_1()==_undefV_)) otcep->setSTATE_V_OUT_1(zam->ris()->STATE_V());
-        if ((zam->NTP()==2) &&(otcep->STATE_V_OUT_2()==_undefV_)) otcep->setSTATE_V_OUT_2(zam->ris()->STATE_V());
-        if ((zam->NTP()==3) &&(otcep->STATE_V_OUT_3()==_undefV_)) otcep->setSTATE_V_OUT_3(zam->ris()->STATE_V());
+        otcep->tos->out_tp_t=T;
+        otcep->tos->out_tp_rc=otcep->RCF;
+        otcep->tos->out_tp_v=zam->ris()->STATE_V();
+
+
+        if ((zam->NTP()==1) &&(otcep->STATE_V_OUT_1()==_undefV_)) {otcep->setSTATE_V_OUT_1(zam->ris()->STATE_V());}
+        if ((zam->NTP()==2) &&(otcep->STATE_V_OUT_2()==_undefV_)) {otcep->setSTATE_V_OUT_2(zam->ris()->STATE_V());}
+        if ((zam->NTP()==3) &&(otcep->STATE_V_OUT_3()==_undefV_)) {otcep->setSTATE_V_OUT_3(zam->ris()->STATE_V());}
+
     }
     m_RC_Gor*rc=qobject_cast<m_RC_Gor*>(otcep->RCS);
     if ((rc==nullptr)||
-        ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)&&
-         ((otcep->STATE_MAR()<rc->MINWAY())||(otcep->STATE_MAR()>rc->MAXWAY()))
-         )
-        )otcep->setSTATE_ERROR(true); else otcep->setSTATE_ERROR(false);
+            ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)&&
+             ((otcep->STATE_MAR()<rc->MINWAY())||(otcep->STATE_MAR()>rc->MAXWAY()))
+             )
+            )otcep->setSTATE_ERROR(true); else otcep->setSTATE_ERROR(false);
     int marf=0;
     while (rc!=nullptr){
         if (rc->MINWAY()==rc->MAXWAY()){
@@ -315,7 +342,10 @@ void TrackingOtcepSystem::updateOtcepParams(m_Otcep *otcep)
     }
     otcep->setSTATE_MAR_F(marf);
 
-     otcep->tos->calcLenByRc();
+     m_RC_Gor_ZKR *rc_zkr=qobject_cast<m_RC_Gor_ZKR*>(otcep->RCS);
+     if (rc_zkr!=nullptr) otcep->setSTATE_PUT_NADVIG(rc_zkr->PUTNADVIG());
+
+    otcep->tos->calcLenByRc();
 
 }
 void TrackingOtcepSystem::updateV_RC(m_Otcep *otcep, const QDateTime &T)

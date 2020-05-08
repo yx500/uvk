@@ -4,6 +4,8 @@
 #include "trackingotcepsystem.h"
 class m_RIS;
 class m_RC_Gor_Park;
+class DynamicStatistic;
+
 
 class DynamicOtcepSystem : public BaseWorker
 {
@@ -16,12 +18,15 @@ public:
     void calculateXoffset(m_Otcep *otcep, const QDateTime &T, int sf);
     void calculateXoffsetKzp(const QDateTime &T);
     void updateV_ARS(m_Otcep *otcep, const QDateTime &T);
-    void prognoz_KZP(m_Otcep *otcep, const QDateTime &T);
+
+    DynamicStatistic *dynamicStatistic=nullptr;
 
 
 signals:
 
 public slots:
+    void slot_otcep_rcsf_change(m_Otcep *otcep,int sf,m_RC*rcFrom,m_RC*rcTo,QDateTime T,QDateTime Trc);
+
 protected:
     TrackingOtcepSystem *TOS;
     QMap<m_RC*,m_RIS*> mRc2Ris;

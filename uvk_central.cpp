@@ -24,6 +24,7 @@ bool UVK_Central::init(QString fileNameModel)
     qDebug() << "model load:" << QFileInfo(fileNameModel).absoluteFilePath();
 
     TOS=new TrackingOtcepSystem(this,GORKA);
+    TOS->disableBuffers();
 
     GAC=new GtGac(this,TOS);
 

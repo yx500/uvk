@@ -29,8 +29,8 @@ class tos_OtcepData : public BaseObject
     Q_OBJECT
 public:
 
-    MYSTATE(qreal, STATE_V_RCS)
-    MYSTATE(qreal, STATE_V_RCF)
+    MYSTATE(qreal, STATE_V_RCF_IN)
+    MYSTATE(qreal, STATE_V_RCF_OUT)
 
 public:
     explicit tos_OtcepData(TrackingOtcepSystem *parent, m_Otcep *otcep);
@@ -60,6 +60,13 @@ public:
     QDateTime dos_dt_RCF_XOFFSET;
     m_RC*dos_RCS;
     m_RC*dos_RCF;
+    int _stat_kzp_d=0;
+    QDateTime _stat_kzp_t;
+
+    QDateTime out_tp_t;
+    qreal out_tp_v;
+    m_RC* out_tp_rc;
+    qreal rcf_v_pred;
 
     void setOtcepSF(m_RC* rcs, m_RC* rcf, const QDateTime &T);
 
