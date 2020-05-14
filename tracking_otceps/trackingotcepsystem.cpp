@@ -3,6 +3,7 @@
 #include <qdebug.h>
 #include <assert.h>
 #include "baseobjecttools.h"
+#include "mvp_system.h"
 
 #include "tos_speedcalc.h"
 #include "m_otceps.h"
@@ -21,6 +22,9 @@ void TrackingOtcepSystem::disableBuffers()
     foreach (auto *otcep, lo) {
         otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
     }
+    for (int i=0;i<MaxVagon;i++){
+        otceps->chanelVag[i]->static_mode=true;
+    }
 }
 
 QList<BaseWorker *> TrackingOtcepSystem::makeWorkers(ModelGroupGorka *O)
@@ -31,6 +35,7 @@ QList<BaseWorker *> TrackingOtcepSystem::makeWorkers(ModelGroupGorka *O)
     auto lotceps=modelGorka->findChildren<m_Otceps *>();
     if (!lotceps.isEmpty()) {
         otceps=lotceps.first();
+        otceps->disableUpdateStates=true;
         lo=otceps->findChildren<m_Otcep *>();
         foreach (auto *otcep, lo) {
             tos_OtcepData *w=new tos_OtcepData(this,otcep);
@@ -75,6 +80,7 @@ QList<BaseWorker *> TrackingOtcepSystem::makeWorkers(ModelGroupGorka *O)
 
 void TrackingOtcepSystem::resetStates()
 {
+    otceps->resetStates();
     foreach (auto rct, l_rct) {
         rct->resetStates();
     }
@@ -105,6 +111,18 @@ void TrackingOtcepSystem::state2buffer()
     foreach (auto *zkrt, l_zkrt) {
         zkrt->state2buffer();
     }
+    for (int i=0;i<MaxVagon;i++){
+        if (otceps->TYPE_DESCR()==0){
+            otceps->chanelVag[i]->A.resize(sizeof(otceps->vagons[i]));
+            memcpy(otceps->chanelVag[i]->A.data(),&otceps->vagons[i],sizeof(otceps->vagons[i]));
+        }
+        if (otceps->TYPE_DESCR()==1){
+            QVariantHash m=tSlVagon2Map(otceps->vagons[i]);
+            QString S=MVP_System::QVariantHashToQString_str(m);
+            otceps->chanelVag[i]->A=S.toUtf8();
+        }
+    }
+
 }
 
 
@@ -187,7 +205,7 @@ void TrackingOtcepSystem::work(const QDateTime &T)
 
 
         // убираем заброшенные
-        int idrosp=0;
+        quint32 idrosp=0;
         if (lo.first()->STATE_ENABLED()){
             idrosp=lo.first()->STATE_ID_ROSP();
         }

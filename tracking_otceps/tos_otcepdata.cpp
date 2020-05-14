@@ -221,7 +221,7 @@ void tos_OtcepData::state2buffer()
             if (!S.isEmpty()) S=S+";";
             stateName.remove(0,6);
             QVariant V=metaProperty.read(otcep);
-            S=stateName+"="+V.toString();
+            S=S+stateName+"="+V.toString();
         }
         otcep->SIGNAL_DATA().getBuffer()->A=S.toUtf8();
     }

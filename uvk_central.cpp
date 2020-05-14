@@ -141,6 +141,13 @@ void UVK_Central::acceptBuffers()
             }
         }
     }
+    for (int i=0;i<MaxVagon;i++){
+        if (TOS->otceps->chanelVag[i]->static_mode==true)
+        {
+            if (l_buffers.indexOf(TOS->otceps->chanelVag[i])<0)
+                                    l_buffers.push_back(TOS->otceps->chanelVag[i]);
+        }
+    }
 }
 
 void UVK_Central::work()
@@ -156,23 +163,29 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
 {
     // только свои
     if (m["DEST"]!="UVK") return;
+    QString dbgStr="CMD:"+m["CMD"]+" ";
     if (m["CMD"]=="SET_RIGIME"){
         if (m["REGIME"]=="ROSPUSK"){
             setRegim(ModelGroupGorka::regimRospusk);
+            dbgStr+="ROSPUSK accepted";
         }
         if (m["REGIME"]=="PAUSE"){
             setRegim(ModelGroupGorka::regimPausa);
+            dbgStr+="PAUSE accepted";
         }
         if (m["REGIME"]=="STOP"){
             setRegim(ModelGroupGorka::regimStop);
+            dbgStr+="STOP accepted";
         }
     }
     if (m["CMD"]=="SET_ACT_ZKR"){
         if (m["ACT_ZKR"]=="1"){
             setPutNadvig(1);
+            dbgStr+="1 accepted";
         }
         if (m["ACT_ZKR"]=="2"){
             setPutNadvig(2);
+            dbgStr+="2 accepted";
         }
     }
     if (m["CMD"]=="OTCEPS"){
@@ -182,6 +195,7 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
                 TOS->otceps->resetStates();
                 TOS->resetStates();
                 GAC->resetStates();
+                dbgStr+="CLEAR_ALL accepted";
             }
             if (m["ACTIVATE_ALL"]=="1"){
                 if (GORKA->STATE_REGIM()==ModelGroupGorka::regimStop)
@@ -190,6 +204,7 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
                     }
                 TOS->resetStates();
                 GAC->resetStates();
+                dbgStr+="ACTIVATE_ALL accepted";
             }
             if (!m["DEL_OTCEP"].isEmpty()){
                 if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
@@ -199,6 +214,7 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
                             TOS->lo[i]->acceptStaticData(TOS->lo[i+1]);
                         }
                         TOS->lo.last()->resetStates();
+                        dbgStr+="DEL_OTCEP accepted";
                     }
                 }
             }
@@ -210,6 +226,7 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
                             TOS->lo[i]->acceptStaticData(TOS->lo[i-1]);
                         }
                         TOS->lo[N-1]->resetStates();
+                        dbgStr+="INC_OTCEP accepted";
 
                     }
                 }
@@ -219,8 +236,16 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
     }
     if (m["CMD"]=="SET_OTCEP_STATE"){
         setOtcepStates(m);
+        dbgStr+="accepted";
 
     }
+    if (m["CMD"]=="ADD_OTCEP_VAG"){
+        if (addOtcepVag(m))
+            dbgStr+="accepted";
+
+    }
+    sendBuffers();
+    qDebug()<< dbgStr;
 }
 
 void UVK_Central::sendBuffers()
@@ -240,7 +265,10 @@ void UVK_Central::sendBuffers()
         };
     }
     foreach (GtBuffer*B, l_buffers) {
-        if ( B->timeDataRecived.msecsTo(T)>1000){
+        int period=1000;
+        if ((B->getType()==9)|| ((B->getType()==109))) period=10000;
+        if ((B->getType()==15)) period=20000;
+        if ( B->timeDataRecived.msecsTo(T)>period){
             B->timeDataRecived=T;
             udp->sendGtBuffer(B);
         };
@@ -338,6 +366,53 @@ void UVK_Central::setOtcepStates(QMap<QString, QString> &m)
             }
         }
     }
+}
+
+bool UVK_Central::addOtcepVag(QMap<QString, QString> &m)
+{
+    if (!m["N"].isEmpty()){
+        if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk) {
+            qDebug()<<"addOtcepVag: GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk";
+            return false;
+        }
+            int N=m["N"].toInt();
+            if ((N>0)&& (N<TOS->lo.size()-1)){
+                m_Otcep *otcep=TOS->lo[N-1];
+                QVariantHash mv;
+                foreach (QString key, m.keys()) {
+                    mv[key]=m[key];
+                }
+                tSlVagon v=Map2tSlVagon(mv);
+                if (v.Id!=otcep->STATE_ID_ROSP()) {
+                    qDebug()<<"addOtcepVag: v.Id!=otcep->STATE_ID_ROSP()";
+                    return false;
+                }
+                if (v.NO!=otcep->NUM()) {
+                    qDebug()<<"addOtcepVag: v.NO!=otcep->NUM()";
+                    return false;
+                };
+                if ((v.IV<=0)||(v.IV>MaxVagon)) {
+                    qDebug()<<"addOtcepVag: (v.IV<=0)||(v.IV>MaxVagon)";
+                    return false;
+                };
+
+//                if (otcep->vVag.isEmpty()){
+//                    if (v.IV!=1) {
+//                        qDebug()<<"addOtcepVag: v.IV!=1";
+//                        return false;
+//                    };
+//                }else {
+//                    if (otcep->vVag.last().IV+1!=v.IV) {
+//                        qDebug()<<"addOtcepVag: otcep->vVag.last().IV+1!=v.IV";
+//                        return false;
+//                    };
+//                }
+                otcep->vVag.push_back(v);
+                TOS->otceps->vagons[v.IV-1]=v;
+
+            }
+        }
+    return true;
 }
 
 

@@ -45,6 +45,7 @@ protected:
      void setPutNadvig(int p);
      void setRegim(int p);
      void setOtcepStates(QMap<QString, QString> &m);
+     bool addOtcepVag(QMap<QString, QString> &m);
      void state2buffer();
 };
 
