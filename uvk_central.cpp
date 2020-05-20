@@ -1,5 +1,6 @@
 #include "uvk_central.h"
 #include <QFileInfo>
+#include "do_message.hpp"
 
 UVK_Central::UVK_Central(QObject *parent) : QObject(parent)
 {
@@ -8,8 +9,10 @@ UVK_Central::UVK_Central(QObject *parent) : QObject(parent)
 
 bool UVK_Central::init(QString fileNameModel)
 {
+
+
     if (!QFileInfo(fileNameModel).exists()){
-        qDebug() << "file not found " << QFileInfo(fileNameModel).absoluteFilePath();
+        qFatal("file not found %s",QFileInfo(fileNameModel).absoluteFilePath().toStdString().c_str());
         return false;
     }
     udp=new GtBuffers_UDP_D2();
@@ -18,20 +21,33 @@ bool UVK_Central::init(QString fileNameModel)
     QObject *O=MVP.loadObject(fileNameModel);
     GORKA=qobject_cast<ModelGroupGorka *>(O);
     if (!GORKA){
-        err(QString("Нет объекта ModelGroupGorka в %1").arg(fileNameModel));
+        qFatal("class ModelGroupGorka not found");
+        return false;
+    }
+    QList<m_Otceps *> l_otceps=GORKA->findChildren<m_Otceps*>();
+    if (l_otceps.isEmpty()){
+        qFatal("class m_Otceps not found");
         return false;
     }
     qDebug() << "model load:" << QFileInfo(fileNameModel).absoluteFilePath();
 
+    otcepsController=new OtcepsController(this,l_otceps.first());
+    otcepsController->disableBuffers();
     TOS=new TrackingOtcepSystem(this,GORKA);
     TOS->disableBuffers();
 
     GAC=new GtGac(this,TOS);
 
     CMD=new GtCommandInterface(this,udp);
+    CMD->setSRC_ID("UVK");
 
     acceptSignals();
     acceptBuffers();
+
+    GORKA->resetStates();
+    TOS->resetStates();
+    GAC->resetStates();
+    otcepsController->resetStates();
 
 
     return validation();
@@ -41,10 +57,12 @@ bool UVK_Central::init(QString fileNameModel)
 
 void UVK_Central::start()
 {
+    connect(GAC,&GtGac::uvk_command,this,&UVK_Central::gac_command);
+
     connect(CMD,&GtCommandInterface::recv_cmd,this,&UVK_Central::recv_cmd);
     timer=new QTimer(this);
     connect(timer,&QTimer::timeout,this,&UVK_Central::work);
-    timer->start(10);
+    timer->start(100);
     // перебрасываем все каналы на себя
     foreach (GtBuffer *B, udp->allBuffers()) {
         if (!B->static_mode){
@@ -105,8 +123,8 @@ bool UVK_Central::validateBuffers()
                 if (p.isNotUse()) continue;
                 if (p.isEmpty())continue;
                 if (p.isInnerUse()) continue;
-                if (l_buffers.indexOf(p.getBuffer())>=0) {
-                    err(QString("%1->%2 use inner buffer %3").arg(b->objectName())
+                if (l_out_buffers.indexOf(p.getBuffer())>=0) {
+                    err(QString("%1->%2 out buffer use like inner %3").arg(b->objectName())
                         .arg(metaProperty.name())
                         .arg(p.getBuffer()->name));
                     noerr=false;
@@ -132,10 +150,9 @@ void UVK_Central::acceptBuffers()
                 SignalDescription p = val.value<SignalDescription>();
                 if (p.isEmpty())continue;
                 if (p.isInnerUse()) {
-                    if (l_buffers.indexOf(p.getBuffer())<0) {
-                        l_buffers.push_back(p.getBuffer());
+                    if (l_out_buffers.indexOf(p.getBuffer())<0) {
+                        l_out_buffers.push_back(p.getBuffer());
                         p.getBuffer()->static_mode=true;
-                        qDebug()<< "accept inner buffer " <<p.getBuffer()->name;
                     }
                 }
             }
@@ -144,9 +161,16 @@ void UVK_Central::acceptBuffers()
     for (int i=0;i<MaxVagon;i++){
         if (TOS->otceps->chanelVag[i]->static_mode==true)
         {
-            if (l_buffers.indexOf(TOS->otceps->chanelVag[i])<0)
-                                    l_buffers.push_back(TOS->otceps->chanelVag[i]);
+            if (l_out_buffers.indexOf(TOS->otceps->chanelVag[i])<0)
+                l_out_buffers.push_back(TOS->otceps->chanelVag[i]);
         }
+    }
+    foreach (auto b, udp->allBuffers()) {
+        if (!b->static_mode)
+            qDebug()<< "use in buffer " <<b->getType() << b->objectName();
+    }
+    foreach (auto b, l_out_buffers) {
+        qDebug()<< "use out buffer " <<b->getType() << b->objectName();
     }
 }
 
@@ -156,6 +180,7 @@ void UVK_Central::work()
     GORKA->updateStates();
     TOS->work(T);
     GAC->work(T);
+    otcepsController->work(T);
     sendBuffers();
 }
 
@@ -192,87 +217,107 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
 
         if (m["CLEAR_ALL"]=="1"){
             if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
-                TOS->otceps->resetStates();
+                otcepsController->cmd_CLEAR_ALL(m);
                 TOS->resetStates();
-                GAC->resetStates();
+                //                GAC->resetStates();
                 dbgStr+="CLEAR_ALL accepted";
             }
             if (m["ACTIVATE_ALL"]=="1"){
                 if (GORKA->STATE_REGIM()==ModelGroupGorka::regimStop)
-                    foreach (m_Otcep*otcep, TOS->lo) {
-                        if (otcep->STATE_MAR()>0) otcep->setSTATE_ENABLED(true);
-                    }
+                    otcepsController->cmd_ACTIVATE_ALL(m);
                 TOS->resetStates();
-                GAC->resetStates();
+                //                GAC->resetStates();
                 dbgStr+="ACTIVATE_ALL accepted";
             }
             if (!m["DEL_OTCEP"].isEmpty()){
                 if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
-                    int N=m["DEL_OTCEP"].toInt();
-                    if ((N>0)&& (N<TOS->lo.size())){
-                        for (int i=N-1;i<TOS->lo.size()-1;i++){
-                            TOS->lo[i]->acceptStaticData(TOS->lo[i+1]);
-                        }
-                        TOS->lo.last()->resetStates();
-                        dbgStr+="DEL_OTCEP accepted";
-                    }
+                    otcepsController->cmd_DEL_OTCEP(m);
+                    dbgStr+="DEL_OTCEP accepted";
                 }
             }
-            if (!m["INC_OTCEP"].isEmpty()){
-                if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
-                    int N=m["INC_OTCEP"].toInt();
-                    if ((N>0)&& (N<TOS->lo.size()-1)){
-                        for (int i=TOS->lo.size()-1;i>=N-1+1;i--){
-                            TOS->lo[i]->acceptStaticData(TOS->lo[i-1]);
-                        }
-                        TOS->lo[N-1]->resetStates();
-                        dbgStr+="INC_OTCEP accepted";
+        }
+        if (!m["INC_OTCEP"].isEmpty()){
+            if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
+                otcepsController->cmd_INC_OTCEP(m);
 
-                    }
-                }
+                dbgStr+="INC_OTCEP accepted";
+
             }
 
         }
     }
     if (m["CMD"]=="SET_OTCEP_STATE"){
-        setOtcepStates(m);
-        dbgStr+="accepted";
-
+        if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
+            otcepsController->cmd_SET_OTCEP_STATE(m);
+            dbgStr+="accepted";
+        }
     }
     if (m["CMD"]=="ADD_OTCEP_VAG"){
-        if (addOtcepVag(m))
-            dbgStr+="accepted";
-
+        if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk) {
+            if (otcepsController->cmd_ADD_OTCEP_VAG(m))
+                dbgStr+="accepted";
+        }
     }
     sendBuffers();
     qDebug()<< dbgStr;
 }
 
+void UVK_Central::gac_command(const SignalDescription &s, int state)
+{
+    tu_cmd c;
+    c.number=s.chanelOffset();
+    c.on_off=state;
+    do_message(&c).commit();
+    udp->sendData(s.chanelType(),s.chanelName(),QByteArray((const char *)&c,sizeof(c)));
+}
+
+GtBuffer *oldestBuffer(QList<GtBuffer*> &l_buffers){
+    if (l_buffers.isEmpty()) return nullptr;
+    GtBuffer *oldb=l_buffers.first();
+    foreach (GtBuffer *b, l_buffers) {
+        if (!b->timeDataRecived.isValid()) return b;
+        if (b->timeDataRecived>oldb->timeDataRecived) oldb=b;
+    }
+    return oldb;
+}
+
 void UVK_Central::sendBuffers()
 {
     QDateTime T=QDateTime::currentDateTime();
-    foreach (GtBuffer*B, l_buffers) {
+    foreach (GtBuffer*B, l_out_buffers) {
         mB2A[B]=B->A;
     }
     this->state2buffer();
     TOS->state2buffer();
     GAC->state2buffer();
-    foreach (GtBuffer*B, l_buffers) {
+    otcepsController->state2buffer();
+    foreach (GtBuffer*B, l_out_buffers) {
         if (mB2A[B]!=B->A){
             B->timeDataChanged=T;
             B->timeDataRecived=T;
             udp->sendGtBuffer(B);
         };
     }
-    foreach (GtBuffer*B, l_buffers) {
+    foreach (GtBuffer*B, l_out_buffers) {
         int period=1000;
         if ((B->getType()==9)|| ((B->getType()==109))) period=10000;
         if ((B->getType()==15)) period=20000;
         if ( B->timeDataRecived.msecsTo(T)>period){
             B->timeDataRecived=T;
             udp->sendGtBuffer(B);
+
         };
     }
+    GtBuffer*B=oldestBuffer(l_out_buffers);
+    if (B!=nullptr) {
+        if ((!B->timeDataRecived.isValid())||(B->timeDataRecived.msecsTo(T)>20)){
+            udp->sendGtBuffer(B);
+            B->timeDataRecived=T;
+        }
+
+    }
+
+
 
 }
 
@@ -299,7 +344,7 @@ void UVK_Central::setPutNadvig(int p)
 {
 
     foreach (auto zkrt, TOS->l_zkrt) {
-        if (zkrt->rc_zkr->PUTNADVIG()==p){
+        if (zkrt->rc_zkr->PUT_NADVIG()==p){
             zkrt->rc_zkr->setSTATE_ROSPUSK(true);
         } else {
             zkrt->rc_zkr->setSTATE_ROSPUSK(false);
@@ -312,15 +357,23 @@ void UVK_Central::setRegim(int p)
 {
     if (p==ModelGroupGorka::regimStop){
         GORKA->setSTATE_REGIM(ModelGroupGorka::regimStop);
-        TOS->setSTATE_ENABLED(false);
+        // продолжаем следить
+//        foreach (auto otcep, otcepsController->otceps->l_otceps) {
+//            otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+//        }
+        //TOS->setSTATE_ENABLED(false);
+        GAC->resetStates();
         GAC->setSTATE_ENABLED(false);
         return;
     }
     if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk){
         if (p==ModelGroupGorka::regimPausa){
             GORKA->setSTATE_REGIM(ModelGroupGorka::regimPausa);
-            TOS->setSTATE_ENABLED(true);
-            GAC->setSTATE_ENABLED(false);
+            // продолжаем следить и управлять стрелками
+            // выявления нет
+//            TOS->setSTATE_ENABLED(true);
+//            GAC->resetStates();
+//            GAC->setSTATE_ENABLED(false);
         }
     }
     if (GORKA->STATE_REGIM()==ModelGroupGorka::regimPausa){
@@ -343,76 +396,7 @@ void UVK_Central::setRegim(int p)
     }
 }
 
-void UVK_Central::setOtcepStates(QMap<QString, QString> &m)
-{
-    if (!m["N"].isEmpty()){
-        if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
-            int N=m["N"].toInt();
-            if ((N>0)&& (N<TOS->lo.size()-1)){
-                m_Otcep *otcep=TOS->lo[N-1];
-                foreach (QString key, m.keys()) {
-                    if ((key=="CMD") || (key=="N")) continue;
-                    QString stateName="STATE_"+key;
-                    QVariant V;
-                    V=m[key];
 
-                    for (int idx = 0; idx < otcep->metaObject()->propertyCount(); idx++) {
-                        QMetaProperty metaProperty = otcep->metaObject()->property(idx);
-                        if (metaProperty.name()!=stateName) continue;
-                        metaProperty.write(otcep,V);
 
-                    }
-                }
-            }
-        }
-    }
-}
-
-bool UVK_Central::addOtcepVag(QMap<QString, QString> &m)
-{
-    if (!m["N"].isEmpty()){
-        if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk) {
-            qDebug()<<"addOtcepVag: GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk";
-            return false;
-        }
-            int N=m["N"].toInt();
-            if ((N>0)&& (N<TOS->lo.size()-1)){
-                m_Otcep *otcep=TOS->lo[N-1];
-                QVariantHash mv;
-                foreach (QString key, m.keys()) {
-                    mv[key]=m[key];
-                }
-                tSlVagon v=Map2tSlVagon(mv);
-                if (v.Id!=otcep->STATE_ID_ROSP()) {
-                    qDebug()<<"addOtcepVag: v.Id!=otcep->STATE_ID_ROSP()";
-                    return false;
-                }
-                if (v.NO!=otcep->NUM()) {
-                    qDebug()<<"addOtcepVag: v.NO!=otcep->NUM()";
-                    return false;
-                };
-                if ((v.IV<=0)||(v.IV>MaxVagon)) {
-                    qDebug()<<"addOtcepVag: (v.IV<=0)||(v.IV>MaxVagon)";
-                    return false;
-                };
-
-//                if (otcep->vVag.isEmpty()){
-//                    if (v.IV!=1) {
-//                        qDebug()<<"addOtcepVag: v.IV!=1";
-//                        return false;
-//                    };
-//                }else {
-//                    if (otcep->vVag.last().IV+1!=v.IV) {
-//                        qDebug()<<"addOtcepVag: otcep->vVag.last().IV+1!=v.IV";
-//                        return false;
-//                    };
-//                }
-                otcep->vVag.push_back(v);
-                TOS->otceps->vagons[v.IV-1]=v;
-
-            }
-        }
-    return true;
-}
 
 

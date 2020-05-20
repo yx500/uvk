@@ -31,6 +31,8 @@ public:
 
     MYSTATE(qreal, STATE_V_RCF_IN)
     MYSTATE(qreal, STATE_V_RCF_OUT)
+    MYSTATE(qreal, STATE_LEN_BY_RC_MIN)
+    MYSTATE(qreal, STATE_LEN_BY_RC_MAX)
 
 public:
     explicit tos_OtcepData(TrackingOtcepSystem *parent, m_Otcep *otcep);
@@ -40,8 +42,10 @@ public:
 
     m_Otcep *otcep;
 
-
+    void updateOtcepParams(const QDateTime &T);
+    void checkOtcepComplete();
     qreal STATE_V() const;
+    void updateV_RC(const QDateTime &T);
     void calcLenByRc();
 
     void state2buffer();

@@ -31,6 +31,7 @@ include($$PWD/tracking_otceps/tracking_otceps.pri)
 SOURCES += \
         main.cpp \
     gtgac.cpp \
+    otcepscontroller.cpp \
     uvk_central.cpp
 
 # Default rules for deployment.
@@ -42,4 +43,5 @@ HEADERS += \
     Crc32.h \
     do_message.hpp \
     gtgac.h \
+    otcepscontroller.h \
     uvk_central.h

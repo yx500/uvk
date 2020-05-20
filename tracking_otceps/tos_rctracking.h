@@ -3,6 +3,7 @@
 
 #include "baseworker.h"
 #include "m_otcep.h"
+#include <QElapsedTimer>
 
 enum {tos_normal=0,tos_hard=1};
 
@@ -35,6 +36,7 @@ public:
         cmdMoveFinishToFront,
         cmdMoveFinishToFrontCheck,
         cmdMoveFinishToBack,
+        cmdMoveStartFinishToBack,
         cmdMoveFinishToRC0,
         cmdMoveStartFinishToRc1,
         cmdPushStartFinishToRc1,
@@ -124,7 +126,7 @@ public:
     MVP_Enums::TStrelPol pol_zad;
     MVP_Enums::TStrelPol pol_cmd;
     MVP_Enums::TStrelPol pol_mar;
-    QDateTime pol_cmd_time;
+    QElapsedTimer pol_cmd_time;
     QDateTime pol_cmd_w_time;
 
     void state2buffer();

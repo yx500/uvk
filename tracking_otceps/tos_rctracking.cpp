@@ -164,7 +164,7 @@ void tos_RcTracking::workOtcep(int sf,const QDateTime &T,int stepTable)
         // нормальное прохождение хвоста вперед с проверкой дб
         {{s_none , {_xx ,_TxB1 ,_TFB1 ,_tfB1}}  ,
          {s_none , {_xx ,_TxB1 ,_TFB0 ,_tfB1}}, cmdMoveFinishToFrontCheck  },
-        // нормальное прохождение хвоаста вперед
+        // нормальное прохождение хвоста вперед
         {{s_none , {_xx ,_TxB1 ,_TxB1 ,_xx}}  ,
          {s_none , {_xx ,_TxB1 ,_TFB0 ,_xx}}, cmdMoveFinishToFront  }
     };
@@ -183,20 +183,28 @@ void tos_RcTracking::workOtcep(int sf,const QDateTime &T,int stepTable)
         {{s_checking_drebezg ,{_xx ,_xx ,_TSB0 ,_TxB1 }}   ,
          {s_none ,            {_xx ,_xx ,_TSB0 ,_TxB1 }}, cmdMoveStartToBack  },
 
+        //  прохождение головохвоста назад , проверяем дребезг
+        {{s_none , {_xx ,___B0 ,_TSFB0 ,___B1 }} ,
+         {s_none , {_xx ,___B0 ,_TSFB1 ,___B1 }},  cmdCheckDrebezg1onRC3  },
+        {{s_checking_drebezg1OnRC3 ,{_xx ,___B0 ,_TSFB1 ,___B1 }}   ,
+         {s_checking_drebezg1OnRC3 ,{_xx ,___B0 ,_TSFB1 ,___B1 }}, cmdCheckDrebezg1onRC3  },
+        {{s_checking_drebezg1OnRC3 ,{_xx ,___B0 ,_TSFB1 ,___B1 }}   ,
+         {s_none ,                  {_xx ,___B0 ,_TSFB1 ,___B1 }}, cmdMoveStartFinishToBack  },
         //  прохождение хвоста назад , проверяем дребезг
-        {{s_none , {_xx ,_xx ,_TSFB1 ,___B0 }} ,
-         {s_none , {_xx ,_xx ,_TSFB1 ,___B1 }},  cmdCheckDrebezg1onRC3  },
-        {{s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TSFB1 ,___B1 }}   ,
-         {s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TSFB1 ,___B1 }}, cmdCheckDrebezg1onRC3  },
-        {{s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TSFB1 ,___B1 }}   ,
-         {s_none ,                  {_xx ,_xx ,_TSFB1 ,___B1 }}, cmdMoveFinishToBack  },
-        //  прохождение хвоста назад , проверяем дребезг
-        {{s_none , {_xx ,_xx ,_TFB1 ,___B0 }} ,
-         {s_none , {_xx ,_xx ,_TFB1 ,___B1 }},  cmdCheckDrebezg1onRC3  },
-        {{s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TFB1 ,___B1 }}   ,
-         {s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TFB1 ,___B1 }}, cmdCheckDrebezg1onRC3  },
-        {{s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TFB1 ,___B1 }}   ,
-         {s_none ,                  {_xx ,_xx ,_TFB1 ,___B1 }}, cmdMoveFinishToBack  },
+        // убрал- на 99% это локомотив
+//        {{s_none , {_xx ,_xx ,_TSFB1 ,___B0 }} ,
+//         {s_none , {_xx ,_xx ,_TSFB1 ,___B1 }},  cmdCheckDrebezg1onRC3  },
+//        {{s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TSFB1 ,___B1 }}   ,
+//         {s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TSFB1 ,___B1 }}, cmdCheckDrebezg1onRC3  },
+//        {{s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TSFB1 ,___B1 }}   ,
+//         {s_none ,                  {_xx ,_xx ,_TSFB1 ,___B1 }}, cmdMoveFinishToBack  },
+//        //  прохождение хвоста назад , проверяем дребезг
+//        {{s_none , {_xx ,_xx ,_TFB1 ,___B0 }} ,
+//         {s_none , {_xx ,_xx ,_TFB1 ,___B1 }},  cmdCheckDrebezg1onRC3  },
+//        {{s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TFB1 ,___B1 }}   ,
+//         {s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TFB1 ,___B1 }}, cmdCheckDrebezg1onRC3  },
+//        {{s_checking_drebezg1OnRC3 ,{_xx ,_xx ,_TFB1 ,___B1 }}   ,
+//         {s_none ,                  {_xx ,_xx ,_TFB1 ,___B1 }}, cmdMoveFinishToBack  },
 
 
         //  прохождение хвоста назад  без дребезга
@@ -249,7 +257,15 @@ void tos_RcTracking::workOtcep(int sf,const QDateTime &T,int stepTable)
          {s_none , {_xx ,_TMB0 ,_TFB0,_xx }}, cmdResetRCF  },
          //  сброс слежения
         {{s_none , {_xx ,___B0 ,_TSFB1,___B0 }} ,
-         {s_none , {_xx ,___B0 ,_TSFB0,___B0 }}, cmdReset  }
+         {s_none , {_xx ,___B0 ,_TSFB0,___B0 }}, cmdReset  },
+        {{s_none , {_xx ,___B0 ,_TSFB1,_txB1 }} ,
+         {s_none , {_xx ,___B0 ,_TSFB0,_txB1 }}, cmdReset  },
+        {{s_none , {_xx ,_NN ,_TSFB1,___B0 }} ,
+         {s_none , {_xx ,_NN ,_TSFB0,___B0 }}, cmdReset  },
+        {{s_none , {_xx ,_NN ,_TSFB1,_txB1 }} ,
+         {s_none , {_xx ,_NN ,_TSFB0,_txB1 }}, cmdReset  }
+
+
 
     };
 
@@ -292,7 +308,7 @@ void tos_RcTracking::workOtcep(int sf,const QDateTime &T,int stepTable)
     case cmdMoveStartToFront:
         otcep->tos->setOtcepSF(rc_next,otcep->RCF,T);
         otcep->setSTATE_DIRECTION(0);
-        otcep->setSTATE_RCS_XOFFSET(0);
+        otcep->setSTATE_D_RCS_XOFFSET(0);
         otcep->tos->rc_tracking_comleted[sf]=true;
         break;
     case cmdMoveStartToBack:
@@ -328,6 +344,14 @@ void tos_RcTracking::workOtcep(int sf,const QDateTime &T,int stepTable)
         }
     }
         break;
+    case cmdMoveStartFinishToBack:
+    {
+            otcep->tos->setOtcepSF(rc_prev,rc_prev,T);
+            otcep->setSTATE_DIRECTION(1);
+            otcep->tos->rc_tracking_comleted[0]=true;
+            otcep->tos->rc_tracking_comleted[1]=true;
+    }
+        break;
     case cmdMoveStartFinishToRc1:
         otcep->tos->setOtcepSF(rc_next,rc_next,T);
         otcep->setSTATE_DIRECTION(0);
@@ -348,6 +372,7 @@ void tos_RcTracking::workOtcep(int sf,const QDateTime &T,int stepTable)
     {
         // пытаемся сдвинуть отцеп
         // именно толкаем
+        bool pushok=false;
         if (rc_next->rcs->l_otceps.size()==1){
             if (rc_next->next_rc[0]!=nullptr) {
                 m_Otcep *otcep1=rc_next->rcs->l_otceps.last();
@@ -359,8 +384,15 @@ void tos_RcTracking::workOtcep(int sf,const QDateTime &T,int stepTable)
                     otcep->setSTATE_NAGON(1);
                     otcep->tos->rc_tracking_comleted[0]=true;
                     otcep->tos->rc_tracking_comleted[1]=true;
+                    pushok=true;
                 }
             }
+        }
+        if (!pushok){
+            otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+            otcep->tos->setOtcepSF(nullptr,nullptr,T);
+            otcep->tos->rc_tracking_comleted[0]=true;
+            otcep->tos->rc_tracking_comleted[1]=true;
         }
     }
         break;
@@ -397,10 +429,12 @@ void tos_RcTracking::workOtcep(int sf,const QDateTime &T,int stepTable)
         while (_rc!=nullptr)
         {
             z++;
+            m_RC* _rc_prev=_rc->next_rc[1];
             if (z>100) {_rc=otcep->RCS;break;}
-            if (_rc->next_rc[1]==nullptr) break;
-            if (_rc->STATE_BUSY()!=1) break;
-            if ((!_rc->rcs->l_otceps.isEmpty()&&(!_rc->rcs->l_otceps.contains(otcep)))) break;
+            if (_rc_prev==nullptr) break;
+            if (_rc_prev->STATE_BUSY()!=1) break;
+            if ((!_rc_prev->rcs->l_otceps.isEmpty()&&(!_rc_prev->rcs->l_otceps.contains(otcep)))) break;
+            _rc=_rc_prev;
         }
         otcep->tos->setOtcepSF(otcep->RCS,_rc,T);
         otcep->tos->rc_tracking_comleted[1]=true;

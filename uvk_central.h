@@ -3,6 +3,7 @@
 #include <QTimer>
 #include "trackingotcepsystem.h"
 #include "gtgac.h"
+#include "otcepscontroller.h"
 #include "gtcommandinterface.h"
 #include "modelgroupgorka.h"
 #include "gtbuffers_udp_d2.h"
@@ -19,6 +20,7 @@ public:
     ModelGroupGorka *GORKA;
     TrackingOtcepSystem*TOS;
     GtGac *GAC;
+    OtcepsController *otcepsController;
     GtCommandInterface *CMD;
     GtBuffers_UDP_D2 *udp;
     QTimer *timer;
@@ -29,7 +31,7 @@ public:
     void acceptBuffers();
 
 
-    QList<GtBuffer*> l_buffers;
+    QList<GtBuffer*> l_out_buffers;
     QMap<GtBuffer*,QByteArray> mB2A;
     void sendBuffers();
     void acceptSignals();
@@ -41,11 +43,10 @@ signals:
 public slots:
      void work();
      void recv_cmd(QMap<QString,QString> m);
+     void gac_command(const SignalDescription&s,int state);
 protected:
      void setPutNadvig(int p);
      void setRegim(int p);
-     void setOtcepStates(QMap<QString, QString> &m);
-     bool addOtcepVag(QMap<QString, QString> &m);
      void state2buffer();
 };
 

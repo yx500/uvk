@@ -19,11 +19,9 @@ TrackingOtcepSystem::TrackingOtcepSystem(QObject *parent,ModelGroupGorka *modelG
 }
 void TrackingOtcepSystem::disableBuffers()
 {
+    otceps->disableUpdateStates=true;
     foreach (auto *otcep, lo) {
         otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
-    }
-    for (int i=0;i<MaxVagon;i++){
-        otceps->chanelVag[i]->static_mode=true;
     }
 }
 
@@ -73,6 +71,14 @@ QList<BaseWorker *> TrackingOtcepSystem::makeWorkers(ModelGroupGorka *O)
     foreach (auto zam, l_zam) {
         mRc2Zam.insert(zam->rc(),zam);
     }
+    // собираем РИС для текущей скорости
+    foreach (auto rc, l_rc) {
+        foreach (m_Base *m, rc->devices()) {
+            m_RIS *ris=qobject_cast<m_RIS *>(m);
+            if (ris!=nullptr)
+                mRc2Ris.insert(rc,ris);
+        }
+    }
 
     resetStates();
     return l;
@@ -111,17 +117,7 @@ void TrackingOtcepSystem::state2buffer()
     foreach (auto *zkrt, l_zkrt) {
         zkrt->state2buffer();
     }
-    for (int i=0;i<MaxVagon;i++){
-        if (otceps->TYPE_DESCR()==0){
-            otceps->chanelVag[i]->A.resize(sizeof(otceps->vagons[i]));
-            memcpy(otceps->chanelVag[i]->A.data(),&otceps->vagons[i],sizeof(otceps->vagons[i]));
-        }
-        if (otceps->TYPE_DESCR()==1){
-            QVariantHash m=tSlVagon2Map(otceps->vagons[i]);
-            QString S=MVP_System::QVariantHashToQString_str(m);
-            otceps->chanelVag[i]->A=S.toUtf8();
-        }
-    }
+
 
 }
 
@@ -169,25 +165,15 @@ void TrackingOtcepSystem::work(const QDateTime &T)
 
         // проверяем отцепы
         foreach (auto otcep, lo) {
-            checkOtcepComplete(otcep);
+            otcep->tos->checkOtcepComplete();
         }
 
 
 
-        // финализируем скорость отцепов +V ARS
-        foreach (auto otcep, lo) {
-            if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
-                updateV_RC(otcep,T);
-        }
 
-
-        // выставляем параметра отцепа
-        foreach (auto otcep, lo) {
-            if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
-                updateOtcepParams(otcep,T);
-        }
 
     } else {
+        // следим по дескр +кзп
         if ((_regim==ModelGroupGorka::regimStop)&&(modelGorka->STATE_REGIM()==ModelGroupGorka::regimRospusk)){
             foreach (auto otcep, lo) {
                 if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
@@ -197,7 +183,7 @@ void TrackingOtcepSystem::work(const QDateTime &T)
         }
         _regim=modelGorka->STATE_REGIM();
 
-        // следим по дескр +кзп
+
         foreach (auto otcep, lo) {
             otcep->update_descr();
         }
@@ -251,21 +237,21 @@ void TrackingOtcepSystem::work(const QDateTime &T)
         foreach (tos_KzpTracking *kzpt, l_kzpt) {
             kzpt->work(T);
         }
-
-
-
-        // финализируем скорость отцепов +V ARS
-        foreach (auto otcep, lo) {
-            if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
-                updateV_RC(otcep,T);
-        }
-        // выставляем параметра отцепа
-        foreach (auto otcep, lo) {
-            if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
-                updateOtcepParams(otcep,T);
-        }
-
     }
+
+    // финализируем скорость отцепов
+    foreach (auto otcep, lo) {
+        if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
+            otcep->tos->updateV_RC(T);
+    }
+
+
+    // выставляем параметра отцепа
+    foreach (auto otcep, lo) {
+        if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
+            otcep->tos->updateOtcepParams(T);
+    }
+
 }
 
 
@@ -282,123 +268,4 @@ void TrackingOtcepSystem::updateOtcepsOnRc()
     }
 }
 
-void TrackingOtcepSystem::checkOtcepComplete(m_Otcep *otcep)
-{
-    if (otcep->RCS==nullptr){
-        otcep->RCF=nullptr;
-        return;
-    }
-    // проверяем что хвост достижим
-    bool backExists=false;
-    if ((otcep->RCS!=nullptr)&&(otcep->RCF!=nullptr)){
-        m_RC *RC=otcep->RCS;
-        int grafSize=0;
-        while (RC!=nullptr){
-            if (RC==otcep->RCF) {
-                backExists=true;
-                break;
-            }
-            RC=RC->getNextRCpolcfb(1);
-            grafSize++;
-            if (grafSize>80) break;
-        }
-    }
-    if (!backExists){
-        // до последней занятости
-        //otceps->clearOtcep_l_rc(otcep);
-        int grafSize=0;
-        otcep->RCF=otcep->RCS;
-        //otcep->setSTATE_LEN_BY_RC(0);
 
-        m_RC *RC=otcep->RCS->getNextRCpolcfb(1);
-        while ((RC!=nullptr)&&(RC->STATE_BUSY()==MVP_Enums::free)){
-            otcep->RCF=RC;
-            RC=RC->getNextRCpolcfb(1);
-            grafSize++;
-            if (grafSize>80) {
-                otcep->RCF=otcep->RCS;
-                break;
-            }
-        }
-        otcep->setBusyRC();
-    }
-}
-
-void TrackingOtcepSystem::updateOtcepParams(m_Otcep *otcep, const QDateTime &T)
-{
-    if (mRc2Zam.contains(otcep->RCS)){
-        m_Zam *zam=mRc2Zam[otcep->RCS];
-        if ((zam->NTP()==1) &&(otcep->STATE_V_IN_1()==_undefV_)) {otcep->setSTATE_V_IN_1(zam->ris()->STATE_V());}
-        if ((zam->NTP()==2) &&(otcep->STATE_V_IN_2()==_undefV_)) {otcep->setSTATE_V_IN_2(zam->ris()->STATE_V());}
-        if ((zam->NTP()==3) &&(otcep->STATE_V_IN_3()==_undefV_)) {otcep->setSTATE_V_IN_3(zam->ris()->STATE_V());}
-    }
-    if (mRc2Zam.contains(otcep->RCF)){
-        m_Zam *zam=mRc2Zam[otcep->RCF];
-        otcep->tos->out_tp_t=T;
-        otcep->tos->out_tp_rc=otcep->RCF;
-        otcep->tos->out_tp_v=zam->ris()->STATE_V();
-
-
-        if ((zam->NTP()==1) &&(otcep->STATE_V_OUT_1()==_undefV_)) {otcep->setSTATE_V_OUT_1(zam->ris()->STATE_V());}
-        if ((zam->NTP()==2) &&(otcep->STATE_V_OUT_2()==_undefV_)) {otcep->setSTATE_V_OUT_2(zam->ris()->STATE_V());}
-        if ((zam->NTP()==3) &&(otcep->STATE_V_OUT_3()==_undefV_)) {otcep->setSTATE_V_OUT_3(zam->ris()->STATE_V());}
-
-    }
-    m_RC_Gor*rc=qobject_cast<m_RC_Gor*>(otcep->RCS);
-    if ((rc==nullptr)||
-            ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)&&
-             ((otcep->STATE_MAR()<rc->MINWAY())||(otcep->STATE_MAR()>rc->MAXWAY()))
-             )
-            )otcep->setSTATE_ERROR(true); else otcep->setSTATE_ERROR(false);
-    int marf=0;
-    while (rc!=nullptr){
-        if (rc->MINWAY()==rc->MAXWAY()){
-            marf=rc->MINWAY();
-            break;
-        }
-        rc=qobject_cast<m_RC_Gor*>(rc->next_rc[0]);
-    }
-    otcep->setSTATE_MAR_F(marf);
-
-     m_RC_Gor_ZKR *rc_zkr=qobject_cast<m_RC_Gor_ZKR*>(otcep->RCS);
-     if (rc_zkr!=nullptr) otcep->setSTATE_PUT_NADVIG(rc_zkr->PUTNADVIG());
-
-    otcep->tos->calcLenByRc();
-
-}
-void TrackingOtcepSystem::updateV_RC(m_Otcep *otcep, const QDateTime &T)
-{
-    // обнуляем скорость если голова не двигается
-    if ((!otcep->tos->dtRCS.isValid())&&(!otcep->tos->dtRCF.isValid())){
-        otcep->setSTATE_V_RC(_undefV_);
-        return;
-    }
-    qreal Vrcs=otcep->STATE_V_RC();
-    qreal Vrcf=otcep->STATE_V_RC();
-    if ((otcep->RCS==nullptr)||(!otcep->RCS->rcs->useRcTracking)) Vrcs=_undefV_;
-    if ((otcep->RCF==nullptr)||(!otcep->RCF->rcs->useRcTracking)) Vrcf=_undefV_;
-    if ((Vrcs==_undefV_) &&(Vrcf==_undefV_)){
-        otcep->setSTATE_V_RC(_undefV_);
-        return;
-    }
-    if (otcep->tos->dtRCS.isValid()){
-        if ((otcep->RCS)&&(otcep->RCS->next_rc[0]!=nullptr)){
-            qint64 ms=otcep->tos->dtRCS.msecsTo(T);
-            if (ms>=otcep->RCS->LEN()*3600) { // 1km/h
-                Vrcs=0;
-            }
-        }
-
-    }
-    if (otcep->tos->dtRCF.isValid()){
-        if ((otcep->RCF)&&(otcep->RCF->next_rc[1]!=nullptr)){
-            qint64 ms=otcep->tos->dtRCF.msecsTo(T);
-            if (ms>=otcep->RCF->LEN()*3600) { // 1km/h
-                Vrcf=0;
-            }
-        }
-    }
-    if ((Vrcs==0) &&(Vrcf==0)){
-        otcep->setSTATE_V_RC(0);
-    }
-}

@@ -147,7 +147,7 @@ void DynamicStatistic::makeDefault()
     QList<m_RC_Gor_ZKR*> lzkr=TOS->modelGorka->findChildren<m_RC_Gor_ZKR*>();
     m_RC_Gor_ZKR *zkr=lzkr.first();
     for (int m=zkr->MINWAY();m<=zkr->MAXWAY();m++){
-        QList<t_rc_stat_data> ldx=rc_marshrut(zkr->PUTNADVIG(),m);
+        QList<t_rc_stat_data> ldx=rc_marshrut(zkr->PUT_NADVIG(),m);
         for (int ives=0;ives<4;ives++){
             if (ives==0) d.ves=70;
             if (ives==1) d.ves=120;

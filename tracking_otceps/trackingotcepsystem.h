@@ -31,10 +31,6 @@ public:
 
     virtual void resetStates();
     void updateOtcepsOnRc();
-    void checkOtcepComplete(m_Otcep *otcep);
-    void updateOtcepParams(m_Otcep *otcep, const QDateTime &T);
-    void updateV_RC(m_Otcep *otcep, const QDateTime &T);
-
 
 
     QList<m_Otcep *> lo;
@@ -45,17 +41,20 @@ public:
     void disableBuffers();
     int trackingType=0;
 
+    QList<tos_KzpTracking *> l_kzpt;
+
+    QList<tos_RcTracking *> l_rct;
+
+    QMap<m_RC*,m_Zam*> mRc2Zam;
+    QMap<m_RC*,m_RIS*> mRc2Ris;
+
 signals:
     void otcep_rcsf_change(m_Otcep *otcep,int sf,m_RC*rcFrom,m_RC*rcTo,QDateTime T,QDateTime Trc);
 
 public slots:
 protected:
     m_Otcep *topOtcep() const;
-    QList<tos_KzpTracking *> l_kzpt;
 
-    QList<tos_RcTracking *> l_rct;
-
-    QMap<m_RC*,m_Zam*> mRc2Zam;
     int _regim=0;
 
 

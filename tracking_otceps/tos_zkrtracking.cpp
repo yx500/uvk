@@ -25,6 +25,7 @@ tos_ZkrTracking::tos_ZkrTracking(QObject *parent, m_RC_Gor_ZKR *rc_zkr, m_Otceps
     if (!rc_next) qCritical() << objectName() << "Нет РЦ за ЗКР" <<endl ;
     rc_prev=rc_zkr->getNextRC(1,0);
     if (!rc_prev) qCritical() << objectName() << "Нет РЦ перед ЗКР" <<endl ;
+    if (rc_prev->rcs) rc_prev->rcs->useRcTracking=false;
     for (int d=0;d<2;d++)
         for (int j=0;j<2;j++){
             if (qobject_cast<m_DSO_RD_21*>(rc_zkr->dso[d][j])!=nullptr){
@@ -184,13 +185,13 @@ void tos_ZkrTracking::work(const QDateTime &T)
         case _head2front:
             otcep->tos->setOtcepSF(rc_next,rc_zkr,T);
             otcep->setSTATE_DIRECTION(0);
-            otcep->setSTATE_OSY_CNT(osy_count[1]);
+            otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
             otcep->tos->rc_tracking_comleted[0]=true;
             break;
         case _back2front:
             otcep->tos->setOtcepSF(otcep->RCS,rc_next,T);
             otcep->setSTATE_DIRECTION(0);
-            otcep->setSTATE_OSY_CNT(osy_count[1]);
+            otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
             otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
             otcep->setSTATE_ZKR_PROGRESS(false);
             checkNeRascep();
@@ -201,7 +202,7 @@ void tos_ZkrTracking::work(const QDateTime &T)
             otcep->tos->setOtcepSF(otcep->RCS,rc_next,T);
             otcep->setSTATE_DIRECTION(0);
             otcep->tos->rc_tracking_comleted[1]=true;
-            otcep->setSTATE_OSY_CNT(osy_count[1]);
+            otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
             otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
             otcep->setSTATE_ZKR_PROGRESS(false);
             checkNeRascep();
@@ -219,7 +220,7 @@ void tos_ZkrTracking::work(const QDateTime &T)
             prev_otcep->tos->setOtcepSF(prev_otcep->RCS,rc_next->next_rc[0],T);
             otcep->tos->setOtcepSF(rc_next,rc_next,T);
             otcep->setSTATE_DIRECTION(0);
-            otcep->setSTATE_OSY_CNT(osy_count[1]);
+            otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
             otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
             otcep->setSTATE_ZKR_PROGRESS(false);
             checkNeRascep();
@@ -229,12 +230,14 @@ void tos_ZkrTracking::work(const QDateTime &T)
         case _resetOtcepOnZKR:
         {
             // надо проверить что в топе рееально предыдущий
-            auto *arrivingOtcep=otceps->topOtcep();
+            // но по сути это вытяжка и по инстркуции мы его выкидываем
+            /*auto *arrivingOtcep=otceps->topOtcep();
             if ((arrivingOtcep==nullptr) && (otcep->NUM()==arrivingOtcep->NUM()-1)&&
                     (dso_pair.d==1)) {
                 otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
                 otcep->tos->setOtcepSF(nullptr,nullptr,T);
-            } else {
+            } else */
+            {
                 otcep->tos->resetStates();
             }
         }
@@ -287,18 +290,20 @@ void tos_ZkrTracking::checkNeRascep()
     auto *otcep=otceps->topOtcep();
     if (otcep!=nullptr){
         int N=otcep->NUM();
-        if ((N>1)&&(otceps->otcepByNum(N)!=nullptr)){
-            auto *prev_otcep=otceps->otcepByNum(N);
+        if ((N>1)&&(otceps->otcepByNum(N-1)!=nullptr)){
+            auto *prev_otcep=otceps->otcepByNum(N-1);
             if ((prev_otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)&&
                     (prev_otcep->STATE_SL_OSY_CNT()>=4)&& (otcep->STATE_SL_OSY_CNT()>=4) &&
                     (prev_otcep->STATE_ZKR_OSY_CNT()>=prev_otcep->STATE_SL_OSY_CNT()+4) &&
                     (prev_otcep->STATE_ZKR_OSY_CNT()==prev_otcep->STATE_SL_OSY_CNT()+otcep->STATE_SL_OSY_CNT())){
                 rc_zkr->setSTATE_ERROR_NERASCEP(true);
                 otcep->tos->resetStates();
+                return;
             }
         }
 
     }
+    rc_zkr->setSTATE_ERROR_NERASCEP(false);
 }
 
 void tos_ZkrTracking::checkOsyCount(m_Otcep *otcep)

@@ -19,7 +19,7 @@ public:
     void sendCommand(m_Strel_Gor_Y *strel, MVP_Enums::TStrelPol pol_cmd, bool force=false);
     void state2buffer()override;
 signals:
-    void uvk_command(int nmyte,int state);
+    void uvk_command(const SignalDescription &s,int state);
 protected:
     TrackingOtcepSystem *TOS;
     QList<m_Strel_Gor_Y*> l_strel;

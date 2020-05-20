@@ -1,9 +1,8 @@
 #include "gtgac.h"
-#include "do_message.hpp"
+
 GtGac::GtGac(QObject *parent,TrackingOtcepSystem *TOS):BaseWorker(parent)
 {
-    tu_cmd c;
-    do_message(&c).commit();
+
 
     this->TOS=TOS;
     l_strel=TOS->modelGorka->findChildren<m_Strel_Gor_Y*>();
@@ -11,6 +10,8 @@ GtGac::GtGac(QObject *parent,TrackingOtcepSystem *TOS):BaseWorker(parent)
         strel->setSIGNAL_UVK_PRP(strel->SIGNAL_UVK_PRP().innerUse());
         strel->setSIGNAL_UVK_PRM(strel->SIGNAL_UVK_PRM().innerUse());
         strel->setSIGNAL_UVK_PRM(strel->SIGNAL_UVK_AV().innerUse());
+        strel->setTU_PRP(strel->TU_PRP().innerUse());
+        strel->setTU_PRM(strel->TU_PRM().innerUse());
     }
 }
 
@@ -42,8 +43,8 @@ void GtGac::validation(ListObjStr *l) const
         if (strel->MINWAY()==0) l->error(strel,"MINWAY=0");
         if (strel->MAXWAY()==0) l->error(strel,"MAXWAY=0");
 
-        if (strel->TU_PRP()==0) l->error(strel,"TU_PRP=0");else
-            if (strel->TU_PRM()==0) l->error(strel,"TU_PRM=0");else
+        if (strel->TU_PRP().isEmpty()) l->error(strel,"TU_PRP=0");else
+            if (strel->TU_PRM().isEmpty()) l->error(strel,"TU_PRM=0");else
                 if (strel->TU_PRP()==strel->TU_PRM()) l->error(strel,"TU_PRM=TU_PRP");
         if (strel->SIGNAL_PRP().isEmpty()) l->error(strel,"SIGNAL_PRP empty");
         if (strel->SIGNAL_PRM().isEmpty()) l->error(strel,"SIGNAL_PRM empty");
@@ -94,7 +95,30 @@ void GtGac::validation(ListObjStr *l) const
 
 
 
-
+bool isNegabarit(m_Strel_Gor_Y*strel,MVP_Enums::TStrelPol pol)
+{
+    if (pol==MVP_Enums::pol_plus){
+        if (strel->NEGAB_RC_CNT_M()>0){
+            m_RC* rc=strel->getNextRC(0,1);
+            for(int i=0;i<strel->NEGAB_RC_CNT_M();i++){
+                if (rc==nullptr) return false;
+                if (rc->STATE_BUSY()==1) return true;
+                rc=rc->getNextRC(0,0);
+            }
+        }
+    }
+    if (pol==MVP_Enums::pol_minus){
+        if (strel->NEGAB_RC_CNT_P()>0){
+            m_RC* rc=strel->getNextRC(0,0);
+            for(int i=0;i<strel->NEGAB_RC_CNT_P();i++){
+                if (rc==nullptr) return false;
+                if (rc->STATE_BUSY()==1) return true;
+                rc=rc->getNextRC(0,0);
+            }
+        }
+    }
+    return false;
+}
 
 void GtGac::work(const QDateTime &T)
 {
@@ -105,24 +129,48 @@ void GtGac::work(const QDateTime &T)
         // убираем автовозврат
         if (strel->STATE_A()!=1) strel->setSTATE_UVK_AV(false);
     }
-    // определяем нужное для отцепа положение
+    // определяем на стрелках нужное для отцепов положение pol_mar
     foreach (m_Otcep *otcep, TOS->lo) {
         if (!otcep->STATE_ENABLED()) continue;
-        if (otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk) continue;
+        if ((otcep->NUM()==1) && (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib)){
+            // для 1 первого выставляем даж когда он еще не выехал
+        } else {
+            if (otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk) continue;
+            // не выставляем для отцепов которые едут в гору
+            if (otcep->STATE_DIRECTION()!=0) continue;
+        }
         auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
+
         if (rcs==nullptr) continue;
+        // реализован
         if (rcs->MINWAY()==rcs->MAXWAY()) continue;
+        // на случай если хвост вышел из зоны ГАЦ
+        auto rcf=qobject_cast<m_RC_Gor*>(otcep->RCF);
+        if (rcf==nullptr) continue;
+        if (rcf->MINWAY()==rcf->MAXWAY()) continue;
+        // были случаи когда затаскивали отцеп на другую гору
+        auto rc_zkr=qobject_cast<m_RC_Gor_ZKR*>(otcep->RCF);
+        if (rc_zkr!=nullptr){
+            if (rc_zkr->STATE_ROSPUSK()!=1) continue;
+        }
         auto rc=rcs->next_rc[0];
+        int recurs_count=0;
         while(rc!=nullptr){
+            recurs_count++;
+            if (recurs_count>200) break; // защита от бесконечного цикла при сбойном графе
+
             if (rc->STATE_BUSY()) break;
             if (!rc->rcs->l_otceps.isEmpty()) break;
             auto grc=qobject_cast<m_RC_Gor*>(rc);
+            // дальше считаем стрелок нет
+            if (grc->MINWAY()==grc->MAXWAY()) break;
             if (grc->MINWAY()>otcep->STATE_MAR()) break;
             if (grc->MAXWAY()<otcep->STATE_MAR()) break;
             auto strel=qobject_cast<m_Strel_Gor_Y*>(rc);
             if (strel){
-                if (!l_strel.contains(strel)) break;
+                if (!l_strel.contains(strel)) break; // избыточно
                 // только один отцеп решает
+                // но по сути это ситуация когда из 2 точек есть выход на одну рц
                 if (strel->rcs->pol_mar!=MVP_Enums::pol_unknow) break;
                 auto rcplus=qobject_cast<m_RC_Gor*>(strel->getNextRC(0,0));
                 auto rcmnus=qobject_cast<m_RC_Gor*>(strel->getNextRC(0,1));
@@ -138,20 +186,25 @@ void GtGac::work(const QDateTime &T)
                 // до первой необходимости перевода
                 if ((strel->STATE_POL()!=strel->rcs->pol_mar)) break;
             }
+            // так как только до первой стр с неправ положением - то можем брать просто след
+            // а не rcplus/rcmnus
             rc=rc->next_rc[0];
         }
     }
 
     // определяем возможность команды на перевод
     foreach (m_Strel_Gor_Y*strel, l_strel) {
+        if ((TOS->modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk)&&(TOS->modelGorka->STATE_REGIM()!=ModelGroupGorka::regimPausa)) continue;
         if (strel->rcs->pol_mar==MVP_Enums::pol_unknow) continue;
-        if ((strel->STATE_POL()==strel->rcs->pol_mar)) continue;
+        if (strel->STATE_POL()==strel->rcs->pol_mar) continue;
         if (strel->STATE_A()!=1) continue;
         if (strel->rcs->STATE_CHECK_FREE_DB()==1) continue;
         if (strel->STATE_NEGAB_RC()==1) continue;
         if (strel->STATE_UVK_AV()==1) continue;
         if ((strel->get_rtds()!=nullptr)&&(strel->get_rtds()->STATE_SRAB()==1)) continue;
         if ((strel->get_ipd()!=nullptr)&&(strel->get_ipd()->STATE_SRAB()==1)) continue;
+        if (isNegabarit(strel,strel->rcs->pol_mar)) continue;
+
         strel->rcs->pol_zad=strel->rcs->pol_mar;
     }
 
@@ -198,6 +251,7 @@ void GtGac::sendCommand(m_Strel_Gor_Y *strel, MVP_Enums::TStrelPol pol_cmd,bool 
 {
     if ((strel->rcs->pol_cmd!=pol_cmd)||(force)){
         strel->rcs->pol_cmd=pol_cmd;
+        strel->rcs->pol_cmd_time.start();
         if (strel->rcs->pol_cmd==MVP_Enums::pol_plus) {
             emit uvk_command(strel->TU_PRP(),1);
             emit uvk_command(strel->TU_PRM(),0);
@@ -219,11 +273,13 @@ void GtGac::sendCommand(m_Strel_Gor_Y *strel, MVP_Enums::TStrelPol pol_cmd,bool 
         }
     } else {
         // если нет ответа от платы шлем еще
-        if ((strel->STATE_UVK_PRP()!=strel->STATE_PRP())){
-            emit uvk_command(strel->TU_PRP(),strel->STATE_UVK_PRP());
-        }
-        if ((strel->STATE_UVK_PRM()!=strel->STATE_PRM())){
-            emit uvk_command(strel->TU_PRM(),1);
+        if ((strel->rcs->pol_cmd_time.isValid()) && (strel->rcs->pol_cmd_time.elapsed()<500)){
+            if ((strel->STATE_UVK_PRP()!=strel->STATE_PRP())){
+                emit uvk_command(strel->TU_PRP(),strel->STATE_UVK_PRP());
+            }
+            if ((strel->STATE_UVK_PRM()!=strel->STATE_PRM())){
+                emit uvk_command(strel->TU_PRM(),1);
+            }
         }
     }
 }

@@ -5,19 +5,29 @@
 #include <math.h>
 
 
-qreal tos_SpeedCalc::calcV(QDateTime t1, QDateTime t2, qreal len)
+qreal tos_SpeedCalc::calcV(QDateTime t1, QDateTime t2, qreal len_m)
 {
     qint64 ms=t1.msecsTo(t2);
-    if (ms!=0) return 3600.*len/ms;
+    if (ms!=0) return 3600.*len_m/ms;
     return 0;
 }
 
-qreal tos_SpeedCalc::calcV(qint64 ms, qreal len)
+qreal tos_SpeedCalc::calcV(qint64 ms, qreal len_m)
 {
     if (ms==0) return 0;
-    return 3600.*len/ms;
+    return 3600.*len_m/ms;
 }
 
+qint64 tos_SpeedCalc::calcMs(qreal V, qreal len_m)
+{
+    if (V==0) return __INT64_MAX__;
+    return 3600.*len_m/V;
+}
+
+qreal tos_SpeedCalc::vt_len_m(qreal V,qint64 ms)
+{
+    return   V*(1.*ms/3600.);
+}
 
 
 
@@ -41,10 +51,6 @@ qreal tos_SpeedCalc::calcV(qint64 ms, qreal len)
 //    return xx;
 //}
 
-qreal tos_SpeedCalc::vt_len(qreal V,qint64 ms)
-{
-    return   V*(1.*ms/3600.);
-}
 
 
 
