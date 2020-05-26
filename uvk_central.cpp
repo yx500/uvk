@@ -356,7 +356,7 @@ void UVK_Central::setPutNadvig(int p)
 void UVK_Central::setRegim(int p)
 {
     if (p==ModelGroupGorka::regimStop){
-        GORKA->setSTATE_REGIM(ModelGroupGorka::regimStop);
+        GORKA->setSTATE_REGIM(p);
         // продолжаем следить
 //        foreach (auto otcep, otcepsController->otceps->l_otceps) {
 //            otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);

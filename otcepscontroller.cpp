@@ -79,7 +79,7 @@ void OtcepsController::state2buffer()
                 //            stored_Descr.r_mar  ;
                 for (int i=0;i<3;i++){
                 stored_Descr.t_ot[i]=otcep->STATE_OT_RA(0,i); // 0- растарможка 1-4 ступени максимал ступень работы замедлителя
-                stored_Descr.r_a[i]==otcep->STATE_OT_RA(1,i); ; // 0-автомат режим ручного вмешательсва
+                stored_Descr.r_a[i]=otcep->STATE_OT_RA(1,i); ; // 0-автомат режим ручного вмешательсва
                 }
                     stored_Descr.V_in=otcep->STATE_V_IN_1()*10 ; // Cкорость входа 1 ТП
                 //            stored_Descr.Kzp    ; // КЗП по расчету Антона
@@ -106,7 +106,7 @@ void OtcepsController::state2buffer()
                 QMetaProperty metaProperty = otcep->metaObject()->property(idx);
                 QString stateName=metaProperty.name();
                 if (stateName.indexOf("STATE_")!=0) continue;
-                if (stateName.indexOf("STATE_D_")!=0) continue;
+                if (stateName.indexOf("STATE_D_")==0) continue;
                 stateName.remove(0,6);
                 QVariant V=metaProperty.read(otcep);
                 m[stateName]=V;
@@ -184,6 +184,10 @@ bool OtcepsController::cmd_SET_OTCEP_STATE(QMap<QString, QString> &m)
                 for (int idx = 0; idx < otcep->metaObject()->propertyCount(); idx++) {
                     QMetaProperty metaProperty = otcep->metaObject()->property(idx);
                     if (metaProperty.name()!=stateName) continue;
+                    QVariant V1=otcep->property(qPrintable(stateName));
+                    if (V1!=V)
+                            qDebug()<< stateName << V1.toString() << V.toString();
+                    //otcep->setProperty(qPrintable(stateName),V);
                     metaProperty.write(otcep,V);
 
                 }

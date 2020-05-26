@@ -86,7 +86,7 @@ QList<BaseWorker *> TrackingOtcepSystem::makeWorkers(ModelGroupGorka *O)
 
 void TrackingOtcepSystem::resetStates()
 {
-    otceps->resetStates();
+    //otceps->resetStates();
     foreach (auto rct, l_rct) {
         rct->resetStates();
     }

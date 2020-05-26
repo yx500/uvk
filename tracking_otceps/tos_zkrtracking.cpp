@@ -57,7 +57,11 @@ void tos_ZkrTracking::state2buffer()
 void tos_ZkrTracking::resetStates()
 {
     tos_RcTracking::resetStates();
-    rc_zkr->resetStates();
+    //rc_zkr->resetStates();
+    rc_zkr->setSTATE_ERROR_RTDS(false);
+    //rc_zkr->setSTATE_ROSPUSK(false);
+    rc_zkr->setSTATE_ERROR_NERASCEP(false);
+    rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
     for (int d=0;d<2;d++)
         for (int j=0;j<2;j++)
             dsot[d][j]->resetStates();

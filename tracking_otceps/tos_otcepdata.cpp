@@ -19,7 +19,7 @@ void tos_OtcepData::resetStates()
     //otcep->resetStates();
     //снимаем только параметры TOS
     otcep->setSTATE_CHANGE_COUNTER(0);
-    otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+    if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
     otcep->setSTATE_MAR_F(0);
     otcep->setSTATE_DIRECTION(0);
     otcep->setSTATE_NAGON(0);
