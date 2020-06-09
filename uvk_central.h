@@ -27,14 +27,18 @@ public:
     QStringList errLog;
     void err(QString errstr);
     bool validation();
-    bool validateBuffers();
-    void acceptBuffers();
+    bool acceptBuffers();
+    bool cmd_setPutNadvig(int p,QString &acceptStr);
+    bool cmd_setRegim(int p,QString &acceptStr);
 
 
     QList<GtBuffer*> l_out_buffers;
     QMap<GtBuffer*,QByteArray> mB2A;
+    void state2buffer();
+
     void sendBuffers();
-    void acceptSignals();
+
+    virtual QList<SignalDescription> acceptOutputSignals() ;
 
 
 
@@ -45,9 +49,6 @@ public slots:
      void recv_cmd(QMap<QString,QString> m);
      void gac_command(const SignalDescription&s,int state);
 protected:
-     void setPutNadvig(int p);
-     void setRegim(int p);
-     void state2buffer();
 };
 
 #endif // UVK_CENTRAL_H

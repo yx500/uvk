@@ -5,10 +5,17 @@ tos_DsoTracking::tos_DsoTracking(QObject *parent, m_DSO_RD_21 *dso) : BaseWorker
     this->dso=dso;
     setObjectName(dso->objectName());
     dso->disableUpdateStates=true;
-    dso->setSIGNAL_DSODATA(dso->SIGNAL_DSODATA().innerUse());
-
     l_statistic.reserve(16);
 }
+
+QList<SignalDescription> tos_DsoTracking::acceptOutputSignals()
+{
+    dso->setSIGNAL_DSODATA(dso->SIGNAL_DSODATA().innerUse());
+    QList<SignalDescription> l;
+    l << dso->SIGNAL_DSODATA();
+    return l;
+}
+
 void tos_DsoTracking::state2buffer()
 {
     DSO_Data d;
@@ -130,6 +137,8 @@ void tos_DsoTracking::work(const QDateTime &T)
 
 
 }
+
+
 
 
 

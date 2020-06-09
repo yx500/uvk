@@ -53,10 +53,11 @@ public:
 
     explicit tos_ZkrTracking(QObject *parent ,m_RC_Gor_ZKR * rc_zkr,m_Otceps *otceps,ModelGroupGorka *modelGorka);
     virtual ~tos_ZkrTracking(){}
-    virtual void resetStates();
-    virtual void work(const QDateTime &T);
+    void resetStates()override;
+    void work(const QDateTime &T)override;
 
-    void state2buffer();
+    QList<SignalDescription> acceptOutputSignals() override;
+    void state2buffer() override;
 
     m_RC_Gor_ZKR * rc_zkr;
     ModelGroupGorka *modelGorka=nullptr;

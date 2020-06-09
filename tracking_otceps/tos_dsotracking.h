@@ -25,9 +25,10 @@ public:
 
         explicit tos_DsoTracking(QObject *parent,m_DSO_RD_21 *dso);
     virtual ~tos_DsoTracking(){}
-    virtual void resetStates();
-    virtual void work(const QDateTime &T);
-    void state2buffer();
+    void resetStates() override;
+    void work(const QDateTime &T) override;
+    QList<SignalDescription> acceptOutputSignals() override;
+    void state2buffer() override;
     TDSO_statistic getStatistic(qlonglong n);
 
     m_DSO_RD_21 *dso;

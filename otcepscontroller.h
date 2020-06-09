@@ -14,15 +14,16 @@ public:
     void resetStates() override;
     void work(const QDateTime &T) override;
     void validation(ListObjStr *l) const override;
-    void disableBuffers()override;
+    QList<SignalDescription> acceptOutputSignals() override;
+
     void state2buffer()override;
 
-    bool cmd_CLEAR_ALL(QMap<QString, QString> &m);
-    bool cmd_ACTIVATE_ALL(QMap<QString, QString> &m);
-    bool cmd_DEL_OTCEP(QMap<QString, QString> &m);
-    bool cmd_INC_OTCEP(QMap<QString, QString> &m);
-    bool cmd_SET_OTCEP_STATE(QMap<QString, QString> &m);
-    bool cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m);
+    bool cmd_CLEAR_ALL(QString &acceptStr);
+    bool cmd_ACTIVATE_ALL(QString &acceptStr);
+    bool cmd_DEL_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
+    bool cmd_INC_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
+    bool cmd_SET_OTCEP_STATE(QMap<QString, QString> &m,QString &acceptStr);
+    bool cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m,QString &acceptStr);
 signals:
 
 };

@@ -18,6 +18,7 @@ public:
     void validation(ListObjStr *l) const override;
     void sendCommand(m_Strel_Gor_Y *strel, MVP_Enums::TStrelPol pol_cmd, bool force=false);
     void state2buffer()override;
+    QList<SignalDescription> acceptOutputSignals() override;
 signals:
     void uvk_command(const SignalDescription &s,int state);
 protected:

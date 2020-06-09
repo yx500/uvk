@@ -115,6 +115,16 @@ void tos_RcTracking::removeOtcep(m_Otcep *otcep)
     if (otcep->RCF==this->rc) otcep->RCF=nullptr;
 }
 
+QList<SignalDescription> tos_RcTracking::acceptOutputSignals()
+{
+    rc->setSIGNAL_ERR_LS(rc->SIGNAL_ERR_LS().innerUse());
+    rc->setSIGNAL_ERR_LZ(rc->SIGNAL_ERR_LZ().innerUse());
+    rc->setSIGNAL_ERR_KZ(rc->SIGNAL_ERR_KZ().innerUse());
+    QList<SignalDescription> l;
+    l << rc->SIGNAL_ERR_LS()<<rc->SIGNAL_ERR_LZ()<<rc->SIGNAL_ERR_KZ();
+    return l;
+}
+
 void tos_RcTracking::state2buffer()
 {
     rc->SIGNAL_ERR_LS().setValue_1bit(rc->STATE_ERR_LS());
@@ -131,9 +141,7 @@ tos_RcTracking::tos_RcTracking(QObject *parent, m_RC *rc) : BaseWorker(parent)
     rc->rcs=this;
     rc->addTagObject(this);
     useRcTracking=true;
-    rc->setSIGNAL_ERR_LS(rc->SIGNAL_ERR_LS().innerUse());
-    rc->setSIGNAL_ERR_LZ(rc->SIGNAL_ERR_LZ().innerUse());
-    rc->setSIGNAL_ERR_KZ(rc->SIGNAL_ERR_KZ().innerUse());
+
 }
 
 void tos_RcTracking::validation(ListObjStr *l) const

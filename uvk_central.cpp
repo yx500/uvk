@@ -32,17 +32,17 @@ bool UVK_Central::init(QString fileNameModel)
     qDebug() << "model load:" << QFileInfo(fileNameModel).absoluteFilePath();
 
     otcepsController=new OtcepsController(this,l_otceps.first());
-    otcepsController->disableBuffers();
     TOS=new TrackingOtcepSystem(this,GORKA);
-    TOS->disableBuffers();
 
     GAC=new GtGac(this,TOS);
 
     CMD=new GtCommandInterface(this,udp);
     CMD->setSRC_ID("UVK");
 
-    acceptSignals();
-    acceptBuffers();
+    if (!acceptBuffers())
+    {
+        return false;
+    }
 
     GORKA->resetStates();
     TOS->resetStates();
@@ -69,8 +69,10 @@ void UVK_Central::start()
             connect(B,&GtBuffer::bufferChanged,this,&UVK_Central::work);
         }
     }
-    setPutNadvig(1);
-    setRegim(0);
+    QString tmpstr;
+    cmd_setPutNadvig(1,tmpstr);
+    cmd_setRegim(0,tmpstr);
+    sendBuffers();
     qDebug() << "uvk started ";
 }
 
@@ -104,12 +106,82 @@ bool UVK_Central::validation()
         errLog.append(l.toStringList());
         return false;
     }
-    return validateBuffers();
+    return true;
 }
 
-bool UVK_Central::validateBuffers()
+
+
+bool UVK_Central::acceptBuffers()
 {
     bool noerr=true;
+    QList<SignalDescription> l;
+    l+=this->acceptOutputSignals();
+    l+=otcepsController->acceptOutputSignals();
+    l+=TOS->acceptOutputSignals();
+    l+=GAC->acceptOutputSignals();
+
+
+    // закрываем буфера на прием
+    foreach (auto p, l) {
+        if (p.isEmpty())continue;
+        if (l_out_buffers.indexOf(p.getBuffer())<0) {
+            l_out_buffers.push_back(p.getBuffer());
+            p.getBuffer()->static_mode=true;
+        }
+    }
+    for (int i=0;i<l.size();i++){
+        SignalDescription p1=l[i];
+        if (p1.isEmpty()) continue;
+        for (int j=0;j<l.size();j++){
+            if (i==j) continue;
+            SignalDescription p2=l[j];
+
+            if ((p1.chanelType()==p2.chanelType())&&
+                    (p1.chanelName()==p2.chanelName()) &&
+                    (p1.chanelOffset()==p2.chanelOffset()))
+            {
+                err(QString("signal use more than 1 worker %1").arg(p1.toString()));
+                noerr=false;
+            }
+        }
+    }
+
+    //    QList<BaseObject*> lo=GORKA->findChildren<BaseObject*>();
+
+    //    foreach (BaseObject *b, lo) {
+    //        // собираем буфера
+    //        for (int idx = 0; idx < b->metaObject()->propertyCount(); idx++) {
+    //            QMetaProperty metaProperty = b->metaObject()->property(idx);
+    //            int type = metaProperty.userType();
+    //            if (type == qMetaTypeId<SignalDescription>()){
+    //                QVariant val=metaProperty.read(b);
+    //                SignalDescription p = val.value<SignalDescription>();
+    //                if (p.isEmpty())continue;
+    //                if (p.isInnerUse()) {
+    //                    if (l_out_buffers.indexOf(p.getBuffer())<0) {
+    //                        l_out_buffers.push_back(p.getBuffer());
+    //                        p.getBuffer()->static_mode=true;
+    //                    }
+    //                }
+    //            }
+    //        }
+    //    }
+    for (int i=0;i<MaxVagon;i++){
+        if (TOS->otceps->chanelVag[i]->static_mode==true)
+        {
+            if (l_out_buffers.indexOf(TOS->otceps->chanelVag[i])<0)
+                l_out_buffers.push_back(TOS->otceps->chanelVag[i]);
+        }
+    }
+    //    foreach (auto b, udp->allBuffers()) {
+    //        if (!b->static_mode)
+    //            qDebug()<< "use in buffer " <<b->getType() << b->objectName();
+    //    }
+    foreach (auto b, l_out_buffers) {
+        b->sost=GtBuffer::_alive;
+        qDebug()<< "use out buffer " <<b->getType() << b->objectName();
+    }
+
     // проверяем сигналы в буфера на прием
     QList<BaseObject*> lo=GORKA->findChildren<BaseObject*>();
     foreach (BaseObject *b, lo) {
@@ -135,45 +207,6 @@ bool UVK_Central::validateBuffers()
     return noerr;
 }
 
-void UVK_Central::acceptBuffers()
-{
-    // закрываем буфера на прием
-    QList<BaseObject*> lo=GORKA->findChildren<BaseObject*>();
-
-    foreach (BaseObject *b, lo) {
-        // собираем буфера
-        for (int idx = 0; idx < b->metaObject()->propertyCount(); idx++) {
-            QMetaProperty metaProperty = b->metaObject()->property(idx);
-            int type = metaProperty.userType();
-            if (type == qMetaTypeId<SignalDescription>()){
-                QVariant val=metaProperty.read(b);
-                SignalDescription p = val.value<SignalDescription>();
-                if (p.isEmpty())continue;
-                if (p.isInnerUse()) {
-                    if (l_out_buffers.indexOf(p.getBuffer())<0) {
-                        l_out_buffers.push_back(p.getBuffer());
-                        p.getBuffer()->static_mode=true;
-                    }
-                }
-            }
-        }
-    }
-    for (int i=0;i<MaxVagon;i++){
-        if (TOS->otceps->chanelVag[i]->static_mode==true)
-        {
-            if (l_out_buffers.indexOf(TOS->otceps->chanelVag[i])<0)
-                l_out_buffers.push_back(TOS->otceps->chanelVag[i]);
-        }
-    }
-    foreach (auto b, udp->allBuffers()) {
-        if (!b->static_mode)
-            qDebug()<< "use in buffer " <<b->getType() << b->objectName();
-    }
-    foreach (auto b, l_out_buffers) {
-        qDebug()<< "use out buffer " <<b->getType() << b->objectName();
-    }
-}
-
 void UVK_Central::work()
 {
     QDateTime T=QDateTime::currentDateTime();
@@ -188,78 +221,78 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
 {
     // только свои
     if (m["DEST"]!="UVK") return;
-    QString dbgStr="CMD:"+m["CMD"]+" ";
+    QString acceptStr="";
+    qDebug()<< "CMD:"<< m["CMD"]+" ";
     if (m["CMD"]=="SET_RIGIME"){
         if (m["REGIME"]=="ROSPUSK"){
-            setRegim(ModelGroupGorka::regimRospusk);
-            dbgStr+="ROSPUSK accepted";
+            if (cmd_setRegim(ModelGroupGorka::regimRospusk,acceptStr))
+                CMD->accept_cmd(m,1,acceptStr); else
+                CMD->accept_cmd(m,-1,acceptStr);
         }
         if (m["REGIME"]=="PAUSE"){
-            setRegim(ModelGroupGorka::regimPausa);
-            dbgStr+="PAUSE accepted";
+            if (cmd_setRegim(ModelGroupGorka::regimPausa,acceptStr))
+                CMD->accept_cmd(m,1,acceptStr); else
+                CMD->accept_cmd(m,-1,acceptStr);
         }
         if (m["REGIME"]=="STOP"){
-            setRegim(ModelGroupGorka::regimStop);
-            dbgStr+="STOP accepted";
+            if (cmd_setRegim(ModelGroupGorka::regimStop,acceptStr))
+                CMD->accept_cmd(m,1,acceptStr); else
+                CMD->accept_cmd(m,-1,acceptStr);
         }
     }
     if (m["CMD"]=="SET_ACT_ZKR"){
-        if (m["ACT_ZKR"]=="1"){
-            setPutNadvig(1);
-            dbgStr+="1 accepted";
-        }
-        if (m["ACT_ZKR"]=="2"){
-            setPutNadvig(2);
-            dbgStr+="2 accepted";
-        }
+        if (cmd_setPutNadvig(m["ACT_ZKR"].toInt(),acceptStr))
+            CMD->accept_cmd(m,1,acceptStr); else
+            CMD->accept_cmd(m,-1,acceptStr);
     }
     if (m["CMD"]=="OTCEPS"){
 
         if (m["CLEAR_ALL"]=="1"){
             if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
-                otcepsController->cmd_CLEAR_ALL(m);
+                otcepsController->cmd_CLEAR_ALL(acceptStr);
                 TOS->resetStates();
+                CMD->accept_cmd(m,1,acceptStr);
                 //                GAC->resetStates();
-                dbgStr+="CLEAR_ALL accepted";
+            } else {
+                CMD->accept_cmd(m,-1,"Команда на очистку списка в режиме РОСПУСК.");
             }
-            if (m["ACTIVATE_ALL"]=="1"){
-                if (GORKA->STATE_REGIM()==ModelGroupGorka::regimStop)
-                    otcepsController->cmd_ACTIVATE_ALL(m);
-                TOS->resetStates();
-                //                GAC->resetStates();
-                dbgStr+="ACTIVATE_ALL accepted";
-            }
-            if (!m["DEL_OTCEP"].isEmpty()){
-                if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
-                    otcepsController->cmd_DEL_OTCEP(m);
-                    dbgStr+="DEL_OTCEP accepted";
-                }
+        }
+        if (m["ACTIVATE_ALL"]=="1"){
+            if (GORKA->STATE_REGIM()==ModelGroupGorka::regimStop)
+                otcepsController->cmd_ACTIVATE_ALL(acceptStr);
+            TOS->resetStates();
+            CMD->accept_cmd(m,1,acceptStr);
+            //                GAC->resetStates();
+        }
+        if (!m["DEL_OTCEP"].isEmpty()){
+            if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
+                if (otcepsController->cmd_DEL_OTCEP(m,acceptStr))
+                    CMD->accept_cmd(m,1,acceptStr); else
+                    CMD->accept_cmd(m,-1,acceptStr);
             }
         }
         if (!m["INC_OTCEP"].isEmpty()){
             if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
-                otcepsController->cmd_INC_OTCEP(m);
-
-                dbgStr+="INC_OTCEP accepted";
-
+                if (otcepsController->cmd_INC_OTCEP(m,acceptStr))
+                    CMD->accept_cmd(m,1,acceptStr); else
+                    CMD->accept_cmd(m,-1,acceptStr);
             }
-
         }
     }
     if (m["CMD"]=="SET_OTCEP_STATE"){
         if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
-            otcepsController->cmd_SET_OTCEP_STATE(m);
-            dbgStr+="accepted";
+            if (otcepsController->cmd_SET_OTCEP_STATE(m,acceptStr))
+                CMD->accept_cmd(m,1,acceptStr); else
+                CMD->accept_cmd(m,-1,acceptStr);
         }
     }
     if (m["CMD"]=="ADD_OTCEP_VAG"){
-        if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk) {
-            if (otcepsController->cmd_ADD_OTCEP_VAG(m))
-                dbgStr+="accepted";
-        }
+        if (otcepsController->cmd_ADD_OTCEP_VAG(m,acceptStr))
+            CMD->accept_cmd(m,1,acceptStr); else
+            CMD->accept_cmd(m,-1,acceptStr);
     }
     sendBuffers();
-    qDebug()<< dbgStr;
+    qDebug()<< acceptStr;
 }
 
 void UVK_Central::gac_command(const SignalDescription &s, int state)
@@ -270,6 +303,7 @@ void UVK_Central::gac_command(const SignalDescription &s, int state)
     do_message(&c).commit();
     udp->sendData(s.chanelType(),s.chanelName(),QByteArray((const char *)&c,sizeof(c)));
 }
+
 
 GtBuffer *oldestBuffer(QList<GtBuffer*> &l_buffers){
     if (l_buffers.isEmpty()) return nullptr;
@@ -284,13 +318,13 @@ GtBuffer *oldestBuffer(QList<GtBuffer*> &l_buffers){
 void UVK_Central::sendBuffers()
 {
     QDateTime T=QDateTime::currentDateTime();
+    // сохранили старое значение
     foreach (GtBuffer*B, l_out_buffers) {
         mB2A[B]=B->A;
     }
-    this->state2buffer();
-    TOS->state2buffer();
-    GAC->state2buffer();
-    otcepsController->state2buffer();
+    // записали новое
+    state2buffer();
+
     foreach (GtBuffer*B, l_out_buffers) {
         if (mB2A[B]!=B->A){
             B->timeDataChanged=T;
@@ -317,16 +351,19 @@ void UVK_Central::sendBuffers()
 
     }
 
-
-
 }
 
-void UVK_Central::acceptSignals()
+QList<SignalDescription> UVK_Central::acceptOutputSignals()
 {
     GORKA->setSIGNAL_ROSPUSK(GORKA->SIGNAL_ROSPUSK().innerUse());
     GORKA->setSIGNAL_PAUSA(GORKA->SIGNAL_PAUSA().innerUse());
     GORKA->setSIGNAL_STOP(GORKA->SIGNAL_STOP().innerUse());
+    QList<SignalDescription> l;
+    l << GORKA->SIGNAL_ROSPUSK() << GORKA->SIGNAL_PAUSA() << GORKA->SIGNAL_STOP();
+    return l;
 }
+
+
 void UVK_Central::state2buffer()
 {
     GORKA->SIGNAL_ROSPUSK().setValue_1bit(0);
@@ -337,63 +374,101 @@ void UVK_Central::state2buffer()
     case ModelGroupGorka::regimPausa: GORKA->SIGNAL_PAUSA().setValue_1bit(1); break;
     case ModelGroupGorka::regimStop: GORKA->SIGNAL_STOP().setValue_1bit(1); break;
     }
-
+    TOS->state2buffer();
+    GAC->state2buffer();
+    otcepsController->state2buffer();
 
 }
-void UVK_Central::setPutNadvig(int p)
+bool UVK_Central::cmd_setPutNadvig(int p,QString &acceptStr)
 {
-
+    bool ex=false;
     foreach (auto zkrt, TOS->l_zkrt) {
         if (zkrt->rc_zkr->PUT_NADVIG()==p){
             zkrt->rc_zkr->setSTATE_ROSPUSK(true);
+            ex=true;
         } else {
             zkrt->rc_zkr->setSTATE_ROSPUSK(false);
         }
-
     }
+    if (ex) {
+        acceptStr=QString("Путь надвига %1.").arg(p);
+        return true;
+    }
+    acceptStr=QString("Путь надвига %1. не установлен").arg(p);
+    return false;
 }
 
-void UVK_Central::setRegim(int p)
+bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
 {
-    if (p==ModelGroupGorka::regimStop){
+    switch (GORKA->STATE_REGIM()) {
+    case ModelGroupGorka::regimUnknow:
         GORKA->setSTATE_REGIM(p);
-        // продолжаем следить
-//        foreach (auto otcep, otcepsController->otceps->l_otceps) {
-//            otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
-//        }
-        //TOS->setSTATE_ENABLED(false);
-        GAC->resetStates();
-        GAC->setSTATE_ENABLED(false);
-        return;
-    }
-    if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk){
-        if (p==ModelGroupGorka::regimPausa){
-            GORKA->setSTATE_REGIM(ModelGroupGorka::regimPausa);
-            // продолжаем следить и управлять стрелками
+        acceptStr=QString("Режим %1 установлен.").arg(p);
+        return true;
+    case ModelGroupGorka::regimRospusk:
+    {
+        switch (p) {
+        case ModelGroupGorka::regimRospusk:
+            acceptStr=QString("Режим РОСПУСК уже установлен.");
+            return true;
+        case ModelGroupGorka::regimPausa:
             // выявления нет
-//            TOS->setSTATE_ENABLED(true);
-//            GAC->resetStates();
-//            GAC->setSTATE_ENABLED(false);
+            acceptStr=QString("Режим ПАУЗА установлен.");
+            GORKA->setSTATE_REGIM(p);
+            return true;
+        case ModelGroupGorka::regimStop:
+            // продолжаем следить
+            // стрелк не переводим
+            acceptStr=QString("Режим КОНЕЦ РОСПУСКА установлен.");
+            GORKA->setSTATE_REGIM(p);
+            GAC->resetStates();
+            GAC->setSTATE_ENABLED(false);
+            return true;
         }
-    }
-    if (GORKA->STATE_REGIM()==ModelGroupGorka::regimPausa){
-        if (p==ModelGroupGorka::regimRospusk){
-            GORKA->setSTATE_REGIM(ModelGroupGorka::regimRospusk);
-            TOS->setSTATE_ENABLED(true);
-            GAC->setSTATE_ENABLED(true);
+    } break;
+    case ModelGroupGorka::regimPausa:
+    {
+        switch (p) {
+        case ModelGroupGorka::regimRospusk:
+            acceptStr=QString("Режим РОСПУСК установлен.");
+            GORKA->setSTATE_REGIM(p);
+            return true;
+        case ModelGroupGorka::regimPausa:
+            acceptStr=QString("Режим ПАУЗА уже установлен.");
+            return true;
+        case ModelGroupGorka::regimStop:
+            acceptStr=QString("Режим КОНЕЦ РОСПУСКА установлен.");
+            GORKA->setSTATE_REGIM(p);
+            GAC->resetStates();
+            GAC->setSTATE_ENABLED(false);
+            return true;
         }
-
-    }
-    if (GORKA->STATE_REGIM()==ModelGroupGorka::regimStop){
-        if (p==ModelGroupGorka::regimRospusk){
-            GORKA->setSTATE_REGIM(ModelGroupGorka::regimRospusk);
+    } break;
+    case ModelGroupGorka::regimStop:
+    {
+        switch (p) {
+        case ModelGroupGorka::regimRospusk:
+            acceptStr=QString("Режим РОСПУСК установлен.");
             TOS->resetStates();
             GAC->resetStates();
             TOS->setSTATE_ENABLED(true);
             GAC->setSTATE_ENABLED(true);
+            GORKA->setSTATE_REGIM(p);
+            return true;
+        case ModelGroupGorka::regimPausa:
+            acceptStr="Нет перехода режим СТОП -> ПАУЗА";
+            return false;
+        case ModelGroupGorka::regimStop:
+            acceptStr=QString("Режим КОНЕЦ РОСПУСКА установлен.");
+            GORKA->setSTATE_REGIM(p);
+            GAC->resetStates();
+            GAC->setSTATE_ENABLED(false);
+            return true;
         }
-
+    } break;
     }
+    acceptStr=QString("Режим %1 не установлен.").arg(p);
+    return false;
 }
 
 

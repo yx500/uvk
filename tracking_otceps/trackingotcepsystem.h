@@ -27,9 +27,9 @@ public:
     Q_INVOKABLE TrackingOtcepSystem(QObject *parent,ModelGroupGorka *modelGorka,int trackingType=0);
     virtual ~TrackingOtcepSystem(){}
     virtual QList<BaseWorker *> makeWorkers(ModelGroupGorka *O);
-    virtual void work(const QDateTime &T);
+    void work(const QDateTime &T)override;
 
-    virtual void resetStates();
+    void resetStates()override;
     void updateOtcepsOnRc();
 
 
@@ -37,8 +37,8 @@ public:
     m_Otceps *otceps;
     ModelGroupGorka *modelGorka=nullptr;
     QList<tos_ZkrTracking *> l_zkrt;
-    void state2buffer();
-    void disableBuffers();
+    QList<SignalDescription> acceptOutputSignals() override;
+    void state2buffer() override;
     int trackingType=0;
 
     QList<tos_KzpTracking *> l_kzpt;

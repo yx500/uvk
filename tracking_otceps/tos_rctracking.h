@@ -128,8 +128,8 @@ public:
     MVP_Enums::TStrelPol pol_mar;
     QElapsedTimer pol_cmd_time;
     QDateTime pol_cmd_w_time;
-
-    void state2buffer();
+    QList<SignalDescription> acceptOutputSignals() override;
+    void state2buffer() override;
 
 
 signals:

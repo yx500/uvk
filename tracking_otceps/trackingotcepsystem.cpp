@@ -17,13 +17,7 @@ TrackingOtcepSystem::TrackingOtcepSystem(QObject *parent,ModelGroupGorka *modelG
     this->trackingType=trackingType;
     makeWorkers(modelGorka);
 }
-void TrackingOtcepSystem::disableBuffers()
-{
-    otceps->disableUpdateStates=true;
-    foreach (auto *otcep, lo) {
-        otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
-    }
-}
+
 
 QList<BaseWorker *> TrackingOtcepSystem::makeWorkers(ModelGroupGorka *O)
 {
@@ -102,23 +96,23 @@ void TrackingOtcepSystem::resetStates()
 
 
 }
-
+QList<SignalDescription> TrackingOtcepSystem::acceptOutputSignals()
+{
+    // а мы ничего не посылаем для этого есть OtcepsController
+    QList<SignalDescription> l;
+    foreach (auto rct, l_rct) {
+        l+=rct->acceptOutputSignals();
+    }
+    return l;
+}
 void TrackingOtcepSystem::state2buffer()
 {
     foreach (auto rct, l_rct) {
         rct->state2buffer();
     }
-    foreach (auto otcep, lo) {
-        otcep->tos->state2buffer();
-    }
-    foreach (auto *kzpt, l_kzpt) {
-        kzpt->state2buffer();
-    }
-    foreach (auto *zkrt, l_zkrt) {
-        zkrt->state2buffer();
-    }
-
-
+//    foreach (auto otcep, lo) {
+//        otcep->tos->state2buffer();
+//    }
 }
 
 
@@ -267,5 +261,7 @@ void TrackingOtcepSystem::updateOtcepsOnRc()
         }
     }
 }
+
+
 
 

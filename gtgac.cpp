@@ -6,13 +6,22 @@ GtGac::GtGac(QObject *parent,TrackingOtcepSystem *TOS):BaseWorker(parent)
 
     this->TOS=TOS;
     l_strel=TOS->modelGorka->findChildren<m_Strel_Gor_Y*>();
+
+}
+
+QList<SignalDescription> GtGac::acceptOutputSignals()
+{
+    QList<SignalDescription> l;
     foreach (m_Strel_Gor_Y*strel, l_strel) {
         strel->setSIGNAL_UVK_PRP(strel->SIGNAL_UVK_PRP().innerUse());
         strel->setSIGNAL_UVK_PRM(strel->SIGNAL_UVK_PRM().innerUse());
         strel->setSIGNAL_UVK_PRM(strel->SIGNAL_UVK_AV().innerUse());
         strel->setTU_PRP(strel->TU_PRP().innerUse());
         strel->setTU_PRM(strel->TU_PRM().innerUse());
+        l << strel->SIGNAL_UVK_PRP() << strel->SIGNAL_UVK_PRM() << strel->SIGNAL_UVK_AV();
     }
+    return l;
+
 }
 
 void GtGac::resetStates()
@@ -292,3 +301,4 @@ void GtGac::state2buffer()
         strel->SIGNAL_UVK_AV().setValue_1bit(strel->STATE_UVK_AV());
     }
 }
+

@@ -37,10 +37,19 @@ tos_ZkrTracking::tos_ZkrTracking(QObject *parent, m_RC_Gor_ZKR *rc_zkr, m_Otceps
             }
 
         }
+}
+QList<SignalDescription> tos_ZkrTracking::acceptOutputSignals()
+{
     rc_zkr->setSIGNAL_ROSPUSK(rc_zkr->SIGNAL_ROSPUSK().innerUse());
     rc_zkr->setSIGNAL_STATE_ERROR_RTDS(rc_zkr->SIGNAL_STATE_ERROR_RTDS().innerUse());
     rc_zkr->setSIGNAL_STATE_ERROR_NERASCEP(rc_zkr->SIGNAL_STATE_ERROR_NERASCEP().innerUse());
     rc_zkr->setSIGNAL_STATE_ERROR_OSYCOUNT(rc_zkr->SIGNAL_STATE_ERROR_OSYCOUNT().innerUse());
+    QList<SignalDescription> l;
+    l<< rc_zkr->SIGNAL_ROSPUSK() <<
+        rc_zkr->SIGNAL_STATE_ERROR_RTDS() <<
+        rc_zkr->SIGNAL_STATE_ERROR_NERASCEP() <<
+        rc_zkr->SIGNAL_STATE_ERROR_OSYCOUNT();
+    return l;
 }
 void tos_ZkrTracking::state2buffer()
 {
@@ -266,6 +275,8 @@ void tos_ZkrTracking::work(const QDateTime &T)
 
 
 }
+
+
 
 void tos_ZkrTracking::newOtcep(const QDateTime &T)
 {
