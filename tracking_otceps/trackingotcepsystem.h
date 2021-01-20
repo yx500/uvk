@@ -18,6 +18,11 @@ class tos_KzpTracking;
 class tos_SpeedCalc;
 class m_Zam;
 
+class IGetNewOtcep
+{
+    public:
+    virtual int getNewOtcep(m_RC*rc)=0;
+};
 
 class TrackingOtcepSystem : public BaseWorker
 {
@@ -26,36 +31,50 @@ class TrackingOtcepSystem : public BaseWorker
 public:
     Q_INVOKABLE TrackingOtcepSystem(QObject *parent,ModelGroupGorka *modelGorka,int trackingType=0);
     virtual ~TrackingOtcepSystem(){}
+
+    void setIGetNewOtcep(IGetNewOtcep *i){iGetNewOtcep=i;}
+    tos_OtcepData *getNewOtcep(tos_Rc *trc);
+
     virtual QList<BaseWorker *> makeWorkers(ModelGroupGorka *O);
-    void work(const QDateTime &T)override;
-
-    void resetStates()override;
-    void updateOtcepsOnRc();
-
-
-    QList<m_Otcep *> lo;
-    m_Otceps *otceps;
-    ModelGroupGorka *modelGorka=nullptr;
-    QList<tos_ZkrTracking *> l_zkrt;
     QList<SignalDescription> acceptOutputSignals() override;
     void state2buffer() override;
+    void work(const QDateTime &T)override;
+    void resetStates()override;
+
+
+    void updateOtcepsOnRc(const QDateTime &T);
+    void updateOtcepParams(tos_OtcepData *o, const QDateTime &T);
+    void resetTracking(int num);
+    void resetTracking();
+
+
+
+    ModelGroupGorka *modelGorka=nullptr;
     int trackingType=0;
 
-    QList<tos_KzpTracking *> l_kzpt;
+    QList<tos_OtcepData *> lo;
+    QList<tos_Rc *> l_tos_Rc;
 
+    QList<tos_ZkrTracking *> l_zkrt;
+    QList<tos_KzpTracking *> l_kzpt;
     QList<tos_RcTracking *> l_rct;
 
     QMap<m_RC*,m_Zam*> mRc2Zam;
     QMap<m_RC*,m_RIS*> mRc2Ris;
+    QMap<m_RC*,tos_Rc*> mRc2TRC;
+    QMap<int,tos_OtcepData*> mNUM2OD;
 
 signals:
-    void otcep_rcsf_change(m_Otcep *otcep,int sf,m_RC*rcFrom,m_RC*rcTo,QDateTime T,QDateTime Trc);
+    //void otcep_rcsf_changed(int num, int sf, tos_Rc *rcTo, int d,QDateTime T, bool bnorm);
 
 public slots:
 protected:
-    m_Otcep *topOtcep() const;
+    IGetNewOtcep *iGetNewOtcep;
 
     int _regim=0;
+    void checkOtcepComplete();
+    void checkOtcepSplit();
+
 
 
 

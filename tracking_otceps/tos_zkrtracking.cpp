@@ -4,6 +4,7 @@
 #include "m_otceps.h"
 #include "modelgroupgorka.h"
 #include "tos_otcepdata.h"
+#include "trackingotcepsystem.h"
 
 /*
  * задачи
@@ -15,17 +16,14 @@
  * */
 
 
-tos_ZkrTracking::tos_ZkrTracking(QObject *parent, m_RC_Gor_ZKR *rc_zkr, m_Otceps *otceps,ModelGroupGorka *modelGorka=nullptr) : tos_RcTracking(parent,rc_zkr)
+tos_ZkrTracking::tos_ZkrTracking(TrackingOtcepSystem *parent, tos_Rc *rc) : tos_RcTracking(parent,rc)
 {
-    this->rc_zkr=rc_zkr;
-    this->otceps=otceps;
-    this->modelGorka=modelGorka;
-    useRcTracking=false;
-    rc_next=rc_zkr->getNextRC(0,0);
+    this->rc_zkr=qobject_cast<m_RC_Gor_ZKR *>(rc->rc);
+    //useRcTracking=false;
+    auto rc_next=rc_zkr->getNextRC(0,0);
     if (!rc_next) qCritical() << objectName() << "Нет РЦ за ЗКР" <<endl ;
-    rc_prev=rc_zkr->getNextRC(1,0);
+    auto rc_prev=rc_zkr->getNextRC(1,0);
     if (!rc_prev) qCritical() << objectName() << "Нет РЦ перед ЗКР" <<endl ;
-    if (rc_prev->rcs) rc_prev->rcs->useRcTracking=false;
     for (int d=0;d<2;d++)
         for (int j=0;j<2;j++){
             if (qobject_cast<m_DSO_RD_21*>(rc_zkr->dso[d][j])!=nullptr){
@@ -40,13 +38,11 @@ tos_ZkrTracking::tos_ZkrTracking(QObject *parent, m_RC_Gor_ZKR *rc_zkr, m_Otceps
 }
 QList<SignalDescription> tos_ZkrTracking::acceptOutputSignals()
 {
-    rc_zkr->setSIGNAL_ROSPUSK(rc_zkr->SIGNAL_ROSPUSK().innerUse());
     rc_zkr->setSIGNAL_STATE_ERROR_RTDS(rc_zkr->SIGNAL_STATE_ERROR_RTDS().innerUse());
     rc_zkr->setSIGNAL_STATE_ERROR_NERASCEP(rc_zkr->SIGNAL_STATE_ERROR_NERASCEP().innerUse());
     rc_zkr->setSIGNAL_STATE_ERROR_OSYCOUNT(rc_zkr->SIGNAL_STATE_ERROR_OSYCOUNT().innerUse());
     QList<SignalDescription> l;
-    l<< rc_zkr->SIGNAL_ROSPUSK() <<
-        rc_zkr->SIGNAL_STATE_ERROR_RTDS() <<
+    l<< rc_zkr->SIGNAL_STATE_ERROR_RTDS() <<
         rc_zkr->SIGNAL_STATE_ERROR_NERASCEP() <<
         rc_zkr->SIGNAL_STATE_ERROR_OSYCOUNT();
     return l;
@@ -57,7 +53,6 @@ void tos_ZkrTracking::state2buffer()
         for (int j=0;j<2;j++){
             dsot[d][j]->state2buffer();
         }
-    rc_zkr->SIGNAL_ROSPUSK().setValue_1bit(rc_zkr->STATE_ROSPUSK());
     rc_zkr->SIGNAL_STATE_ERROR_RTDS().setValue_1bit(rc_zkr->STATE_ERROR_RTDS());
     rc_zkr->SIGNAL_STATE_ERROR_NERASCEP().setValue_1bit(rc_zkr->STATE_ERROR_NERASCEP());
     rc_zkr->SIGNAL_STATE_ERROR_OSYCOUNT().setValue_1bit(rc_zkr->STATE_ERROR_OSYCOUNT());
@@ -66,9 +61,7 @@ void tos_ZkrTracking::state2buffer()
 void tos_ZkrTracking::resetStates()
 {
     tos_RcTracking::resetStates();
-    //rc_zkr->resetStates();
     rc_zkr->setSTATE_ERROR_RTDS(false);
-    //rc_zkr->setSTATE_ROSPUSK(false);
     rc_zkr->setSTATE_ERROR_NERASCEP(false);
     rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
     for (int d=0;d<2;d++)
@@ -83,81 +76,38 @@ void tos_ZkrTracking::resetStates()
     FSTATE_TLG_SOST=0;
     FSTATE_TLG_D=0;
     FSTATE_V_DSO=_undefV_;
+    baza=false;
 }
 
 
-
-
-int find_step(tos_ZkrTracking::t_zkr_pairs steps[],int size_steps,int current_zkr_state,const tos_ZkrTracking::t_zkr_state &prev_state,const tos_ZkrTracking::t_zkr_state &curr_state)
+void tos_ZkrTracking::prepareCurState()
 {
-    for (int i=0;i<size_steps;i++){
-        if (steps[i].ext_state!=current_zkr_state) continue;
-        if (!prev_state.likeTable(steps[i].prev_state)) continue;
-        if (!curr_state.likeTable(steps[i].curr_state)) continue;
-        return steps[i].cmd ;
-    }
-    return _none;
+    rc_tracking_comleted=false;
+    prev_state_zkr=curr_state_zkr;
+    for (int j=0;j<3;j++)
+        prev_rc3[j]=curr_rc3[j];
+
+    // определяем соседей
+    // RC[1]  RC[0] RC RC[2]
+    //
+    for (int j=0;j<3;j++) curr_rc3[j]=nullptr;
+    curr_rc3[0]=trc->next_rc[_forw];
+    //if (curr_rc3[0])  curr_rc3[1]=curr_rc3[0]->next_rc[_forw];
+    curr_rc3[2]=trc->next_rc[_back];
 }
 
 
-
-void tos_ZkrTracking::work(const QDateTime &T)
+void tos_ZkrTracking::setCurrState()
 {
-    static t_zkr_pairs tos_zkr_steps[]={
-        // нормальное выявление
-        {{{_xx ,___B1 ,_xx} ,0}  ,
-         {{_xx ,___B1 ,_xx} ,1}, 0, _in  },
-        {{{_xx ,___B0 ,_xx} ,0}  ,
-         {{_xx ,___B1 ,_xx} ,1}, 0, _in  },
-        // нормальное движение головы
-        {{{___B0 ,_TSFB1 ,_xx} ,1}  ,
-         {{___B1 ,_TSFB1 ,_xx} ,1}, 0, _head2front  },
-        // нормальное движение хвоста
-        {{{_TxB1 ,_TFB1  ,_xx} ,1}  ,
-         {{_TxB1 ,_TFB0  ,_xx} ,1}, 0, _back2front  },
-        {{{_TxB1 ,_TFB1  ,_xx} ,0}  ,
-         {{_TxB1 ,_TFB0  ,_xx} ,0}, 0, _back2front  },
-        {{{_TxB1 ,_TFB1  ,_xx} ,1}  ,
-         {{_TxB1 ,_TFB0  ,_xx} ,0}, 0, _back2front  },
-        // зкр занята след отцепом
-        {{{_TMB1 ,_TFB1  ,_xx} ,0}  ,
-         {{_TMB0 ,_TFB1  ,_xx} ,0}, 0, _back2front  },
-        // выбрасываем хвост при новом занятии ртдс
-        {{{_xx ,_TFB1  ,___B1} ,0}  ,
-         {{_xx ,_TFB1  ,___B1} ,1}, 0, _back2front_in  },
+    // формируем строчки  состояние РЦ относительно отцепа в RC;
+    //RC1 RC0 RC RC2 <<D0
+    // --  0  1   2
+    TOtcepData od=trc->od(_forw);
+    curr_state_zkr.rcos3[0]=busyOtcepStaotcepteN(curr_rc3[1],_pOtcepEnd,od.num);
+    curr_state_zkr.rcos3[1]=busyOtcepStaotcepteM(trc,_forw);
+    curr_state_zkr.rcos3[2].OS=_T0;
+    curr_state_zkr.rcos3[2].BS=busyState(curr_rc3[2]);
 
-        // не нормальное движение головы проталкиваем вниз
-        {{{_tfB1 ,_TSFB1 ,_xx} ,0}  ,
-         {{_tfB1 ,_TSFB0 ,_xx} ,0}, 0, _pushHeadBack2front  },
-
-
-        // не нормальное движение затащили отцеп обратно
-        // это отрабатывет rctracking на rcn
-        //    {s_ok , {_tsfB1 ,___B1 ,_xx ,1}  ,
-        //            {_tsfB0 ,___B1 ,_xx ,1}, _returnHeadBack2zkr  },
-
-        //    // не нормальное движение затащили отцеп обратно
-        //    {s_ok , {_TSB1 ,_TSFB1 ,_xx ,1}  ,
-        //            {_TSB0 ,_TSFB1 ,_xx ,1}, _returnHeadBack2zkr  },
-
-        // не нормальное движение ушли
-        {{{___B0 ,_TSFB1 ,___B1} ,0}  ,
-         {{___B0 ,_TSFB0 ,___B1} ,0}, 0, _resetOtcepOnZKR},
-
-
-
-        // не может поместится
-        {{{_xx ,_TSFB1 ,_xx} ,1}  ,
-         {{_xx ,_TSFB1 ,_xx} ,0}, 0, _error_rtds  },
-        // вообще не сработал
-        {{{___B0 ,___B1 ,___B1} ,0}  ,
-         {{___B1 ,___B1 ,___B1} ,0}, 0, _error_rtds  },
-
-        {{{_TxB1 ,_TFB1 ,___B1} ,1}  ,
-         {{_TxB1 ,_TFB0 ,___B1} ,1}, 0, _baza  }
-    };
-
-    // собираем текущую пару состояний
     int rtds=prev_state_zkr.rtds;
     if (rc_zkr->RTDS_USL_OR()){
         if ((rc_zkr->rtds_1()->STATE_SRAB()==1) || (rc_zkr->rtds_2()->STATE_SRAB()==1)) rtds=1;
@@ -165,160 +115,236 @@ void tos_ZkrTracking::work(const QDateTime &T)
         if ((rc_zkr->rtds_1()->STATE_SRAB()==1) && (rc_zkr->rtds_2()->STATE_SRAB()==1)) rtds=1;
     }
     if ((rc_zkr->rtds_1()->STATE_SRAB()==0) && (rc_zkr->rtds_2()->STATE_SRAB()==0)) rtds=0;
-    // снимем ошибку РТДС
-    if (rtds==1) rc_zkr->setSTATE_ERROR_RTDS(false);
-
-    curr_state_zkr.rcstate[0]=busyOtcepState(rc_next,rc_zkr);
-    curr_state_zkr.rcstate[1]=busyOtcepState(rc_zkr,rc_zkr);
-    curr_state_zkr.rcstate[2]=busyOtcepState(rc_prev,rc_zkr);
     curr_state_zkr.rtds=rtds;
 
+    //    for (int j=0;j<2;j++){
+    //        if (osy_count[j]==0)curr_state_zkr.dso[j]=_D0;
+    //        if (osy_count[j]>0)curr_state_zkr.dso[j]=_DF;
+    //        if (osy_count[j]<0)curr_state_zkr.dso[j]=_DB;
+    //    }
+    //if (osy_count[0]==osy_count[1]){curr_state_zkr.dso[0]=_D0;curr_state_zkr.dso[1]=_D0;}
+    if (osy_count[0]==osy_count[1])curr_state_zkr.dso=_D0;
+    if (osy_count[0]<osy_count[1]) curr_state_zkr.dso=_DF;
+    if (osy_count[0]>osy_count[1]) curr_state_zkr.dso=_DB;
 
-    if (rc_zkr->STATE_ROSPUSK()){
-        m_Otcep *otcep=nullptr;
-        if (!l_otceps.isEmpty()) otcep=l_otceps.last();
-        if (otcep!=nullptr){
-            // информация от ДСО
-
-            otcep->setSTATE_V_DISO(Vdso);
-            otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
-            otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
-        }
-
-
-        // ищем переход
-        int cnt=sizeof(tos_zkr_steps)/sizeof(tos_zkr_steps[0]);
-        int cmd=find_step(tos_zkr_steps,cnt,0,prev_state_zkr,curr_state_zkr);
-        switch (cmd) {
-        case _in:
-        {
-            newOtcep(T);
-        }
-            break;
-        case _head2front:
-            otcep->tos->setOtcepSF(rc_next,rc_zkr,T);
-            otcep->setSTATE_DIRECTION(0);
-            otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
-            otcep->tos->rc_tracking_comleted[0]=true;
-            break;
-        case _back2front:
-            otcep->tos->setOtcepSF(otcep->RCS,rc_next,T);
-            otcep->setSTATE_DIRECTION(0);
-            otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
-            otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
-            otcep->setSTATE_ZKR_PROGRESS(false);
-            checkNeRascep();
-            reset_dso();
-            otcep->tos->rc_tracking_comleted[1]=true;
-            break;
-        case _back2front_in:
-            otcep->tos->setOtcepSF(otcep->RCS,rc_next,T);
-            otcep->setSTATE_DIRECTION(0);
-            otcep->tos->rc_tracking_comleted[1]=true;
-            otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
-            otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
-            otcep->setSTATE_ZKR_PROGRESS(false);
-            checkNeRascep();
-            reset_dso();
-            dsot[1][0]->dso->setSTATE_OSY_COUNT(osy_count[1]-osy_count[0]);
-            dsot[1][1]->dso->setSTATE_OSY_COUNT(osy_count[1]-osy_count[0]);
-            newOtcep(T);
-            break;
-
-        case _pushHeadBack2front:
-        {
-            // пытаемся сдвинуть отцеп
-            // именно толкаем
-            m_Otcep *prev_otcep=rc_next->rcs->l_otceps.last();
-            prev_otcep->tos->setOtcepSF(prev_otcep->RCS,rc_next->next_rc[0],T);
-            otcep->tos->setOtcepSF(rc_next,rc_next,T);
-            otcep->setSTATE_DIRECTION(0);
-            otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
-            otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
-            otcep->setSTATE_ZKR_PROGRESS(false);
-            checkNeRascep();
-            otcep->tos->rc_tracking_comleted[1]=true;
-        }
-            break;
-        case _resetOtcepOnZKR:
-        {
-            // надо проверить что в топе рееально предыдущий
-            // но по сути это вытяжка и по инстркуции мы его выкидываем
-            /*auto *arrivingOtcep=otceps->topOtcep();
-            if ((arrivingOtcep==nullptr) && (otcep->NUM()==arrivingOtcep->NUM()-1)&&
-                    (dso_pair.d==1)) {
-                otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
-                otcep->tos->setOtcepSF(nullptr,nullptr,T);
-            } else */
-            {
-                otcep->tos->resetStates();
-            }
-        }
-            break;
-        case _error_rtds:
-            rc_zkr->setSTATE_ERROR_RTDS(true);
-            break;
-
-        case _baza:
-            if (otcep)
-                otcep->setSTATE_ZKR_BAZA(true);
-            break;
-        default:
-            break;
-        }
+    // при изменении соседей пропускаем ход
+    if (curr_rc3[0]!=prev_rc3[0]) {
+        prev_state_zkr=curr_state_zkr;
     }
+}
 
+
+
+int tos_ZkrTracking::_find_step(tos_ZkrTracking::t_zkr_pairs steps[],int size_steps,const tos_ZkrTracking::t_zkr_state &prev_state,const tos_ZkrTracking::t_zkr_state &curr_state)
+{
+    for (int i=0;i<size_steps;i++){
+        if (!prev_state.likeTable(steps[i].prev_state)) continue;
+        if (!curr_state.likeTable(steps[i].curr_state)) continue;
+        return steps[i].cmd;
+    }
+    return _none;
+}
+
+
+void tos_ZkrTracking::work(const QDateTime &T)
+{
+    static t_zkr_pairs tos_zkr_steps0[]={
+        // сброс осей при заезде
+        { {{{_xx,_xx},{_B1,_xx},{_xx,_xx}},0,_D0} ,
+          {{{_xx,_xx},{_B1,_xx},{_xx,_xx}},0,_DF} ,_resetDSO_1 },
+        { {{{_xx,_xx},{_B0,_xx},{_xx,_xx}},0,_D0} ,
+          {{{_xx,_xx},{_B1,_xx},{_xx,_xx}},0,_DB} ,_resetDSO_1 }, //???
+        { {{{_B0,_xx},{_B0,_xx},{_xx,_xx}},0,_D0} ,
+          {{{_B0,_xx},{_B1,_xx},{_xx,_xx}},0,_DB} ,_resetDSO_1 }, //???
+        // сброс осей при выявлении
+        { {{{_xx,_xx},{_B1,_xx},{_xx,_xx}},0,_D0} ,
+          {{{_xx,_xx},{_B1,_xx},{_xx,_xx}},1,_D0} ,_resetDSO_0 },
+        // сброс осей при выявлении
+        { {{{_xx,_xx},{_B1,_xx},{_xx,_xx}},0,_DF} ,
+          {{{_xx,_xx},{_B1,_xx},{_xx,_xx}},1,_DF} ,_resetDSO_0IF3 },
+        // сброс осей при освобождении
+        { {{{_xx,_xx},{_B1,_xx},{_xx,_xx}},0,_xx} ,
+          {{{_xx,_xx},{_B0,_xx},{_xx,_xx}},0,_xx} ,_resetDSO_0 }
+
+    };
+    static t_zkr_pairs tos_zkr_steps1[]={
+        // нормальное выявление
+        { {{{_xx,_xx},{_B1,_T0},{_xx,_xx}},0,_DF} ,
+          {{{_xx,_xx},{_B1,_T0},{_xx,_xx}},1,_DF} ,_in },
+        { {{{_xx,_xx},{_B1,_T0},{_B1,_xx}},0,_D0} ,
+          {{{_xx,_xx},{_B1,_T0},{_B1,_xx}},1,_D0} ,_in },
+        { {{{_B0,_T0},{_B1,_T0},{_xx,_xx}},0,_D0} ,
+          {{{_B0,_T0},{_B1,_T0},{_xx,_xx}},1,_D0} ,_in },
+
+        // нормальное движение головы
+        { {{{_B0,_T0},{_B1,_TSF},{_xx,_xx}},_xx,_xx} ,
+          {{{_B1,_T0},{_B1,_TSF},{_xx,_xx}},_xx,_xx} ,cmdMove_1_ToFront },
+
+        // нормальное движение хвоста
+        { {{{_B1,_Tx},{_B1,_TF},{_xx,_xx}},_xx,_xx} ,
+          {{{_B1,_Tx},{_B0,_TF},{_xx,_xx}},_xx,_xx} ,cmdMove_A_ToFront },
+
+        // ненормальное движение
+        { {{{_B1,_T0},{_B1,_TSF},{_xx,_xx}},1,_xx} ,
+          {{{_B1,_T0},{_B0,_TSF},{_xx,_xx}},1,_xx} ,cmdMove_A_ToFront_E },
+
+        // выбрасываем хвост при новом занятии
+        { {{{_xx,_xx},{_B1,_Tx},{_xx,_xx}},0,_D0} ,
+          {{{_xx,_xx},{_B1,_Tx},{_xx,_xx}},0,_DF} ,cmdMove_A_ToFront },
+
+        // выбрасываем хвост при новом занятии ртдс
+        { {{{_xx,_xx},{_B1,_Tx},{_xx,_xx}},0,_DF} ,
+          {{{_xx,_xx},{_B1,_Tx},{_xx,_xx}},1,_DF} ,cmdMove_A_ToFront_in },
+
+        // не нормальное движение головы проталкиваем вниз
+        //        { {{{_B1,_tx},{_B1,_Tx},{_xx,_xx}},0,_DF} ,
+        //          {{{_B1,_tx},{_B1,_Tx},{_xx,_xx}},1,_DF} ,_pushHeadBack2front },
+        // не нормальное движение ушли
+        { {{{_B0,_T0},{_B1,_TSF},{_B1,_xx}},0,_xx} ,
+          {{{_B0,_T0},{_B0,_TSF},{_B1,_xx}},0,_xx} ,_resetOtcepOnZKR },
+
+        // не может поместится
+        { {{{_xx,_xx},{_B1,_TSF},{_xx,_xx}},1,_xx} ,
+          {{{_xx,_xx},{_B0,_TSF},{_xx,_xx}},0,_xx} ,_error_rtds },
+
+        // вообще не сработал
+        { {{{_B0,_xx},{_B1,_xx},{_B1,_xx}},0,_DF} ,
+          {{{_B1,_xx},{_B1,_xx},{_B1,_xx}},0,_DF} ,_error_rtds },
+
+        // база
+        { {{{_B1,_Tx},{_B1,_TF},{_B1,_xx}},1,_DF} ,
+          {{{_B1,_Tx},{_B0,_TF},{_B1,_xx}},1,_DF} ,_baza }
+
+    };
+
+    prepareCurState();
+    // собираем текущую пару состояний
+    setCurrState();
     work_dso(T);
 
+    // снимем ошибку РТДС
+    if (curr_state_zkr.rtds==1) rc_zkr->setSTATE_ERROR_RTDS(false);
 
-    prev_state_zkr=curr_state_zkr;
+    if (curr_state_zkr.equal(prev_state_zkr))return;
+
+    // ищем переход
+    int cmd=_none;
+    cmd= _find_step(tos_zkr_steps0,sizeof(tos_zkr_steps0)/sizeof(tos_zkr_steps0[0]) ,prev_state_zkr,curr_state_zkr);
+    doCmd(cmd,T);
+    cmd= _find_step(tos_zkr_steps1,sizeof(tos_zkr_steps1)/sizeof(tos_zkr_steps1[0]) ,prev_state_zkr,curr_state_zkr);
+    doCmd(cmd,T);
 
 
+    // инфа в отцеп             // информация от ДСО
+
+    // правильней это в TOS
+    auto otcep=trc->otcepOnRc(1);
+    if (otcep!=nullptr){
+            otcep->otcep->setSTATE_ZKR_BAZA(baza);
+            otcep->otcep->setSTATE_V_DISO(Vdso);
+            otcep->otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
+            otcep->otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
+            checkOsyCount(otcep->otcep);
+    }
+
+}
+
+void tos_ZkrTracking::doCmd(int cmd, const QDateTime &T)
+{
+    switch (cmd) {
+
+    case _resetDSO_1:
+        reset_dso(1);
+        break;
+    case _resetDSO_0:
+        reset_dso(0);
+        break;
+    case _resetDSO_0IF3:
+        reset_dso(3);
+        break;
+
+    case _in:
+        newOtcep(T);
+        break;
+
+    case cmdMove_1_ToFront:
+        tos_RcTracking::doCmd(cmdMove_1_ToFront,T);
+        break;
+    case cmdMove_A_ToFront:
+        tos_RcTracking::doCmd(cmdMove_A_ToFront,T);
+        break;
+    case cmdMove_A_ToFront_E:
+        tos_RcTracking::doCmd(cmdMove_A_ToFront_E,T);
+        break;
+    case cmdMove_A_ToFront_in:
+        tos_RcTracking::doCmd(cmdMove_A_ToFront,T);
+        newOtcep(T);
+        break;
+
+    case _resetOtcepOnZKR:
+    {
+        tos_RcTracking::doCmd(cmd_Reset,T);
+
+    }
+        break;
+    case _error_rtds:
+        rc_zkr->setSTATE_ERROR_RTDS(true);
+        break;
+
+    case _baza:
+        baza=true;
+        break;
+    default:
+        break;
+    }
 }
 
 
 
 void tos_ZkrTracking::newOtcep(const QDateTime &T)
 {
-    if (modelGorka->STATE_REGIM()==ModelGroupGorka::regimRospusk){
-        auto *otcep=otceps->topOtcep();
-        if (otcep!=nullptr){
-            rc_zkr->setSTATE_ERROR_NERASCEP(false);
-            rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
-            otcep->tos->setOtcepSF(rc_zkr,rc_zkr,T);
-            otcep->setSTATE_DIRECTION(0);
-            otcep->setSTATE_LOCATION(m_Otcep::locationOnSpusk);
-            otcep->setSTATE_ZKR_BAZA(false);
-            otcep->setSTATE_ZKR_OSY_CNT(0);
-            otcep->setSTATE_ZKR_PROGRESS(true);
-            otcep->setSTATE_ZKR_VAGON_CNT(0);
+    baza=false;
+    auto *otcep=TOS->getNewOtcep(trc);
+    if (otcep!=nullptr){
+        otcep->resetTracking();
 
-            otcep->tos->rc_tracking_comleted[0]=true;
-            otcep->tos->rc_tracking_comleted[1]=true;
-        }
+        TOtcepData od;
+        od.num=otcep->otcep->NUM();
+        od.p=_pOtcepStart;
+        od.d=_forw;
+        od.track=_normal_track;
+        trc->l_od.push_back(od);
+        od.p=_pOtcepEnd;
+        trc->l_od.push_back(od);
+
+        rc_zkr->setSTATE_ERROR_NERASCEP(false);
+        rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
+        otcep->otcep->setSTATE_DIRECTION(0);
+        otcep->otcep->setSTATE_LOCATION(m_Otcep::locationOnSpusk);
+        otcep->otcep->setSTATE_ZKR_BAZA(false);
+        otcep->otcep->setSTATE_ZKR_OSY_CNT(0);
+        otcep->otcep->setSTATE_ZKR_PROGRESS(true);
+        otcep->otcep->setSTATE_ZKR_VAGON_CNT(0);
+        TOS->updateOtcepsOnRc(T);
+        checkNeRascep(otcep->otcep->NUM());
     }
 }
 
-void tos_ZkrTracking::checkNeRascep()
+void tos_ZkrTracking::checkNeRascep(int num)
 {
-    // если оси у предыдущего подозрительно равны своему + следующему
-    auto *otcep=otceps->topOtcep();
-    if (otcep!=nullptr){
-        int N=otcep->NUM();
-        if ((N>1)&&(otceps->otcepByNum(N-1)!=nullptr)){
-            auto *prev_otcep=otceps->otcepByNum(N-1);
-            if ((prev_otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)&&
-                    (prev_otcep->STATE_SL_OSY_CNT()>=4)&& (otcep->STATE_SL_OSY_CNT()>=4) &&
-                    (prev_otcep->STATE_ZKR_OSY_CNT()>=prev_otcep->STATE_SL_OSY_CNT()+4) &&
-                    (prev_otcep->STATE_ZKR_OSY_CNT()==prev_otcep->STATE_SL_OSY_CNT()+otcep->STATE_SL_OSY_CNT())){
-                rc_zkr->setSTATE_ERROR_NERASCEP(true);
-                otcep->tos->resetStates();
-                return;
-            }
+    bool err=false;
+    if ((TOS->mNUM2OD.contains(num)) && (TOS->mNUM2OD.contains(num+1))){
+        // если оси  подозрительно равны своему + следующему
+        auto *otcep1=TOS->mNUM2OD[num];
+        auto *otcep2=TOS->mNUM2OD[num+1];
+        if (otcep1->otcep->STATE_SL_OSY_CNT()+otcep2->otcep->STATE_SL_OSY_CNT()>=8){
+            if (otcep1->otcep->STATE_ZKR_OSY_CNT()==
+                    otcep1->otcep->STATE_SL_OSY_CNT()+otcep2->otcep->STATE_SL_OSY_CNT()
+                    ) err=true;
         }
 
+        rc_zkr->setSTATE_ERROR_NERASCEP(err);
     }
-    rc_zkr->setSTATE_ERROR_NERASCEP(false);
 }
 
 void tos_ZkrTracking::checkOsyCount(m_Otcep *otcep)
@@ -330,35 +356,61 @@ void tos_ZkrTracking::checkOsyCount(m_Otcep *otcep)
         rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
 }
 
-
-
-void tos_ZkrTracking::reset_dso()
+void tos_ZkrTracking::resetOtcep2Nadvig()
 {
-    for (int i=0;i<2;i++)
+    auto otcep=trc->otcepOnRc(1);
+    if (otcep!=nullptr){
+        TOS->resetTracking(otcep->otcep->NUM());
+        otcep->otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
+    }
+}
+
+
+
+void tos_ZkrTracking::reset_dso(int n)
+{
+    if (n==0){
+        for (int i=0;i<2;i++)
+            for (int j=0;j<2;j++)
+                dsot[i][j]->dso->setSTATE_OSY_COUNT(0);
+        dso_pair.resetStates();
+        osy_count[0]=0;
+        osy_count[1]=0;
+        Vdso=_undefV_;
+        VdsoTime=QDateTime();
+    }
+    if (n==1){
+        for (int i=0;i<2;i++)
+            for (int j=0;j<2;j++)
+                dsot[i][j]->dso->setSTATE_OSY_COUNT(0);
+        dso_pair.resetStates();
         for (int j=0;j<2;j++)
-            dsot[i][j]->dso->setSTATE_OSY_COUNT(0);
-    dso_pair.resetStates();
-    osy_count[0]=0;
-    osy_count[1]=0;
-    Vdso=_undefV_;
-    VdsoTime=QDateTime();
+            dsot[1][j]->dso->setSTATE_OSY_COUNT(1);
+        osy_count[0]=0;
+        osy_count[1]=1;
+        Vdso=_undefV_;
+        VdsoTime=QDateTime();
+
+    }
+    if (n==3){
+        if (osy_count[1]>2){
+            for (int i=0;i<2;i++)
+                for (int j=0;j<2;j++)
+                    dsot[i][j]->dso->setSTATE_OSY_COUNT(0);
+            dso_pair.resetStates();
+            osy_count[0]=0;
+            osy_count[0]=1;
+            Vdso=_undefV_;
+            VdsoTime=QDateTime();
+        }
+
+    }
 
 }
 
 
 void tos_ZkrTracking::work_dso(const QDateTime &T)
 {
-    // сброс при полном освобождении
-    if (    (rc_zkr->STATE_BUSY()==0) &&
-            (rc_zkr->rtds_1()->STATE_SRAB()==0)&&
-            (rc_zkr->rtds_2()->STATE_SRAB()==0)){
-
-        if (dso_pair.sost!=tos_DsoPair::tlg_0)
-            dso_pair.resetStates();
-        reset_dso();
-        return;
-    }
-
     for (int d=0;d<2;d++)
         for (int j=0;j<2;j++){
             dsot[d][j]->work(T);
@@ -370,41 +422,43 @@ void tos_ZkrTracking::work_dso(const QDateTime &T)
     if (dsot[0][0]->dso->STATE_ERROR()==0) wdso[0]=dsot[0][0]; else wdso[0]=dsot[0][1];
     if (dsot[1][0]->dso->STATE_ERROR()==0) wdso[1]=dsot[1][0]; else wdso[0]=dsot[1][1];
 
-    //    if ((wdso[0]->dso->STATE_OSY_COUNT()!=osy_count[0]) || (wdso[0]->dso->STATE_OSY_COUNT()!=osy_count[1])){
-    osy_count[0]=wdso[0]->dso->STATE_OSY_COUNT();
-    osy_count[1]=wdso[1]->dso->STATE_OSY_COUNT();
+    if ((wdso[0]->dso->STATE_OSY_COUNT()!=osy_count[0]) ||
+            (wdso[1]->dso->STATE_OSY_COUNT()!=osy_count[1])){
+        osy_count[0]=wdso[0]->dso->STATE_OSY_COUNT();
+        osy_count[1]=wdso[1]->dso->STATE_OSY_COUNT();
 
-    dso_pair.updateStates(osy_count[1],osy_count[0]);
+        dso_pair.updateStates(osy_count[1],osy_count[0]);
 
-    setSTATE_LT_OSY_CNT(dso_pair.c.tlg_os);
-    setSTATE_LT_OSY_S(dso_pair.c.os_start);
-    setSTATE_TLG_CNT(dso_pair.tlg_cnt);
-    setSTATE_TLG_SOST(dso_pair.sost);
-    setSTATE_TLG_D(dso_pair.d);
+        setSTATE_LT_OSY_CNT(dso_pair.c.tlg_os);
+        setSTATE_LT_OSY_S(dso_pair.c.os_start);
+        setSTATE_TLG_CNT(dso_pair.tlg_cnt);
+        setSTATE_TLG_SOST(dso_pair.sost);
+        setSTATE_TLG_D(dso_pair.d);
 
-    // вычисляем скорость по ДСО
-    if (wdso[0]->dso->STATE_DIRECT()==0){
-        tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[1]);
-        tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[1]);
-        if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
-            qint64 ms=s0.T.msecsTo(s1.T);
-            if (ms!=0){
-                qreal len=wdso[1]->dso->RC_OFFSET()-wdso[0]->dso->RC_OFFSET();
-                Vdso=1.*3600*len/ms;
-                VdsoTime=T;
+        // вычисляем скорость по ДСО
+        if (wdso[0]->dso->STATE_DIRECT()==0){
+            tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[1]);
+            tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[1]);
+            if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
+                qint64 ms=s0.T.msecsTo(s1.T);
+                if (ms!=0){
+                    qreal len=wdso[1]->dso->RC_OFFSET()-wdso[0]->dso->RC_OFFSET();
+                    Vdso=1.*3600*len/ms;
+                    VdsoTime=T;
+                }
             }
         }
-    }
 
-    if (wdso[1]->dso->STATE_DIRECT()==1){
-        tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[0]);
-        tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[0]);
-        if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
-            qint64 ms=s0.T.msecsTo(s1.T);
-            if (ms!=0){
-                qreal len=wdso[0]->dso->RC_OFFSET()-wdso[1]->dso->RC_OFFSET();
-                Vdso=1.*3600*len/ms;
-                VdsoTime=T;
+        if (wdso[1]->dso->STATE_DIRECT()==1){
+            tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[0]);
+            tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[0]);
+            if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
+                qint64 ms=s0.T.msecsTo(s1.T);
+                if (ms!=0){
+                    qreal len=wdso[0]->dso->RC_OFFSET()-wdso[1]->dso->RC_OFFSET();
+                    Vdso=1.*3600*len/ms;
+                    VdsoTime=T;
+                }
             }
         }
     }

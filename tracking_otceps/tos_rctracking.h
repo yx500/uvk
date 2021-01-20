@@ -2,93 +2,122 @@
 #define TOS_RCTRACKING_H
 
 #include "baseworker.h"
+#include "tos_rc.h"
 #include "m_otcep.h"
 #include <QElapsedTimer>
 
-enum {tos_normal=0,tos_hard=1};
 
+
+class TrackingOtcepSystem;
+
+enum {_1od=0,_allod=1};
 
 class tos_RcTracking : public BaseWorker
 {
     Q_OBJECT
 public:
-    enum T_BusyOtcepState{
+
+    enum T_RcOtcepState{
+        ___=-7,
         _NN=-1,
-        ___B0=0,___B1=1,
-        _TSB0=10,_TSB1=11,
-        _TFB0=20,_TFB1=21,
-        _TSFB0=30,_TSFB1=31,
-        _TMB0=40,_TMB1=41,
-        _tsB0=50,_tsB1=51,
-        _tfB0=60,_tfB1=61,
-        _tsfB0=70,_tsfB1=71,
-        _tmB0=80,_tmB1=81,
+        _T0=0,
+        _TS=10,
+        _TF=20,
+        _TM=30,
+        _TSF=40,
 
-        _xx=99,
-        _xB0,_xB1,
-        _TxB0,_txB0,
-        _TxB1,_txB1
+        _tx=110,
+
+        _Tx=910,
+        _TSx=920,
+
+
+        _xx=999
     };
-    enum T_tos_RcTrackingCommand{
-        _none=0,
-        cmdMoveStartToFront,
-        cmdMoveStartToBack,
-        cmdMoveFinishToFront,
-        cmdMoveFinishToFrontCheck,
-        cmdMoveFinishToBack,
-        cmdMoveStartFinishToBack,
-        cmdMoveFinishToRC0,
-        cmdMoveStartFinishToRc1,
-        cmdPushStartFinishToRc1,
-        cmdCheckDrebezg0,
-        cmdCheckDrebezg1onRC3,
-        cmdSetLSStartToRc0,
-        cmdSetLSStartFinishToRc0,
-        cmdSetLZStartToRc0,
-        cmdSetLZStartFinishToRc0,
-        cmdSetKZStartToRc0,
-        cmdResetRCF,
-        cmdReset
+    enum T_RcBusyState{
+        _B0=0,_B1=1,
+        _LS=10,
+        _LZ=20,
+        _KZ0=30,_KZ1=31
     };
-
-
-
-    static T_BusyOtcepState busyOtcepState(int state_busy,int otcep_num,TOtcepPart otcep_part,int otcep_main_num);
-    static T_BusyOtcepState busyOtcepState(const m_RC *rc,const m_RC *rcMain) ;
-
-    static bool busyOtcepStateLike(const T_BusyOtcepState &TS, const T_BusyOtcepState &S);
-
-    enum t_rc_tracking_flag{
-        s_none=0,
-        s_checking_drebezg,
-        s_checking_drebezg1OnRC3,
-        s_xx=99
-    };
-
-    struct t_rc_tracking_state{
-        t_rc_tracking_flag flag;
-        T_BusyOtcepState rcos[4];
-        bool likeTable(const t_rc_tracking_state &ts) const{
-            for (int j=0;j<4;j++){
-                if (!busyOtcepStateLike(ts.rcos[j],rcos[j])) return false;
-            }
-            if ((ts.flag!=s_xx)&&(ts.flag!=flag)) return false;
+    struct TRcBOS{
+        TRcBOS(){BS=0;OS=0;}
+        TRcBOS(int B,int O){BS=B;OS=O;}
+        int BS;
+        int OS;
+        bool equal(const TRcBOS&s) const {
+            if ((BS!=s.BS)||(OS!=s.OS)) return false;
             return true;
         }
     };
-    Q_ENUM(T_BusyOtcepState)
-
-    MYSTATE(bool,STATE_CHECK_FREE_DB)
 
 
-    MYSTATE(T_BusyOtcepState,STATE_S0)
-    MYSTATE(T_BusyOtcepState,STATE_S1)
-    MYSTATE(T_BusyOtcepState,STATE_S2)
-    MYSTATE(T_BusyOtcepState,STATE_S3)
-    MYSTATE(T_BusyOtcepState,STATE_P0)
-    MYSTATE(T_BusyOtcepState,STATE_P1)
-    MYSTATE(T_BusyOtcepState,STATE_P2)
-    MYSTATE(T_BusyOtcepState,STATE_P3)
+    static bool rcOtcepStateLike(const TRcBOS  &TS, const TRcBOS  &S){
+        if ((TS.BS==S.BS)&&(TS.OS==S.OS)) return true;
+        if ((TS.BS==_xx) && (TS.OS==_xx))return true;
+        if ((TS.BS!=_xx) && (TS.BS!=S.BS)) return false;
+        if (TS.OS==_xx) return true;
+        if (TS.OS==S.OS) return true;
+        if ((TS.OS==_Tx)&&((S.OS==_TS)||(S.OS==_TF)||(S.OS==_TM)||(S.OS==_TSF))) return true;
+        if ((TS.OS==_TSx)&&((S.OS==_TS)||(S.OS==_TSF))) return true;
+        return false;
+    }
+    static bool rcOtcepStateLikePrev(const TRcBOS  &TS, const TRcBOS  &S,const TRcBOS  &prevS){
+        TRcBOS SS=S;
+        if (TS.BS==___) SS.BS=prevS.BS;
+        if (TS.OS==___) SS.OS=prevS.OS;
+        return  rcOtcepStateLike(TS,SS);
+    }
+
+    enum T_tos_RcTrackingCommand{
+        _none=0,
+        cmdMove_1_ToFront,
+        cmdMove_A_ToFront,
+        cmdMove_1_ToBack,
+        cmdMove_A_ToBack,
+
+        cmdMove_A_ToFront_E,
+        cmdMove_A_ToBack_E,
+        cmdMove_A_ToFront_Nagon,
+
+        cmdMove_A_ToFront2,
+        cmdMove_1_ToFront2,
+        cmdMove_1_ToFront2_LS,
+        cmdMove_1_ToFront2_LZ,
+        cmdMove_1_ToFront2_KZ,
+        cmd_Reset
+    };
+
+    int otcepState(const TOtcepData &od1);
+    int busyState(const tos_Rc *trc);
+    TRcBOS busyOtcepStaotcepteM(const tos_Rc *trc, int sf);
+    TRcBOS busyOtcepStaotcepteN(const tos_Rc *trc,int sf,int main_num);
+
+
+    struct t_rc_tracking_state{
+        TRcBOS rcos4[4];
+        bool likeTable(const t_rc_tracking_state &ts) const{
+            for (int j=0;j<4;j++){
+                if (!rcOtcepStateLike(ts.rcos4[j],rcos4[j])) return false;
+            }
+            return true;
+        }
+        bool likeTablePrev(const t_rc_tracking_state &ts,const t_rc_tracking_state &prev_s) const{
+            for (int j=0;j<4;j++){
+                if (!rcOtcepStateLikePrev(ts.rcos4[j],rcos4[j],prev_s.rcos4[j])) return false;
+            }
+            return true;
+        }
+
+        bool equal(const t_rc_tracking_state &ts) const {
+            for (int j=0;j<4;j++){
+                if (!ts.rcos4[j].equal(rcos4[j])) return false;
+            }
+            return true;
+        }
+    };
+    Q_ENUM(T_RcOtcepState)
+
 
     struct t_rc_pairs{
         t_rc_tracking_state prev_state;
@@ -97,46 +126,44 @@ public:
     };
 
 public:
-    explicit tos_RcTracking(QObject *parent,m_RC *rc);
+    explicit tos_RcTracking(TrackingOtcepSystem *parent,tos_Rc *trc);
     virtual  ~tos_RcTracking(){}
 
-    virtual void validation(ListObjStr *l) const;
+    void validation(ListObjStr *l) const;
 
-    void workOtcep(int sf, const QDateTime &T, int stepTable);
+    virtual void workOtcep(int dd, const QDateTime &T, int stepTable);
 
     virtual void work(const QDateTime &T);
-    void setCurrState();
-    m_RC * rc;
-    bool useRcTracking=false;
+    virtual void setCurrState();
+    virtual void prepareCurState();
+    tos_Rc * trc;
 
     virtual void resetStates();
 
 
-    m_RC * curr_rc4[4];
-    m_RC * prev_rc4[4];
-    t_rc_tracking_state prev_state;
-    t_rc_tracking_state curr_state;
+    tos_Rc * curr_rc3[3];
+    tos_Rc * prev_rc3[3];
+    t_rc_tracking_state prev_state[2];
+    t_rc_tracking_state curr_state[2];
+
+    bool rc_tracking_comleted;
 
 
-    QList<m_Otcep *> l_otceps;
-    void addOtcep(m_Otcep *otcep);
-    void removeOtcep(m_Otcep *otcep=nullptr);
 
-    // ГАЦ
-    MVP_Enums::TStrelPol pol_zad;
-    MVP_Enums::TStrelPol pol_cmd;
-    MVP_Enums::TStrelPol pol_mar;
-    QElapsedTimer pol_cmd_time;
-    QDateTime pol_cmd_w_time;
-    QList<SignalDescription> acceptOutputSignals() override;
-    void state2buffer() override;
 
 
 signals:
 
 public slots:
 protected:
-    void workLSLZ(const QDateTime &T, m_Otcep *otcep, bool sf, int lslz);
+    TrackingOtcepSystem *TOS;
+    void workLSLZ(const QDateTime &T,int lslz);
+    void moveOd(tos_Rc*next_trc,int _1a, int d, const QDateTime &T, bool bnorm);
+    virtual void doCmd(int cmd,const QDateTime &T);
+    void setOtcepNagon(int num);
+    void setOtcepErrorTrack(int num);
+
+
 };
 //Q_DECLARE_METATYPE(T_BusyOtcepState)
 #endif // TOS_RCTRACKING_H

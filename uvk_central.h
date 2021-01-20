@@ -34,9 +34,12 @@ public:
 
     QList<GtBuffer*> l_out_buffers;
     QMap<GtBuffer*,QByteArray> mB2A;
+    QList<m_RC_Gor_ZKR*> l_zkr;
     void state2buffer();
 
     void sendBuffers();
+
+    int getNewOtcep(m_RC *rc);
 
     virtual QList<SignalDescription> acceptOutputSignals() ;
 
@@ -49,6 +52,7 @@ public slots:
      void recv_cmd(QMap<QString,QString> m);
      void gac_command(const SignalDescription&s,int state);
 protected:
+     int maxOtcepCurrenRospusk;
 };
 
 #endif // UVK_CENTRAL_H

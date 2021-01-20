@@ -1,34 +1,67 @@
 #include "gtgac.h"
 
-GtGac::GtGac(QObject *parent,TrackingOtcepSystem *TOS):BaseWorker(parent)
+GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
 {
-
-
-    this->TOS=TOS;
-    l_strel=TOS->modelGorka->findChildren<m_Strel_Gor_Y*>();
+    this->modelGorka=modelGorka;
+    QList<m_Strel_Gor_Y*> l_strel_Y=modelGorka->findChildren<m_Strel_Gor_Y*>();
+    foreach (m_Strel_Gor_Y*strel, l_strel_Y) {
+        GacStrel *gstr=new GacStrel;
+        gstr->strel=strel;
+        l_strel.push_back(gstr);
+        mRC2GS[strel]=gstr;
+    }
+    otceps=modelGorka->findChildren<m_Otceps*>().first();
 
 }
 
 QList<SignalDescription> GtGac::acceptOutputSignals()
 {
     QList<SignalDescription> l;
-    foreach (m_Strel_Gor_Y*strel, l_strel) {
-        strel->setSIGNAL_UVK_PRP(strel->SIGNAL_UVK_PRP().innerUse());
-        strel->setSIGNAL_UVK_PRM(strel->SIGNAL_UVK_PRM().innerUse());
-        strel->setSIGNAL_UVK_PRM(strel->SIGNAL_UVK_AV().innerUse());
-        strel->setTU_PRP(strel->TU_PRP().innerUse());
-        strel->setTU_PRM(strel->TU_PRM().innerUse());
-        l << strel->SIGNAL_UVK_PRP() << strel->SIGNAL_UVK_PRM() << strel->SIGNAL_UVK_AV();
+    for (auto gstr : l_strel){
+        gstr->strel->setSIGNAL_UVK_PRP(gstr->strel->SIGNAL_UVK_PRP().innerUse());
+        gstr->strel->setSIGNAL_UVK_PRM(gstr->strel->SIGNAL_UVK_PRM().innerUse());
+        gstr->strel->setSIGNAL_UVK_PRM(gstr->strel->SIGNAL_UVK_AV().innerUse());
+        gstr->strel->setTU_PRP(gstr->strel->TU_PRP().innerUse());
+        gstr->strel->setTU_PRM(gstr->strel->TU_PRM().innerUse());
+        l << gstr->strel->SIGNAL_UVK_PRP() << gstr->strel->SIGNAL_UVK_PRM() << gstr->strel->SIGNAL_UVK_AV();
+        gstr->strel->setSIGNAL_UVK_BL_PER(gstr->strel->SIGNAL_UVK_BL_PER().innerUse());
+        gstr->strel->setSIGNAL_UVK_BL_PER_SP(gstr->strel->SIGNAL_UVK_BL_PER_SP().innerUse());
+        gstr->strel->setSIGNAL_UVK_BL_PER_DB(gstr->strel->SIGNAL_UVK_BL_PER_DB().innerUse());
+        gstr->strel->setSIGNAL_UVK_BL_PER_OTC(gstr->strel->SIGNAL_UVK_BL_PER_OTC().innerUse());
+        gstr->strel->setSIGNAL_UVK_BL_PER_TLG(gstr->strel->SIGNAL_UVK_BL_PER_TLG().innerUse());
+        gstr->strel->setSIGNAL_UVK_BL_PER_NGBSTAT(gstr->strel->SIGNAL_UVK_BL_PER_NGBSTAT().innerUse());
+        gstr->strel->setSIGNAL_UVK_BL_PER_NGBDYN(gstr->strel->SIGNAL_UVK_BL_PER_NGBDYN().innerUse());
     }
     return l;
 
 }
 
+void GtGac::state2buffer()
+{
+    for (auto gs : l_strel){
+        gs->strel->SIGNAL_UVK_PRP().setValue_1bit(gs->strel->STATE_UVK_PRP());
+        gs->strel->SIGNAL_UVK_PRM().setValue_1bit(gs->strel->STATE_UVK_PRM());
+        gs->strel->SIGNAL_UVK_AV().setValue_1bit(gs->strel->STATE_UVK_AV());
+
+        gs->strel->SIGNAL_UVK_BL_PER().setValue_1bit(gs->BL_PER);
+        gs->strel->SIGNAL_UVK_BL_PER_SP().setValue_1bit(gs->BL_PER_SP);
+        gs->strel->SIGNAL_UVK_BL_PER_DB().setValue_1bit(gs->BL_PER_DB);
+        gs->strel->SIGNAL_UVK_BL_PER_OTC().setValue_1bit(gs->BL_PER_OTC);
+        gs->strel->SIGNAL_UVK_BL_PER_TLG().setValue_1bit(gs->BL_PER_TLG);
+        gs->strel->SIGNAL_UVK_BL_PER_NGBSTAT().setValue_1bit(gs->BL_PER_NGBSTAT);
+        gs->strel->SIGNAL_UVK_BL_PER_NGBDYN().setValue_1bit(gs->BL_PER_NGBDYN);
+    }
+}
+
+
+
+
+
 void GtGac::resetStates()
 {
-    foreach (m_Strel_Gor_Y*strel, l_strel) {
-        strel->rcs->pol_zad=MVP_Enums::pol_unknow;
-        sendCommand(strel,MVP_Enums::pol_unknow,true);
+    for (auto gs : l_strel){
+        gs->pol_zad=MVP_Enums::pol_unknow;
+        sendCommand(gs,MVP_Enums::pol_unknow,true);
     }
 }
 
@@ -48,43 +81,43 @@ bool collectTree(m_RC * rc,QList<m_RC_Gor*> &l)
 
 void GtGac::validation(ListObjStr *l) const
 {
-    foreach (m_Strel_Gor_Y * strel, l_strel) {
-        if (strel->MINWAY()==0) l->error(strel,"MINWAY=0");
-        if (strel->MAXWAY()==0) l->error(strel,"MAXWAY=0");
+    for (auto gs : l_strel){
+        if (gs->strel->MINWAY()==0) l->error(gs->strel,"MINWAY=0");
+        if (gs->strel->MAXWAY()==0) l->error(gs->strel,"MAXWAY=0");
 
-        if (strel->TU_PRP().isEmpty()) l->error(strel,"TU_PRP=0");else
-            if (strel->TU_PRM().isEmpty()) l->error(strel,"TU_PRM=0");else
-                if (strel->TU_PRP()==strel->TU_PRM()) l->error(strel,"TU_PRM=TU_PRP");
-        if (strel->SIGNAL_PRP().isEmpty()) l->error(strel,"SIGNAL_PRP empty");
-        if (strel->SIGNAL_PRM().isEmpty()) l->error(strel,"SIGNAL_PRM empty");
-        if (strel->SIGNAL_UVK_AV().isEmpty()) l->warning(strel,"SIGNAL_AV empty");
-        if (strel->SIGNAL_UVK_PRM().isEmpty()) l->warning(strel,"SIGNAL_UVK_PRM empty");
-        if (strel->SIGNAL_UVK_PRP().isEmpty()) l->warning(strel,"SIGNAL_UVK_PRP empty");
+        if (gs->strel->TU_PRP().isEmpty()) l->error(gs->strel,"TU_PRP=0");else
+            if (gs->strel->TU_PRM().isEmpty()) l->error(gs->strel,"TU_PRM=0");else
+                if (gs->strel->TU_PRP()==gs->strel->TU_PRM()) l->error(gs->strel,"TU_PRM=TU_PRP");
+        if (gs->strel->SIGNAL_PRP().isEmpty()) l->error(gs->strel,"SIGNAL_PRP empty");
+        if (gs->strel->SIGNAL_PRM().isEmpty()) l->error(gs->strel,"SIGNAL_PRM empty");
+        if (gs->strel->SIGNAL_UVK_AV().isEmpty()) l->warning(gs->strel,"SIGNAL_AV empty");
+        if (gs->strel->SIGNAL_UVK_PRM().isEmpty()) l->warning(gs->strel,"SIGNAL_UVK_PRM empty");
+        if (gs->strel->SIGNAL_UVK_PRP().isEmpty()) l->warning(gs->strel,"SIGNAL_UVK_PRP empty");
     }
-    foreach (m_Strel_Gor_Y * strel1, l_strel) {
-        foreach (m_Strel_Gor_Y * strel2, l_strel) {
-            if (strel1==strel2) continue;
-            if (strel1->TU_PRP()==strel2->TU_PRP()) l->error(strel1,QString("TU_PRP=%1 TU_PRP").arg(strel2->objectName()));
-            if (strel1->TU_PRP()==strel2->TU_PRM()) l->error(strel1,QString("TU_PRP=%1 TU_PRM").arg(strel2->objectName()));
-            if (strel1->TU_PRM()==strel2->TU_PRP()) l->error(strel1,QString("TU_PRM=%1 TU_PRP").arg(strel2->objectName()));
-            if (strel1->TU_PRM()==strel2->TU_PRM()) l->error(strel1,QString("TU_PRM=%1 TU_PRM").arg(strel2->objectName()));
+    for (auto gs1 : l_strel){
+        for (auto gs2 : l_strel){
+            if (gs1->strel==gs2->strel) continue;
+            if (gs1->strel->TU_PRP()==gs2->strel->TU_PRP()) l->error(gs1->strel,QString("TU_PRP=%1 TU_PRP").arg(gs2->strel->objectName()));
+            if (gs1->strel->TU_PRP()==gs2->strel->TU_PRM()) l->error(gs1->strel,QString("TU_PRP=%1 TU_PRM").arg(gs2->strel->objectName()));
+            if (gs1->strel->TU_PRM()==gs2->strel->TU_PRP()) l->error(gs1->strel,QString("TU_PRM=%1 TU_PRP").arg(gs2->strel->objectName()));
+            if (gs1->strel->TU_PRM()==gs2->strel->TU_PRM()) l->error(gs1->strel,QString("TU_PRM=%1 TU_PRM").arg(gs2->strel->objectName()));
         }
     }
-    foreach (m_Strel_Gor_Y * strel, l_strel) {
+    for (auto gs : l_strel){
         QList<m_RC_Gor*> lrc;
         lrc.clear();
-        if (!collectTree(strel,lrc)) {
+        if (!collectTree(gs->strel,lrc)) {
             QString last="";
             if (!lrc.isEmpty()) last=lrc.last()->objectName();
-            l->error(strel,QString("Не построить дерево маршрутов "+last));
+            l->error(gs->strel,QString("Не построить дерево маршрутов "+last));
         } else {
             foreach (m_RC_Gor *rc, lrc) {
-                if (rc->MINWAY()<strel->MINWAY()) l->error(rc,QString("MINWAY вне диапазона %1->%2").arg(strel->objectName()).arg(strel->MINWAY()));
-                if (rc->MAXWAY()>strel->MAXWAY()) l->error(rc,QString("MAXWAY вне диапазона %1->%2").arg(strel->objectName()).arg(strel->MAXWAY()));
+                if (rc->MINWAY()<gs->strel->MINWAY()) l->error(rc,QString("MINWAY вне диапазона %1->%2").arg(gs->strel->objectName()).arg(gs->strel->MINWAY()));
+                if (rc->MAXWAY()>gs->strel->MAXWAY()) l->error(rc,QString("MAXWAY вне диапазона %1->%2").arg(gs->strel->objectName()).arg(gs->strel->MAXWAY()));
 
             }
 
-            for(int mar=strel->MINWAY();mar<=strel->MAXWAY();mar++){
+            for(int mar=gs->strel->MINWAY();mar<=gs->strel->MAXWAY();mar++){
                 bool exmar=false;
                 foreach (m_RC_Gor *rc, lrc) {
                     if ((rc->MINWAY()==rc->MAXWAY())&&(mar==rc->MINWAY())){
@@ -93,7 +126,7 @@ void GtGac::validation(ListObjStr *l) const
                     }
                 }
                 if (!exmar){
-                    l->error(strel,QString("Нет реализации для mar=%1").arg(mar));
+                    l->error(gs->strel,QString("Нет реализации для mar=%1").arg(mar));
                 }
             }
 
@@ -132,22 +165,26 @@ bool isNegabarit(m_Strel_Gor_Y*strel,MVP_Enums::TStrelPol pol)
 void GtGac::work(const QDateTime &T)
 {
     if (!FSTATE_ENABLED) return;
-    foreach (m_Strel_Gor_Y*strel, l_strel) {
-        strel->rcs->pol_zad=MVP_Enums::pol_unknow;
-        strel->rcs->pol_mar=MVP_Enums::pol_unknow;
+    // выставляем блокировку перевода
+    for (auto gs : l_strel){
+        setStateBlockPerevod(gs);
+    }
+
+    for (auto gs : l_strel){
+        gs->pol_zad=MVP_Enums::pol_unknow;
+        gs->pol_mar=MVP_Enums::pol_unknow;
         // убираем автовозврат
-        if (strel->STATE_A()!=1) strel->setSTATE_UVK_AV(false);
+        if (gs->strel->STATE_A()!=1) gs->strel->setSTATE_UVK_AV(false);
     }
     // определяем на стрелках нужное для отцепов положение pol_mar
-    foreach (m_Otcep *otcep, TOS->lo) {
+    foreach (m_Otcep *otcep, otceps->otceps()) {
         if (!otcep->STATE_ENABLED()) continue;
-        if ((otcep->NUM()==1) && (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib)){
-            // для 1 первого выставляем даж когда он еще не выехал
-        } else {
-            if (otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk) continue;
-            // не выставляем для отцепов которые едут в гору
-            if (otcep->STATE_DIRECTION()!=0) continue;
-        }
+
+        // для первого выставляем даж когда он еще не выехал
+        if ((!otceps->isFirstOtcep(otcep))&&(otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk)) continue;
+        // не выставляем для отцепов которые едут в гору
+        if (otcep->STATE_DIRECTION()!=0) continue;
+
         auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
 
         if (rcs==nullptr) continue;
@@ -169,74 +206,73 @@ void GtGac::work(const QDateTime &T)
             if (recurs_count>200) break; // защита от бесконечного цикла при сбойном графе
 
             if (rc->STATE_BUSY()) break;
-            if (!rc->rcs->l_otceps.isEmpty()) break;
+            if (otceps->otcepOnRc(rc)!=nullptr) break;
             auto grc=qobject_cast<m_RC_Gor*>(rc);
             // дальше считаем стрелок нет
             if (grc->MINWAY()==grc->MAXWAY()) break;
+
             if (grc->MINWAY()>otcep->STATE_MAR()) break;
             if (grc->MAXWAY()<otcep->STATE_MAR()) break;
-            auto strel=qobject_cast<m_Strel_Gor_Y*>(rc);
-            if (strel){
-                if (!l_strel.contains(strel)) break; // избыточно
+            // наша стрелка?
+            if (mRC2GS.contains(rc)){
+                GacStrel*gs=mRC2GS[rc];
                 // только один отцеп решает
                 // но по сути это ситуация когда из 2 точек есть выход на одну рц
-                if (strel->rcs->pol_mar!=MVP_Enums::pol_unknow) break;
-                auto rcplus=qobject_cast<m_RC_Gor*>(strel->getNextRC(0,0));
-                auto rcmnus=qobject_cast<m_RC_Gor*>(strel->getNextRC(0,1));
-                if (rcplus==nullptr) break;
-                if (rcmnus==nullptr) break;
-                bool cmd_plus=false;
-                bool cmd_mnus=false;
-                if (inway(otcep->STATE_MAR(),rcplus->MINWAY(),rcplus->MAXWAY())) cmd_plus=true;
-                if (inway(otcep->STATE_MAR(),rcmnus->MINWAY(),rcmnus->MAXWAY())) cmd_mnus=true;
-                if (cmd_plus==cmd_mnus) break;
-                if (cmd_plus) strel->rcs->pol_mar=MVP_Enums::pol_plus;
-                if (cmd_mnus) strel->rcs->pol_mar=MVP_Enums::pol_minus;
+                if (gs->pol_mar!=MVP_Enums::pol_unknow) break;
+                bool mar_plus=false;
+                bool mar_mnus=false;
+                auto rcplus=qobject_cast<m_RC_Gor*>(gs->strel->getNextRC(0,0));
+                auto rcmnus=qobject_cast<m_RC_Gor*>(gs->strel->getNextRC(0,1));
+                if (rcplus!=nullptr) {
+                    if (inway(otcep->STATE_MAR(),rcplus->MINWAY(),rcplus->MAXWAY())) mar_plus=true;
+                }
+                if (rcmnus!=nullptr) {
+                    if (inway(otcep->STATE_MAR(),rcmnus->MINWAY(),rcmnus->MAXWAY())) mar_mnus=true;
+                }
+                if (mar_plus==mar_mnus) break;
+                if (mar_plus) gs->pol_mar=MVP_Enums::pol_plus;
+                if (mar_mnus) gs->pol_mar=MVP_Enums::pol_minus;
                 // до первой необходимости перевода
-                if ((strel->STATE_POL()!=strel->rcs->pol_mar)) break;
+                if ((gs->strel->STATE_POL()!=gs->pol_mar)) break;
             }
             // так как только до первой стр с неправ положением - то можем брать просто след
             // а не rcplus/rcmnus
-            rc=rc->next_rc[0];
+            rc=rc->next_rc[0];// getNextRCpolcfb(0);
         }
     }
 
     // определяем возможность команды на перевод
-    foreach (m_Strel_Gor_Y*strel, l_strel) {
-        if ((TOS->modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk)&&(TOS->modelGorka->STATE_REGIM()!=ModelGroupGorka::regimPausa)) continue;
-        if (strel->rcs->pol_mar==MVP_Enums::pol_unknow) continue;
-        if (strel->STATE_POL()==strel->rcs->pol_mar) continue;
-        if (strel->STATE_A()!=1) continue;
-        if (strel->rcs->STATE_CHECK_FREE_DB()==1) continue;
-        if (strel->STATE_NEGAB_RC()==1) continue;
-        if (strel->STATE_UVK_AV()==1) continue;
-        if ((strel->get_rtds()!=nullptr)&&(strel->get_rtds()->STATE_SRAB()==1)) continue;
-        if ((strel->get_ipd()!=nullptr)&&(strel->get_ipd()->STATE_SRAB()==1)) continue;
-        if (isNegabarit(strel,strel->rcs->pol_mar)) continue;
+    for (auto gs : l_strel){
+        if ((modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk)&&(modelGorka->STATE_REGIM()!=ModelGroupGorka::regimPausa)) continue;
+        if (gs->pol_mar==MVP_Enums::pol_unknow) continue;
+        if (gs->strel->STATE_POL()==gs->pol_mar) continue;
+        if (gs->strel->STATE_A()!=1) continue;
 
-        strel->rcs->pol_zad=strel->rcs->pol_mar;
+        if (gs->BL_PER) continue;
+
+        gs->pol_zad=gs->pol_mar;
     }
 
     // задаем команды
-    foreach (m_Strel_Gor_Y*strel, l_strel) {
-        sendCommand(strel,strel->rcs->pol_zad);
+    for (auto gs : l_strel){
+        sendCommand(gs,gs->pol_zad);
     }
 
     // проверки времени перевода
-    foreach (m_Strel_Gor_Y*strel, l_strel) {
-        if (strel->rcs->pol_cmd!=MVP_Enums::pol_unknow){
+    for (auto gs : l_strel){
+        if (gs->pol_cmd!=MVP_Enums::pol_unknow){
             // определям начало перевода по команде
-            if (strel->STATE_POL()==MVP_Enums::pol_w){
-                if (!strel->rcs->pol_cmd_w_time.isValid()) strel->rcs->pol_cmd_w_time=T;
+            if (gs->strel->STATE_POL()==MVP_Enums::pol_w){
+                if (!gs->pol_cmd_w_time.isValid()) gs->pol_cmd_w_time=T;
             }
 
-            if (strel->rcs->pol_cmd_w_time.isValid()){
-                qint64 ms=strel->rcs->pol_cmd_w_time.msecsTo(T);
-                if (strel->STATE_POL()!=MVP_Enums::pol_w){
+            if (gs->pol_cmd_w_time.isValid()){
+                qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
+                if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
                     // определям автовозврат
-                    if (strel->rcs->pol_cmd!=strel->STATE_POL()){
+                    if (gs->pol_cmd!=gs->strel->STATE_POL()){
                         if ((ms>100) &&(ms<2000)) {
-                            strel->setSTATE_UVK_AV(true);
+                            gs->strel->setSTATE_UVK_AV(true);
                         }
                     }
                 } else {
@@ -248,57 +284,79 @@ void GtGac::work(const QDateTime &T)
         }
     }
     //сбраcываем таймер
-    foreach (m_Strel_Gor_Y*strel, l_strel) {
-        if (strel->STATE_POL()!=MVP_Enums::pol_w) strel->rcs->pol_cmd_w_time=QDateTime();
+    for (auto gs : l_strel){
+        if (gs->strel->STATE_POL()!=MVP_Enums::pol_w) gs->pol_cmd_w_time=QDateTime();
     }
 
 
 
 }
 
-void GtGac::sendCommand(m_Strel_Gor_Y *strel, MVP_Enums::TStrelPol pol_cmd,bool force)
+
+void GtGac::setStateBlockPerevod(GacStrel *gs)
 {
-    if ((strel->rcs->pol_cmd!=pol_cmd)||(force)){
-        strel->rcs->pol_cmd=pol_cmd;
-        strel->rcs->pol_cmd_time.start();
-        if (strel->rcs->pol_cmd==MVP_Enums::pol_plus) {
-            emit uvk_command(strel->TU_PRP(),1);
-            emit uvk_command(strel->TU_PRM(),0);
-            strel->setSTATE_UVK_PRP(true);
-            strel->setSTATE_UVK_PRM(false);
+    if (otceps->otcepOnRc(gs->strel)!=nullptr) gs->BL_PER_OTC=true;else gs->BL_PER_OTC=false;
+    bool sp=false;
+    if ((gs->strel->get_rtds()!=nullptr)&&(gs->strel->get_rtds()->STATE_SRAB()==1)) sp=true;
+    if ((gs->strel->get_ipd()!=nullptr)&&(gs->strel->get_ipd()->STATE_SRAB()==1)) sp=true;
+    if (gs->strel->STATE_BUSY()!=0) sp=true;
+    gs->BL_PER_SP=sp;
+
+    gs->BL_PER_DB=gs->strel->STATE_CHECK_FREE_DB(); // это проеверка освобождения стрелки при занятой пред
+
+    gs->BL_PER_TLG=false; /// ================ДОБАВИТЬ!
+
+    gs->BL_PER_NGBSTAT=isNegabarit(gs->strel,gs->strel->STATE_POL());
+
+    gs->BL_PER_NGBDYN=false; /// ================ДОБАВИТЬ!
+
+    gs->BL_PER=gs->BL_PER_OTC |
+            gs->BL_PER_SP |
+            gs->BL_PER_DB |
+            gs->BL_PER_TLG |
+            gs->BL_PER_NGBSTAT |
+            gs->BL_PER_NGBDYN |
+            gs->strel->STATE_UVK_AV();
+
+}
+
+
+
+void GtGac::sendCommand(GacStrel * gs, MVP_Enums::TStrelPol pol_cmd,bool force)
+{
+    if ((gs->pol_cmd!=pol_cmd)||(force)){
+        gs->pol_cmd=pol_cmd;
+        gs->pol_cmd_time.start();
+        if (gs->pol_cmd==MVP_Enums::pol_plus) {
+            emit uvk_command(gs->strel->TU_PRP(),1);
+            emit uvk_command(gs->strel->TU_PRM(),0);
+            gs->strel->setSTATE_UVK_PRP(true);
+            gs->strel->setSTATE_UVK_PRM(false);
 
         }
-        if (strel->rcs->pol_cmd==MVP_Enums::pol_minus) {
-            emit uvk_command(strel->TU_PRP(),0);
-            emit uvk_command(strel->TU_PRM(),1);
-            strel->setSTATE_UVK_PRP(false);
-            strel->setSTATE_UVK_PRM(true);
+        if (gs->pol_cmd==MVP_Enums::pol_minus) {
+            emit uvk_command(gs->strel->TU_PRP(),0);
+            emit uvk_command(gs->strel->TU_PRM(),1);
+            gs->strel->setSTATE_UVK_PRP(false);
+            gs->strel->setSTATE_UVK_PRM(true);
         }
-        if (strel->rcs->pol_cmd==MVP_Enums::pol_unknow) {
-            emit uvk_command(strel->TU_PRP(),0);
-            emit uvk_command(strel->TU_PRM(),0);
-            strel->setSTATE_UVK_PRP(false);
-            strel->setSTATE_UVK_PRM(false);
+        if (gs->pol_cmd==MVP_Enums::pol_unknow) {
+            emit uvk_command(gs->strel->TU_PRP(),0);
+            emit uvk_command(gs->strel->TU_PRM(),0);
+            gs->strel->setSTATE_UVK_PRP(false);
+            gs->strel->setSTATE_UVK_PRM(false);
         }
     } else {
         // если нет ответа от платы шлем еще
-        if ((strel->rcs->pol_cmd_time.isValid()) && (strel->rcs->pol_cmd_time.elapsed()<500)){
-            if ((strel->STATE_UVK_PRP()!=strel->STATE_PRP())){
-                emit uvk_command(strel->TU_PRP(),strel->STATE_UVK_PRP());
+        if ((gs->pol_cmd_time.isValid()) && (gs->pol_cmd_time.elapsed()<500)){
+            if ((gs->strel->STATE_UVK_PRP()!=gs->strel->STATE_PRP())){
+                emit uvk_command(gs->strel->TU_PRP(),gs->strel->STATE_UVK_PRP());
             }
-            if ((strel->STATE_UVK_PRM()!=strel->STATE_PRM())){
-                emit uvk_command(strel->TU_PRM(),1);
+            if ((gs->strel->STATE_UVK_PRM()!=gs->strel->STATE_PRM())){
+                emit uvk_command(gs->strel->TU_PRM(),gs->strel->STATE_UVK_PRM());
             }
         }
     }
 }
 
-void GtGac::state2buffer()
-{
-    foreach (m_Strel_Gor_Y*strel, l_strel) {
-        strel->SIGNAL_UVK_PRP().setValue_1bit(strel->STATE_UVK_PRP());
-        strel->SIGNAL_UVK_PRM().setValue_1bit(strel->STATE_UVK_PRM());
-        strel->SIGNAL_UVK_AV().setValue_1bit(strel->STATE_UVK_AV());
-    }
-}
 

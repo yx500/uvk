@@ -27,13 +27,23 @@ void OtcepsController::validation(ListObjStr *l) const
 QList<SignalDescription> OtcepsController::acceptOutputSignals()
 {
     QList<SignalDescription> l;
-
+    // рассыка в обоих форматах
     foreach (auto *otcep, otceps->l_otceps) {
         otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
-        l<< otcep->SIGNAL_DATA();
+        auto s1=otcep->SIGNAL_DATA();
+        s1.setChanelType(9);
+        mO29[otcep]=s1;
+        l<< s1;
+        auto s2=otcep->SIGNAL_DATA();
+        s2.setChanelType(109);
+        mO2109[otcep]=s2;
+        l<< s2;
     }
+    // 14 сортир 15 от увк
+    otceps->setSIGNAL_DATA_VAGON_0(otceps->SIGNAL_DATA_VAGON_0().innerUse());
     for (int i=0;i<MaxVagon;i++){
-        SignalDescription p=SignalDescription(otceps->chanelVag[i]->type,otceps->chanelVag[i]->name,0);
+        SignalDescription p=SignalDescription(15,QString("vag%1").arg(i+1),0);
+        l_chanelVag.push_back(p);
         l<<p;
     }
     return l;
@@ -42,7 +52,7 @@ QList<SignalDescription> OtcepsController::acceptOutputSignals()
 void OtcepsController::state2buffer()
 {
     foreach (auto *otcep, otceps->l_otceps) {
-        if (otcep->SIGNAL_DATA().chanelType()==9){
+        {
             t_Descr stored_Descr;
             memset(&stored_Descr,0,sizeof(stored_Descr));
             if (otcep->STATE_ENABLED()){
@@ -100,11 +110,13 @@ void OtcepsController::state2buffer()
                 //                   stored_Descr.VrospZ;
                 //                   stored_Descr.VrospF;
                 //                   stored_Descr.V_zad2_S ; // Скорость заданная 2TP
-                otcep->SIGNAL_DATA().setBufferData(&stored_Descr,sizeof(stored_Descr));
+
+                auto &s=mO29[otcep];
+                s.setBufferData(&stored_Descr,sizeof(stored_Descr));
             }
         }
 
-        if (otcep->SIGNAL_DATA().chanelType()==109){
+        {
             QString S;
             QVariantHash m;
             m["NUM"]=otcep->NUM();
@@ -118,19 +130,20 @@ void OtcepsController::state2buffer()
                 m[stateName]=V;
             }
             S=MVP_System::QVariantHashToQString_str(m);
-            otcep->SIGNAL_DATA().getBuffer()->A=S.toUtf8();
+            auto &s=mO2109[otcep];
+            s.getBuffer()->A=S.toUtf8();
         }
     }
     for (int i=0;i<MaxVagon;i++){
-        if (otceps->TYPE_DESCR()==0){
-            otceps->chanelVag[i]->A.resize(sizeof(otceps->vagons[i]));
-            memcpy(otceps->chanelVag[i]->A.data(),&otceps->vagons[i],sizeof(otceps->vagons[i]));
-        }
-        if (otceps->TYPE_DESCR()==1){
-            QVariantHash m=tSlVagon2Map(otceps->vagons[i]);
-            QString S=MVP_System::QVariantHashToQString_str(m);
-            otceps->chanelVag[i]->A=S.toUtf8();
-        }
+        // рассылаем в старом
+        //if (otceps->TYPE_DESCR()==0){
+        otceps->chanelVag[i].getBuffer()->A.resize(sizeof(otceps->vagons[i]));
+        memcpy(otceps->chanelVag[i].getBuffer()->A.data(),&otceps->vagons[i],sizeof(otceps->vagons[i]));
+        //        if (otceps->TYPE_DESCR()==1){
+        //            QVariantHash m=tSlVagon2Map(otceps->vagons[i]);
+        //            QString S=MVP_System::QVariantHashToQString_str(m);
+        //            otceps->chanelVag[i]->A=S.toUtf8();
+        //        }
     }
 }
 
@@ -138,6 +151,7 @@ bool OtcepsController::cmd_CLEAR_ALL(QString &acceptStr)
 {
 
     otceps->resetStates();
+    updateVagons();
     acceptStr="Сброс списка отцепов.";
     return true;
 }
@@ -154,19 +168,23 @@ bool OtcepsController::cmd_ACTIVATE_ALL(QString &acceptStr)
 bool OtcepsController::cmd_DEL_OTCEP(QMap<QString, QString> &m, QString &acceptStr)
 {
     int N=m["DEL_OTCEP"].toInt();
-    if ((N>0)&& (N<otceps->l_otceps.size())){
-        int n=N-1;
-        if ((otceps->l_otceps[n]->STATE_ENABLED()) && (otceps->l_otceps[n]->STATE_LOCATION()!=m_Otcep::locationOnPrib)){
+    auto otcep=otceps->otcepByNum(N);
+    if (otcep!=nullptr){
+        if ((otcep->STATE_ENABLED()) && (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)){
             acceptStr=QString("Попытка удалить выявленный отцеп. Отцеп %1.").arg(N);
             return false;
         }
+        int n=otceps->l_otceps.indexOf(otcep);
         for (int i=n;i<otceps->l_otceps.size()-1;i++){
-            otceps->l_otceps[i]->acceptSLStates(otceps->l_otceps[i+1]);
-            otceps->l_otceps[i]->setSTATE_LOCATION(otceps->l_otceps[i+1]->STATE_LOCATION());
-            otceps->l_otceps[i]->setSTATE_ENABLED(otceps->l_otceps[i+1]->STATE_ENABLED());
+            auto otcep_0=otceps->l_otceps[i];
+            auto otcep_1=otceps->l_otceps[i+1];
+            otcep_0->acceptSLStates(otcep_1);
+            otcep_0->setSTATE_LOCATION(otcep_1->STATE_LOCATION());
+            otcep_0->setSTATE_ENABLED(otcep_1->STATE_ENABLED());
 
         }
         otceps->l_otceps.last()->resetStates();
+        updateVagons();
         acceptStr=QString("Отцеп %1 удален.").arg(N);
         return true;
 
@@ -178,22 +196,28 @@ bool OtcepsController::cmd_DEL_OTCEP(QMap<QString, QString> &m, QString &acceptS
 bool OtcepsController::cmd_INC_OTCEP(QMap<QString, QString> &m, QString &acceptStr)
 {
     int N=m["INC_OTCEP"].toInt();
-    if ((N>0)&& (N-1<otceps->l_otceps.size())){
-        int n=N-1;
-        if ((otceps->l_otceps[n]->STATE_ENABLED()) && (otceps->l_otceps[n]->STATE_LOCATION()!=m_Otcep::locationOnPrib)){
+    auto otcep=otceps->otcepByNum(N);
+    if (otcep!=nullptr){
+        if ((otcep->STATE_ENABLED()) && (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)){
             acceptStr=QString("Попытка добавить отцеп перед выявленным. Отцеп %1.").arg(N);
             return false;
         }
-        for (int i=otceps->l_otceps.size()-1;i>=n+1;i--){
-            otceps->l_otceps[i]->acceptSLStates(otceps->l_otceps[i-1]);
-            otceps->l_otceps[i]->setSTATE_LOCATION(otceps->l_otceps[i-1]->STATE_LOCATION());
-            otceps->l_otceps[i]->setSTATE_ENABLED(otceps->l_otceps[i-1]->STATE_ENABLED());
+        int ib=otceps->l_otceps.indexOf(otcep);
+        for (int i=otceps->l_otceps.size()-1;i>=ib+1;i--){
+            auto otcep_0=otceps->l_otceps[i-1];
+            auto otcep_1=otceps->l_otceps[i];
+            if ((otcep_0->STATE_ENABLED()) && (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) break;
+            if ((otcep_1->STATE_ENABLED()) && (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) break;
+            otcep_1->acceptSLStates(otcep_0);
+            otcep_1->setSTATE_LOCATION(otcep_0->STATE_LOCATION());
+            otcep_1->setSTATE_ENABLED(otcep_0->STATE_ENABLED());
         }
-        otceps->l_otceps[n]->resetStates();
-        if (n<otceps->l_otceps.size()-1) otceps->l_otceps[n]->acceptSLStates(otceps->l_otceps[n+1]);
-        otceps->l_otceps[n]->setSTATE_LOCATION(m_Otcep::locationOnPrib);
-        otceps->l_otceps[n]->setSTATE_ENABLED(true);
+        otcep->resetStates();
+        //if (n<otceps->l_otceps.size()-1) otceps->l_otceps[n]->acceptSLStates(otceps->l_otceps[n+1]);
+        otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
+        otcep->setSTATE_ENABLED(true);
         acceptStr=QString("Отцеп %1 добавлен.").arg(N);
+        updateVagons();
         return true;
     }
     acceptStr=QString("Ошибка добавления отцепа %1.").arg(m["N"]);
@@ -204,8 +228,8 @@ bool OtcepsController::cmd_SET_OTCEP_STATE(QMap<QString, QString> &m, QString &a
     if (!m["N"].isEmpty()){
 
         int N=m["N"].toInt();
-        if ((N>0)&& (N<otceps->l_otceps.size()-1)){
-            m_Otcep *otcep=otceps->l_otceps[N-1];
+        auto otcep=otceps->otcepByNum(N);
+        if (otcep!=nullptr){
             foreach (QString key, m.keys()) {
                 if ((key=="CMD") || (key=="N")) continue;
                 QString stateName="STATE_"+key;
@@ -235,8 +259,8 @@ bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acc
 {
     if (!m["N"].isEmpty()){
         int N=m["N"].toInt();
-        if ((N>0)&& (N<otceps->l_otceps.size()-1)){
-            m_Otcep *otcep=otceps->l_otceps[N-1];
+        auto otcep=otceps->otcepByNum(N);
+        if (otcep!=nullptr){
             QVariantHash mv;
             foreach (QString key, m.keys()) {
                 mv[key]=m[key];
@@ -268,9 +292,29 @@ bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acc
             //                }
             otcep->vVag.push_back(v);
             otceps->vagons[v.IV-1]=v;
-
+            acceptStr=QString("Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
+            updateVagons();
+            return true;
         }
     }
-    acceptStr=QString("Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
-    return true;
+    acceptStr=QString("Ощибка добавления: Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
+    return false;
+}
+
+void OtcepsController::updateVagons()
+{
+    tSlVagon vagons0;
+    memset(&vagons0,0,sizeof(vagons0));
+    foreach (auto &s, l_chanelVag) {
+        s.setValue_data(&vagons0,sizeof(vagons0));
+    }
+    int i=0;
+    foreach (auto otcep, otceps->otceps()) {
+        foreach (auto &v, otcep->vVag) {
+            if (i>=l_chanelVag.size()) break;
+            auto &s=l_chanelVag[i];
+            s.setValue_data(&v,sizeof(v));
+            i++;
+        }
+    }
 }

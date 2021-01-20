@@ -5,7 +5,8 @@
 INCLUDEPATH += $$PWD
 
 HEADERS += \
-    $$PWD/dynamicstatistic.h \
+#    $$PWD/dynamicstatistic.h \
+    $$PWD/tos_rc.h \
     $$PWD/trackingotcepsystem.h \
     $$PWD/tos_zkrtracking.h \
     $$PWD/tos_speedcalc.h \
@@ -17,7 +18,8 @@ HEADERS += \
     
 
 SOURCES += \
-    $$PWD/dynamicstatistic.cpp \
+#    $$PWD/dynamicstatistic.cpp \
+    $$PWD/tos_rc.cpp \
     $$PWD/trackingotcepsystem.cpp \
     $$PWD/tos_zkrtracking.cpp \
     $$PWD/tos_speedcalc.cpp \

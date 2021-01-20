@@ -5,8 +5,7 @@
 #include "tos_dsotracking.h"
 #include "tos_rctracking.h"
 
-class ModelGroupGorka;
-class m_Otceps;
+
 
 enum TZkrOtcepState{
     _zkrOtcepNone=0,
@@ -16,10 +15,21 @@ enum TZkrOtcepState{
 };
 
 enum T_OTC_ZKR_cmd{
-     _none=0,_in,_error_rtds,_baza,
-    _head2front,_back2front,_pushHeadBack2front,_resetOtcepOnZKR,_back2front_in
+    _resetDSO_0=1000,
+    _resetDSO_1,
+    _resetDSO_0IF3,
+
+    _in,
+    cmdMove_A_ToFront_in,
+    _error_rtds,_baza,
+    _resetOtcepOnZKR
 };
 
+enum T_ZkrDsoState{
+    _D0=0,
+    _DF=1,
+    _DB=2
+};
 
 
 class tos_ZkrTracking : public tos_RcTracking
@@ -27,21 +37,31 @@ class tos_ZkrTracking : public tos_RcTracking
     Q_OBJECT
 public:
     struct t_zkr_state {
-        T_BusyOtcepState rcstate[3];
+        TRcBOS rcos3[3];
         int rtds;
+        int dso;
+
         bool likeTable(const t_zkr_state &ts) const{
             for (int j=0;j<3;j++){
-                if (!busyOtcepStateLike(ts.rcstate[j],rcstate[j])) return false;
+                if (!rcOtcepStateLike(ts.rcos3[j],rcos3[j])) return false;
+            }
+            if ((ts.rtds!=_xx)||(ts.rtds!=rtds)) return false;
+            if ((ts.dso!=_xx)||(ts.dso!=dso))return false;
+            return true;
+        }
+        bool equal(const t_zkr_state &ts) const {
+            for (int j=0;j<3;j++){
+                if (!rcOtcepStateLike(ts.rcos3[j],rcos3[j])) return false;
             }
             if (ts.rtds!=rtds) return false;
+            if (ts.dso!=dso)return false;
             return true;
         }
     };
     struct t_zkr_pairs{
         tos_ZkrTracking::t_zkr_state prev_state;
         tos_ZkrTracking::t_zkr_state curr_state;
-        int ext_state;
-        T_OTC_ZKR_cmd cmd;
+        int cmd;
     };
 public:
     MYSTATE(int ,STATE_LT_OSY_CNT)
@@ -51,27 +71,28 @@ public:
     MYSTATE(int, STATE_TLG_D)
     MYSTATE(qreal, STATE_V_DSO)
 
-    explicit tos_ZkrTracking(QObject *parent ,m_RC_Gor_ZKR * rc_zkr,m_Otceps *otceps,ModelGroupGorka *modelGorka);
+    explicit tos_ZkrTracking(TrackingOtcepSystem *parent, tos_Rc *rc);
     virtual ~tos_ZkrTracking(){}
     void resetStates()override;
+    void setCurrState()override;
+    void prepareCurState()override;
     void work(const QDateTime &T)override;
 
     QList<SignalDescription> acceptOutputSignals() override;
     void state2buffer() override;
 
+
+
     m_RC_Gor_ZKR * rc_zkr;
-    ModelGroupGorka *modelGorka=nullptr;
 signals:
 
 public slots:
 protected:
-    m_Otceps *otceps;
 
-    m_RC *rc_next;
-    m_RC *rc_prev;
     tos_DsoTracking *dsot[2][2];
     tos_DsoPair dso_pair;
     int osy_count[2];
+    bool baza;
     qreal Vdso;
     QDateTime VdsoTime;
 
@@ -79,13 +100,18 @@ protected:
     t_zkr_state prev_state_zkr;
 
     void newOtcep(const QDateTime &T);
-    void checkNeRascep();
+    void checkNeRascep(int num);
     void checkOsyCount(m_Otcep *otcep);
+    void resetOtcep2Nadvig();
 
     int prev_base_os;
     int baza_count;
-    void reset_dso();
+    void reset_dso(int n);
     void work_dso(const QDateTime &T);
+
+    int _find_step(tos_ZkrTracking::t_zkr_pairs steps[],int size_steps,const tos_ZkrTracking::t_zkr_state &prev_state,const tos_ZkrTracking::t_zkr_state &curr_state);
+    void doCmd(int cmd,const QDateTime &T)override ;
+
 
 
 };

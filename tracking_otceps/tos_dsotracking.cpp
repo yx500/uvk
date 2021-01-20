@@ -19,8 +19,8 @@ QList<SignalDescription> tos_DsoTracking::acceptOutputSignals()
 void tos_DsoTracking::state2buffer()
 {
     DSO_Data d;
-    d.count=dso->STATE_OSY_COUNT();
-    d.direct=dso->STATE_DIRECT();
+    d.V=dso->STATE_OSY_COUNT();
+    d.D=dso->STATE_DIRECT();
     dso->SIGNAL_DSODATA().setValue_data(&d,sizeof (d));
 }
 void tos_DsoTracking::resetStates()

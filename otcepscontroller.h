@@ -24,6 +24,11 @@ public:
     bool cmd_INC_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_SET_OTCEP_STATE(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m,QString &acceptStr);
+
+    void updateVagons();
+    QList<SignalDescription> l_chanelVag;
+    QMap<m_Otcep*,SignalDescription> mO29;
+    QMap<m_Otcep*,SignalDescription> mO2109;
 signals:
 
 };

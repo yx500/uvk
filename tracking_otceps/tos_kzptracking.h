@@ -21,33 +21,13 @@ enum TZkpOtcepState{
     _kzpOtcep_RCF_LeavePark
 };
 
-enum T_kzp_rc_state{
-    _NNN=-1,
-
-
-    _MMT0,
-    _MMTS,
-    _MMTF,
-
-    _LLT0,
-    _LLTS,
-    _LLTF,
-
-    _LMT0,
-    _LMTS,
-    _LMTF,
-
-    _MLT0,
-    _MLTS,
-    _MLTF
-
-    //,_xxxx=99
+enum T_KzpBusyState{
+    _MM=101,
+    _LL,
+    _LM,
+    _ML
 };
 
-
-enum T_kzp_state{
-    s_ok
-};
 
 
 class tos_KzpTracking : public tos_RcTracking
@@ -55,54 +35,50 @@ class tos_KzpTracking : public tos_RcTracking
     Q_OBJECT
 public:
     struct t_kzp_tracking_state{
-        T_kzp_state flag;
-        T_kzp_rc_state kzpos;
-        T_BusyOtcepState rcos0;
+        TRcBOS rcos3[3];
         bool likeTable(const t_kzp_tracking_state &ts) const{
-             if (ts.kzpos!=kzpos)   return false;
-             if (!busyOtcepStateLike(ts.rcos0,rcos0)) return false;
-            if ((ts.flag!=flag)) return false;
+             for (int i=0;i<3;i++)
+                if (!rcOtcepStateLike(ts.rcos3[0],rcos3[0])) return false;
             return true;
         }
     };
     enum T_kzp_command{
-        cmdNothing=0,
-        cmdMoveStartToPark,
-        cmdMoveFinishToPark,
-        cmdMoveStartToRc0,
-        cmdMoveStartFinishToPark,
-        cmdUpdateLast,
-        cmdReset
+        cmdReset_kzp
     };
     struct t_kzp_pairs{
         t_kzp_tracking_state prev_state;
         t_kzp_tracking_state curr_state;
-        T_kzp_command cmd;
+        int cmd;
     };
 
-    explicit tos_KzpTracking(QObject *parent ,m_RC_Gor_Park * rc_park);
+    explicit tos_KzpTracking(TrackingOtcepSystem *parent , tos_Rc *trc);
     virtual ~tos_KzpTracking(){}
-    virtual void resetStates();
+    virtual void resetStates()override;
+
+    void setCurrState() override;
+    void prepareCurState()override;
 
     m_RC_Gor_Park * rc_park;
-    virtual void work(const QDateTime &T);
+    virtual void work(const QDateTime &T)override;
 
 signals:
 
 
 protected:
-    m_RC *rc2[2];
 
     t_kzp_tracking_state prev_state_kzp;
     t_kzp_tracking_state curr_state_kzp;
 
 
     int prev_kzp;
+    int curr_kzp;
     int x_narast;
     QDateTime dtNarast;
 
 
-    T_kzp_rc_state kzp_rc_state();
+    TRcBOS kzp_rc_state();
+    void doCmd(int cmd,const QDateTime &T) override;
+    void closePred(const QDateTime &T);
 
 };
 
