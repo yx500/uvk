@@ -179,6 +179,8 @@ void GtGac::work(const QDateTime &T)
     // определяем на стрелках нужное для отцепов положение pol_mar
     foreach (m_Otcep *otcep, otceps->otceps()) {
         if (!otcep->STATE_ENABLED()) continue;
+        // не задан
+        if (otcep->STATE_MAR()==0) continue;
 
         // для первого выставляем даж когда он еще не выехал
         if ((!otceps->isFirstOtcep(otcep))&&(otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk)) continue;
@@ -237,7 +239,7 @@ void GtGac::work(const QDateTime &T)
             }
             // так как только до первой стр с неправ положением - то можем брать просто след
             // а не rcplus/rcmnus
-            rc=rc->next_rc[0];// getNextRCpolcfb(0);
+            rc=rc->next_rc[_forw];// getNextRCpolcfb(0);
         }
     }
 

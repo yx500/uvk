@@ -291,7 +291,7 @@ bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acc
             //                    };
             //                }
             otcep->vVag.push_back(v);
-            otceps->vagons[v.IV-1]=v;
+            //otceps->vagons[v.IV-1]=v;
             acceptStr=QString("Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
             updateVagons();
             return true;
