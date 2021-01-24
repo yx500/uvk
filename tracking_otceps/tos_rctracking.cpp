@@ -1,10 +1,10 @@
 #include "tos_rctracking.h"
 #include "tos_otcepdata.h"
-#include "trackingotcepsystem.h"
+#include "tos_system_rc.h"
 
 
 
-tos_RcTracking::tos_RcTracking(TrackingOtcepSystem *parent, tos_Rc *rc) : BaseWorker(parent)
+tos_RcTracking::tos_RcTracking(tos_System_RC *parent, tos_Rc *rc) : BaseWorker(parent)
 {
 
     TOS=parent;
@@ -445,7 +445,7 @@ void tos_RcTracking::moveOd(tos_Rc*next_trc, int _1a, int d, const QDateTime &T,
 
 
 
-void tos_RcTracking::work(const QDateTime &T)
+void tos_RcTracking::work(const QDateTime &)
 {
 
 }

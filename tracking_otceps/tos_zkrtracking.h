@@ -2,7 +2,8 @@
 #define TOS_ZKRTRACKING_H
 
 #include "m_rc_gor_zkr.h"
-#include "tos_dsotracking.h"
+#include "tos_dso.h"
+#include "tos_dso_pair.h"
 #include "tos_rctracking.h"
 
 
@@ -64,14 +65,8 @@ public:
         int cmd;
     };
 public:
-    MYSTATE(int ,STATE_LT_OSY_CNT)
-    MYSTATE(int ,STATE_LT_OSY_S)
-    MYSTATE(int ,STATE_TLG_CNT)
-    MYSTATE(int, STATE_TLG_SOST)
-    MYSTATE(int, STATE_TLG_D)
-    MYSTATE(qreal, STATE_V_DSO)
 
-    explicit tos_ZkrTracking(TrackingOtcepSystem *parent, tos_Rc *rc);
+    explicit tos_ZkrTracking(tos_System_RC *parent, tos_Rc *rc);
     virtual ~tos_ZkrTracking(){}
     void resetStates()override;
     void setCurrState()override;
@@ -89,7 +84,7 @@ signals:
 public slots:
 protected:
 
-    tos_DsoTracking *dsot[2][2];
+    tos_DSO *dsot[2][2];
     tos_DsoPair dso_pair;
     int osy_count[2];
     bool baza;

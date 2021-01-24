@@ -8,7 +8,7 @@
 #include "baseworker.h"
 #include "tos_rctracking.h"
 
-class TrackingOtcepSystem;
+class tos_System_RC;
 class m_RC_Gor_Park;
 class m_RC;
 class m_Otcep;
@@ -51,7 +51,7 @@ public:
         int cmd;
     };
 
-    explicit tos_KzpTracking(TrackingOtcepSystem *parent , tos_Rc *trc);
+    explicit tos_KzpTracking(tos_System_RC *parent , tos_Rc *trc);
     virtual ~tos_KzpTracking(){}
     virtual void resetStates()override;
 

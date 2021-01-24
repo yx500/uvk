@@ -185,11 +185,19 @@ void GtGac::work(const QDateTime &T)
         // для первого выставляем даж когда он еще не выехал
         if ((!otceps->isFirstOtcep(otcep))&&(otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk)) continue;
         // не выставляем для отцепов которые едут в гору
-        if (otcep->STATE_DIRECTION()!=0) continue;
+        if ((!otceps->isFirstOtcep(otcep))&&(otcep->STATE_DIRECTION()!=_forw)) continue;
 
         auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
 
         if (rcs==nullptr) continue;
+        // 1 ось - первая на рц, т.е. если есть на рц отцепы с меньшим номером то пропускаем
+        if (otceps->otcepCountOnRc(rcs)>1){
+            bool ex_min=false;
+            foreach (auto o1, otceps->otcepsOnRc(rcs)) {
+                if (o1->NUM()<otcep->NUM()) ex_min=true;
+            }
+            if (ex_min) continue;
+        }
         // реализован
         if (rcs->MINWAY()==rcs->MAXWAY()) continue;
         // на случай если хвост вышел из зоны ГАЦ

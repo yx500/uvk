@@ -1,7 +1,7 @@
 #ifndef UVK_CENTRAL_H
 #define UVK_CENTRAL_H
 #include <QTimer>
-#include "trackingotcepsystem.h"
+#include "tos_system.h"
 #include "gtgac.h"
 #include "otcepscontroller.h"
 #include "gtcommandinterface.h"
@@ -15,10 +15,10 @@ class UVK_Central : public QObject
     Q_OBJECT
 public:
     explicit UVK_Central(QObject *parent = nullptr);
-    bool init(QString fileNameModel);
+    bool init(QString fileNameIni);
     void start();
     ModelGroupGorka *GORKA;
-    TrackingOtcepSystem*TOS;
+    tos_System*TOS;
     GtGac *GAC;
     OtcepsController *otcepsController;
     GtCommandInterface *CMD;
@@ -53,6 +53,9 @@ public slots:
      void gac_command(const SignalDescription&s,int state);
 protected:
      int maxOtcepCurrenRospusk;
+
+     QString fileNameModel;
+     int trackingType;
 };
 
 #endif // UVK_CENTRAL_H

@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
 #endif
 
     UVK_Central uvk;
-    if (!uvk.init("./M.xml")){
+    if (!uvk.init("./uvk.ini")){
         qDebug()<<"ERRORS:\n";
         QString errolLofFileName="./uvk_errors.log";
         QFile txtfile1(errolLofFileName);

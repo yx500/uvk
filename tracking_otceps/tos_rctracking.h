@@ -8,7 +8,7 @@
 
 
 
-class TrackingOtcepSystem;
+class tos_System_RC;
 
 enum {_1od=0,_allod=1};
 
@@ -126,7 +126,7 @@ public:
     };
 
 public:
-    explicit tos_RcTracking(TrackingOtcepSystem *parent,tos_Rc *trc);
+    explicit tos_RcTracking(tos_System_RC *parent,tos_Rc *trc);
     virtual  ~tos_RcTracking(){}
 
     void validation(ListObjStr *l) const;
@@ -156,7 +156,7 @@ signals:
 
 public slots:
 protected:
-    TrackingOtcepSystem *TOS;
+    tos_System_RC *TOS;
     void workLSLZ(const QDateTime &T,int lslz);
     void moveOd(tos_Rc*next_trc,int _1a, int d, const QDateTime &T, bool bnorm);
     virtual void doCmd(int cmd,const QDateTime &T);

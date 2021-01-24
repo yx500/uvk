@@ -6,7 +6,7 @@
 #include <qfileinfo.h>
 #include <QtMath>
 
-DynamicOtcepSystem::DynamicOtcepSystem(QObject *parent, TrackingOtcepSystem *TOS) : BaseWorker(parent)
+DynamicOtcepSystem::DynamicOtcepSystem(QObject *parent, tos_System *TOS) : BaseWorker(parent)
 {
     this->TOS=TOS;
 }
@@ -54,28 +54,28 @@ void DynamicOtcepSystem::calculateXoffset(tos_OtcepData *o, const QDateTime &T,i
     }
 }
 
-void DynamicOtcepSystem::calculateXoffsetKzp(const QDateTime &T)
+void DynamicOtcepSystem::calculateXoffsetKzp(const QDateTime &)
 {
-    foreach (auto kzpt, TOS->l_kzpt) {
-
+    foreach (auto rc_park, TOS->l_park) {
+        auto trc=TOS->mRc2TRC[rc_park];
         // пересчитываем смещения
         bool recalc=false;
-        if (!kzpt->trc->l_otceps.isEmpty()){
-            auto num=kzpt->trc->l_otceps.last();
+        if (!trc->l_otceps.isEmpty()){
+            auto num=trc->l_otceps.last();
             if (TOS->mNUM2OD.contains(num)){
                 auto otcep=TOS->mNUM2OD[num]->otcep;
-                qreal end_x=kzpt->rc_park->STATE_KZP_D();
-                if (otcep->RCF==kzpt->rc_park){
+                qreal end_x=rc_park->STATE_KZP_D();
+                if (otcep->RCF==rc_park){
                     if (end_x!=otcep->STATE_D_RCF_XOFFSET()){
                         recalc=true;
                         otcep->setSTATE_D_RCF_XOFFSET(end_x);
                         otcep->setSTATE_D_RCS_XOFFSET(end_x+otcep->STATE_LEN());
                         end_x=otcep->STATE_D_RCS_XOFFSET();
                     }
-                    otcep->setSTATE_V_KZP(kzpt->rc_park->STATE_KZP_V());
+                    otcep->setSTATE_V_KZP(rc_park->STATE_KZP_V());
                 }
-                for (int i=kzpt->trc->l_otceps.size()-2;i>=0;i--){
-                    auto num=kzpt->trc->l_otceps.last();
+                for (int i=trc->l_otceps.size()-2;i>=0;i--){
+                    auto num=trc->l_otceps.last();
                     if (TOS->mNUM2OD.contains(num)){
                         auto o=TOS->mNUM2OD[num]->otcep;
                         // prognoz_KZP(o,T);// тут должен быть прогноз положения хвоста

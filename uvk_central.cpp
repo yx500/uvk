@@ -1,11 +1,12 @@
 #include "uvk_central.h"
 #include <QFileInfo>
 #include "do_message.hpp"
+#include "tos_system_dso.h"
 
 
 class IUVKGetNewOtcep :public IGetNewOtcep
 {
-    public:
+public:
     IUVKGetNewOtcep(UVK_Central *uvk){this->uvk=uvk;}
     virtual int getNewOtcep(m_RC*rc){return uvk->getNewOtcep(rc);}
     UVK_Central *uvk;
@@ -17,9 +18,23 @@ UVK_Central::UVK_Central(QObject *parent) : QObject(parent)
 
 }
 
-bool UVK_Central::init(QString fileNameModel)
+bool UVK_Central::init(QString fileNameIni)
 {
-
+    if (QFileInfo(fileNameIni).exists()){
+        qDebug() << "ini load:" << QFileInfo(fileNameIni).absoluteFilePath();
+        QSettings settings(fileNameIni,QSettings::IniFormat);
+        fileNameModel=settings.value("main/model","./M.xml").toString();
+//        trackingType=settings.value("main/tracking_type",1).toInt();
+    } else {
+        {
+            QSettings settings(fileNameIni,QSettings::IniFormat);
+            settings.setValue("main/model","./M.xml");
+//            settings.setValue("main/tracking_type",1);
+            fileNameIni=settings.fileName();
+        }
+        qDebug() << "ini created:" << QFileInfo(fileNameIni).absoluteFilePath();
+        return false;
+    }
 
     if (!QFileInfo(fileNameModel).exists()){
         qFatal("file not found %s",QFileInfo(fileNameModel).absoluteFilePath().toStdString().c_str());
@@ -44,9 +59,12 @@ bool UVK_Central::init(QString fileNameModel)
     l_zkr=GORKA->findChildren<m_RC_Gor_ZKR*>();
 
     otcepsController=new OtcepsController(this,l_otceps.first());
-    TOS=new TrackingOtcepSystem(this,GORKA);
+
+    trackingType=_tos_dso;
+    TOS=new tos_System_DSO(this);
     IUVKGetNewOtcep *uvkGetNewOtcep=new IUVKGetNewOtcep(this);
     TOS->setIGetNewOtcep(uvkGetNewOtcep);
+    TOS->makeWorkers(GORKA);
 
     GAC=new GtGac(this,GORKA);
 
@@ -181,10 +199,10 @@ bool UVK_Central::acceptBuffers()
     //            }
     //        }
     //    }
-        foreach (auto b, udp->allBuffers()) {
-            if (!b->static_mode)
-                qDebug()<< "use in buffer " <<b->getType() << b->objectName();
-        }
+    foreach (auto b, udp->allBuffers()) {
+        if (!b->static_mode)
+            qDebug()<< "use in buffer " <<b->getType() << b->objectName();
+    }
     foreach (auto b, l_out_buffers) {
         b->sost=GtBuffer::_alive;
         qDebug()<< "use out buffer " <<b->getType() << b->objectName();
@@ -310,6 +328,13 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
             CMD->accept_cmd(m,1,acceptStr); else
             CMD->accept_cmd(m,-1,acceptStr);
     }
+
+    if (m["CMD"]=="RESET_DSO_BUSY"){
+            if (TOS->resetDSOBUSY(m["RC"],acceptStr))
+                CMD->accept_cmd(m,1,acceptStr); else
+                CMD->accept_cmd(m,-1,acceptStr);
+    }
+
     sendBuffers();
     qDebug()<< acceptStr;
 }
@@ -441,12 +466,12 @@ void UVK_Central::state2buffer()
 bool UVK_Central::cmd_setPutNadvig(int p,QString &acceptStr)
 {
     bool ex=false;
-    foreach (auto zkrt, TOS->l_zkrt) {
-        if (zkrt->rc_zkr->PUT_NADVIG()==p){
-            zkrt->rc_zkr->setSTATE_ROSPUSK(true);
+    foreach (auto rc_zkr, TOS->l_zkr) {
+        if (rc_zkr->PUT_NADVIG()==p){
+            rc_zkr->setSTATE_ROSPUSK(true);
             ex=true;
         } else {
-            zkrt->rc_zkr->setSTATE_ROSPUSK(false);
+            rc_zkr->setSTATE_ROSPUSK(false);
         }
     }
     if (ex) {

@@ -1,14 +1,13 @@
 #include "tos_kzptracking.h"
 
 
-#include "m_otcep.h"
 #include "tos_otcepdata.h"
 #include "tos_rctracking.h"
-#include "trackingotcepsystem.h"
+#include "tos_system_rc.h"
 
 const int _bazalen=15;
 
-tos_KzpTracking::tos_KzpTracking(TrackingOtcepSystem *parent,tos_Rc *trc) : tos_RcTracking(parent,trc)
+tos_KzpTracking::tos_KzpTracking(tos_System_RC *parent, tos_Rc *trc) : tos_RcTracking(parent,trc)
 {
     rc_park=qobject_cast<m_RC_Gor_Park*>(trc->rc);
     trc->useRcTracking=false;

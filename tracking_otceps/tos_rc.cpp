@@ -1,7 +1,7 @@
 #include "tos_rc.h"
-#include "trackingotcepsystem.h"
+#include "tos_system.h"
 
-tos_Rc::tos_Rc(TrackingOtcepSystem *TOS, m_RC *rc) : BaseWorker(TOS)
+tos_Rc::tos_Rc(tos_System *TOS, m_RC *rc) : BaseWorker(TOS)
 {
 
     this->TOS=TOS;

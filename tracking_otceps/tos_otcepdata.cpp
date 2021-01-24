@@ -1,11 +1,11 @@
 #include "tos_otcepdata.h"
 
-#include "trackingotcepsystem.h"
+#include "tos_system.h"
 #include "tos_speedcalc.h"
 #include <QMetaProperty>
 #include <QtMath>
 
-tos_OtcepData::tos_OtcepData(TrackingOtcepSystem *parent, m_Otcep *otcep) : BaseObject(parent)
+tos_OtcepData::tos_OtcepData(tos_System *parent, m_Otcep *otcep) : BaseObject(parent)
 {
     this->TOS=parent;
     this->otcep=otcep;

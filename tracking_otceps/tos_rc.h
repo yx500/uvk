@@ -5,7 +5,7 @@
 #include "m_rc.h"
 #include "m_otcep.h"
 
-class TrackingOtcepSystem;
+class tos_System;
 class tos_OtcepData;
 
 struct TOtcepData{
@@ -24,12 +24,29 @@ struct TOtcepData{
     }
 };
 
+struct TOtcepDataOs{
+    TOtcepDataOs(){this->p=_pOtcepPartUnknow;this->num=0;os_otcep=0;d=0;zkr_num=0;t=QDateTime();}
+    TOtcepDataOs(const TOtcepDataOs&od){this->p=od.p;this->num=od.num;os_otcep=od.os_otcep;d=od.d;zkr_num=od.zkr_num;t=od.t;}
+    TOtcepPart p;
+    int num;
+    int d;
+    int os_otcep;
+    int zkr_num;
+    QDateTime t;
+    bool operator == (const TOtcepDataOs& r) const {
+        return !memcmp(this, &r, sizeof(r));
+    }
+    bool operator != (const TOtcepDataOs& r) const {
+        return memcmp(this, &r, sizeof(r));
+    }
+};
+
 
 
 class tos_Rc : public BaseWorker
 {
 public:
-    tos_Rc(TrackingOtcepSystem *TOS,m_RC *rc);
+    tos_Rc(tos_System *TOS,m_RC *rc);
     m_RC *rc;
 
     void work(const QDateTime &T) override;
@@ -52,8 +69,11 @@ public:
     tos_OtcepData *otcepOnRc(int sf);
     void remove_od(TOtcepData o);
 
+    QList<TOtcepDataOs> l_os;
+
+
 protected:
-    TrackingOtcepSystem *TOS;
+    tos_System *TOS;
     QDateTime time_STATE_BUSY;
 
 };

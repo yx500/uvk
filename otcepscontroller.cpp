@@ -297,7 +297,7 @@ bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acc
             return true;
         }
     }
-    acceptStr=QString("Ощибка добавления: Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
+    acceptStr=QString("Ошибка добавления: Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
     return false;
 }
 
@@ -310,8 +310,11 @@ void OtcepsController::updateVagons()
     }
     int i=0;
     foreach (auto otcep, otceps->otceps()) {
-        foreach (auto &v, otcep->vVag) {
+        for (tSlVagon &v: otcep->vVag) {
             if (i>=l_chanelVag.size()) break;
+            v.NO=otcep->NUM();
+            v.Id=otcep->STATE_ID_ROSP();
+            v.SP=otcep->STATE_SP();
             auto &s=l_chanelVag[i];
             s.setValue_data(&v,sizeof(v));
             i++;

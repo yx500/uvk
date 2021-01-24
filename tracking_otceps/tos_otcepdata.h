@@ -6,7 +6,7 @@
 #include "m_otcep.h"
 #include "tos_rctracking.h"
 
-class TrackingOtcepSystem;
+class tos_System;
 
 
 
@@ -22,7 +22,7 @@ public:
     MYSTATE(qreal, STATE_LEN_BY_RC_MAX)
 
 public:
-    explicit tos_OtcepData(TrackingOtcepSystem *parent, m_Otcep *otcep);
+    explicit tos_OtcepData(tos_System *parent, m_Otcep *otcep);
     virtual  ~tos_OtcepData(){}
 
     virtual void resetStates();
@@ -54,7 +54,7 @@ signals:
 public slots:
 
 protected:
-    TrackingOtcepSystem *TOS;
+    tos_System *TOS;
 };
 
 #endif // TOS_OTCEPDATA_H

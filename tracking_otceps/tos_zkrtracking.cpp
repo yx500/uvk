@@ -4,7 +4,7 @@
 #include "m_otceps.h"
 #include "modelgroupgorka.h"
 #include "tos_otcepdata.h"
-#include "trackingotcepsystem.h"
+#include "tos_system_rc.h"
 
 /*
  * задачи
@@ -16,10 +16,9 @@
  * */
 
 
-tos_ZkrTracking::tos_ZkrTracking(TrackingOtcepSystem *parent, tos_Rc *rc) : tos_RcTracking(parent,rc)
+tos_ZkrTracking::tos_ZkrTracking(tos_System_RC *parent, tos_Rc *rc) : tos_RcTracking(parent,rc)
 {
     this->rc_zkr=qobject_cast<m_RC_Gor_ZKR *>(rc->rc);
-    //useRcTracking=false;
     auto rc_next=rc_zkr->getNextRC(0,0);
     if (!rc_next) qCritical() << objectName() << "Нет РЦ за ЗКР" <<endl ;
     auto rc_prev=rc_zkr->getNextRC(1,0);
@@ -27,9 +26,7 @@ tos_ZkrTracking::tos_ZkrTracking(TrackingOtcepSystem *parent, tos_Rc *rc) : tos_
     for (int d=0;d<2;d++)
         for (int j=0;j<2;j++){
             if (qobject_cast<m_DSO_RD_21*>(rc_zkr->dso[d][j])!=nullptr){
-                dsot[d][j]=new tos_DsoTracking(this,qobject_cast<m_DSO_RD_21*>(rc_zkr->dso[d][j]));
-                rc_zkr->dso[d][j]->addTagObject(dsot[d][j],28);
-
+                dsot[d][j]=new tos_DSO(this,qobject_cast<m_DSO_RD_21*>(rc_zkr->dso[d][j]));
             } else {
                 qCritical() << objectName() << "Нет dsot[][]" << d <<j<<endl ;
             }
@@ -70,12 +67,6 @@ void tos_ZkrTracking::resetStates()
 
     baza_count=0;
     memset(&prev_state_zkr,0,sizeof(prev_state_zkr));
-    FSTATE_LT_OSY_CNT=0;
-    FSTATE_LT_OSY_S=0;
-    FSTATE_TLG_CNT=0;
-    FSTATE_TLG_SOST=0;
-    FSTATE_TLG_D=0;
-    FSTATE_V_DSO=_undefV_;
     baza=false;
 }
 
@@ -243,7 +234,7 @@ void tos_ZkrTracking::work(const QDateTime &T)
             otcep->otcep->setSTATE_ZKR_BAZA(baza);
             otcep->otcep->setSTATE_V_DISO(Vdso);
             otcep->otcep->setSTATE_ZKR_OSY_CNT(osy_count[1]);
-            otcep->otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
+            //otcep->otcep->setSTATE_ZKR_VAGON_CNT((FSTATE_TLG_CNT%2==0)? FSTATE_TLG_CNT/2: FSTATE_TLG_CNT/2+1 );
             checkOsyCount(otcep->otcep);
     }
 
@@ -416,7 +407,7 @@ void tos_ZkrTracking::work_dso(const QDateTime &T)
             dsot[d][j]->work(T);
         }
 
-    tos_DsoTracking * wdso[2];
+    tos_DSO * wdso[2];
     // выбираем работающие ДСО
     // 0- ближний датчик
     if (dsot[0][0]->dso->STATE_ERROR()==0) wdso[0]=dsot[0][0]; else wdso[0]=dsot[0][1];
@@ -429,16 +420,16 @@ void tos_ZkrTracking::work_dso(const QDateTime &T)
 
         dso_pair.updateStates(osy_count[1],osy_count[0]);
 
-        setSTATE_LT_OSY_CNT(dso_pair.c.tlg_os);
-        setSTATE_LT_OSY_S(dso_pair.c.os_start);
-        setSTATE_TLG_CNT(dso_pair.tlg_cnt);
-        setSTATE_TLG_SOST(dso_pair.sost);
-        setSTATE_TLG_D(dso_pair.d);
+//        setSTATE_LT_OSY_CNT(dso_pair.c.tlg_os);
+//        setSTATE_LT_OSY_S(dso_pair.c.os_start);
+//        setSTATE_TLG_CNT(dso_pair.tlg_cnt);
+//        setSTATE_TLG_SOST(dso_pair.sost);
+//        setSTATE_TLG_D(dso_pair.d);
 
         // вычисляем скорость по ДСО
         if (wdso[0]->dso->STATE_DIRECT()==0){
-            tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[1]);
-            tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[1]);
+            tos_DSO::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[1]);
+            tos_DSO::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[1]);
             if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
                 qint64 ms=s0.T.msecsTo(s1.T);
                 if (ms!=0){
@@ -450,8 +441,8 @@ void tos_ZkrTracking::work_dso(const QDateTime &T)
         }
 
         if (wdso[1]->dso->STATE_DIRECT()==1){
-            tos_DsoTracking::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[0]);
-            tos_DsoTracking::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[0]);
+            tos_DSO::TDSO_statistic s0=wdso[0]->getStatistic(osy_count[0]);
+            tos_DSO::TDSO_statistic s1=wdso[1]->getStatistic(osy_count[0]);
             if ((s0.OSY_COUNT==s1.OSY_COUNT)&&(s0.OSY_COUNT!=0)){
                 qint64 ms=s0.T.msecsTo(s1.T);
                 if (ms!=0){
@@ -465,7 +456,7 @@ void tos_ZkrTracking::work_dso(const QDateTime &T)
     //    }
     // тут надо плясать от текущей скорости и растоянию между датчиками
     if ((Vdso!=_undefV_)&&(VdsoTime.isValid()) && (VdsoTime.msecsTo(T)>5000)) Vdso=_undefV_;
-    setSTATE_V_DSO(Vdso);
+//    setSTATE_V_DSO(Vdso);
 }
 
 

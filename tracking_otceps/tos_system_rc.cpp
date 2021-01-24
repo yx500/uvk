@@ -1,4 +1,4 @@
-#include "trackingotcepsystem.h"
+#include "tos_system_rc.h"
 
 #include <qdebug.h>
 #include <QtMath>
@@ -9,50 +9,28 @@
 #include "tos_speedcalc.h"
 #include "m_otceps.h"
 #include "m_zam.h"
-#include "tos_rc.h"
 
 
-TrackingOtcepSystem::TrackingOtcepSystem(QObject *parent,ModelGroupGorka *modelGorka,int trackingType) :
-    BaseWorker(parent)
+tos_System_RC::tos_System_RC(QObject *parent) :
+    tos_System(parent)
 {
-    this->modelGorka=modelGorka;
-    this->trackingType=trackingType;
     iGetNewOtcep=nullptr;
-    makeWorkers(modelGorka);
 }
 
 
-QList<BaseWorker *> TrackingOtcepSystem::makeWorkers(ModelGroupGorka *O)
+void tos_System_RC::makeWorkers(ModelGroupGorka *modelGorka)
 {
-    this->modelGorka=O;
-    QList<BaseWorker *> l;
-    // собираем все отцепы
-    auto lotceps=modelGorka->findChildren<m_Otceps *>();
-    if (!lotceps.isEmpty()) {
-        auto otceps=lotceps.first();
-        otceps->disableUpdateStates=true;
-        foreach (auto *otcep, otceps->otceps()) {
-            tos_OtcepData *od=new tos_OtcepData(this,otcep);
-            lo.push_back(od);
-            mNUM2OD[od->otcep->NUM()]=od;
-            // отключаем собственную обработку
-            otcep->disableUpdateStates=true;
-            otcep->addTagObject(od,27);
-        }
-    }
+    tos_System::makeWorkers(modelGorka);
     // собираем все РЦ
-    auto l_rc=modelGorka->findChildren<m_RC*>();
-    foreach (auto rc, l_rc) {
-        tos_Rc*trc=new tos_Rc(this,rc);
-        mRc2TRC[rc]=trc;
-        l_tos_Rc.push_back(trc);
-        m_RC_Gor_Park *rc_park=qobject_cast<m_RC_Gor_Park*>(rc);
+    foreach (auto trc, l_tos_Rc) {
+
+        m_RC_Gor_Park *rc_park=qobject_cast<m_RC_Gor_Park*>(trc->rc);
         if (rc_park!=nullptr){
             tos_KzpTracking *kzpTracking=new tos_KzpTracking (this,trc);
             l_kzpt.push_back(kzpTracking);
             continue;
         }
-        m_RC_Gor_ZKR *rc_zkr=qobject_cast<m_RC_Gor_ZKR*>(rc);
+        m_RC_Gor_ZKR *rc_zkr=qobject_cast<m_RC_Gor_ZKR*>(trc->rc);
         if (rc_zkr!=nullptr){
             tos_ZkrTracking *zkrTracking=new tos_ZkrTracking (this,trc);
             l_zkrt.push_back(zkrTracking);
@@ -61,32 +39,14 @@ QList<BaseWorker *> TrackingOtcepSystem::makeWorkers(ModelGroupGorka *O)
         tos_RcTracking *rct=new tos_RcTracking(this,trc);
         l_rct.push_back(rct);
     }
-    // собираем замедлители для скорости входа выхода
-    auto l_zam=modelGorka->findChildren<m_Zam*>();
-    foreach (auto zam, l_zam) {
-        mRc2Zam.insert(zam->rc(),zam);
-    }
-    // собираем РИС для текущей скорости
-    foreach (auto rc, l_rc) {
-        foreach (m_Base *m, rc->devices()) {
-            m_RIS *ris=qobject_cast<m_RIS *>(m);
-            if (ris!=nullptr)
-                mRc2Ris.insert(rc,ris);
-        }
-    }
-
     resetStates();
-    return l;
 }
 
-void TrackingOtcepSystem::resetStates()
+void tos_System_RC::resetStates()
 {
-    //otceps->resetStates();
+    tos_System::resetStates();
     foreach (auto rct, l_rct) {
         rct->resetStates();
-    }
-    foreach (auto otcep, lo) {
-        otcep->resetTracking();
     }
     foreach (auto *kzpt, l_kzpt) {
         kzpt->resetStates();
@@ -97,10 +57,10 @@ void TrackingOtcepSystem::resetStates()
 
 
 }
-QList<SignalDescription> TrackingOtcepSystem::acceptOutputSignals()
+QList<SignalDescription> tos_System_RC::acceptOutputSignals()
 {
 
-    QList<SignalDescription> l;
+    auto l=tos_System::acceptOutputSignals();
     foreach (auto trc, l_tos_Rc) {
         l+=trc->acceptOutputSignals();
     }
@@ -109,36 +69,22 @@ QList<SignalDescription> TrackingOtcepSystem::acceptOutputSignals()
     }
     return l;
 }
-void TrackingOtcepSystem::state2buffer()
+void tos_System_RC::state2buffer()
 {
-
+    tos_System::state2buffer();
     foreach (auto trc, l_tos_Rc) {
         trc->state2buffer();
     }
     foreach (auto *zkrt, l_zkrt) {
         zkrt->state2buffer();
     }
-    // а мы ничего не посылаем для этого есть OtcepsController
-    //    foreach (auto otcep, lo) {
-    //        otcep->tos->state2buffer();
-    //    }
-}
-
-tos_OtcepData *TrackingOtcepSystem::getNewOtcep(tos_Rc *trc)
-{
-    if (iGetNewOtcep!=nullptr){
-        int num=iGetNewOtcep->getNewOtcep(trc->rc);
-        if (num>0){
-            return mNUM2OD[num];
-        }
-    }
-    return nullptr;
 }
 
 
 
 
-void TrackingOtcepSystem::work(const QDateTime &T)
+
+void tos_System_RC::work(const QDateTime &T)
 {
     if (!FSTATE_ENABLED) return;
     // состояние рц
@@ -189,7 +135,7 @@ void TrackingOtcepSystem::work(const QDateTime &T)
 
 }
 
-void TrackingOtcepSystem::checkOtcepComplete()
+void tos_System_RC::checkOtcepComplete()
 {
     foreach (auto trc, l_tos_Rc) {
         if (!trc->l_od.isEmpty()){
@@ -238,7 +184,7 @@ void TrackingOtcepSystem::checkOtcepComplete()
     }
 }
 
-void TrackingOtcepSystem::checkOtcepSplit()
+void tos_System_RC::checkOtcepSplit()
 {
     // проверяем чтоб не было 2ух свободных рц по середине
     foreach (auto trc, l_tos_Rc) {
@@ -290,7 +236,7 @@ void TrackingOtcepSystem::checkOtcepSplit()
 
 }
 
-void TrackingOtcepSystem::updateOtcepsOnRc(const QDateTime &T)
+void tos_System_RC::updateOtcepsOnRc(const QDateTime &T)
 {
     checkOtcepComplete();
     checkOtcepSplit();
@@ -335,10 +281,12 @@ void TrackingOtcepSystem::updateOtcepsOnRc(const QDateTime &T)
     foreach (auto trc, l_tos_Rc) {
         foreach (auto od, trc->l_od) {
             if (!trc->l_otceps.contains(od.num)) {
-                if ((od.p==_pOtcepStart)||(od.p==_pOtcepEnd)){
-                    auto otcep=mNUM2OD[od.num];
-                    if (trc->rc!=otcep->otcep->RCS){
-                        otcep->setOtcepSF(od.p,trc->rc,od.d,T,od.track);
+                if (mNUM2OD.contains(od.num)){
+                    if ((od.p==_pOtcepStart)||(od.p==_pOtcepEnd)){
+                        auto otcep=mNUM2OD[od.num];
+                        if (trc->rc!=otcep->otcep->RCS){
+                            otcep->setOtcepSF(od.p,trc->rc,od.d,T,od.track);
+                        }
                     }
                 }
             }
@@ -346,112 +294,10 @@ void TrackingOtcepSystem::updateOtcepsOnRc(const QDateTime &T)
     }
 }
 
-void TrackingOtcepSystem::updateOtcepParams(tos_OtcepData *o,const QDateTime &T)
+void tos_System_RC::resetTracking(int num)
 {
+    tos_System::resetTracking(num);
 
-    auto otcep=o->otcep;
-    if (!otcep->STATE_ENABLED()) return;
-    if ((otcep->RCS==nullptr)&&(otcep->RCF==nullptr)&&(otcep->STATE_LOCATION()==m_Otcep::locationOnPrib)) return;
-    if ((otcep->RCS==nullptr)&&(otcep->RCF==nullptr)){
-        otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
-        return;
-    }
-    int locat=m_Otcep::locationOnSpusk;
-
-    // признак на зкр
-    bool inzkr=false;
-    foreach (auto zkrt, l_zkrt) {
-        if (zkrt->rc_zkr==otcep->RCF) {
-            inzkr=true;
-            otcep->setSTATE_PUT_NADVIG(zkrt->rc_zkr->PUT_NADVIG());
-        }
-    }
-    otcep->setSTATE_ZKR_PROGRESS(inzkr);
-
-    // KZP
-    m_RC_Gor_Park * rc_park=qobject_cast<m_RC_Gor_Park *>(otcep->RCF);
-    if (rc_park!=nullptr){
-        locat=m_Otcep::locationOnPark;
-    }
-
-
-    // скорость входа
-    if (mRc2Zam.contains(otcep->RCS)){
-        m_Zam *zam=mRc2Zam[otcep->RCS];
-        int n=zam->NTP();
-        if ((zam->TIPZM()==1) &&(otcep->STATE_V_INOUT(0,n)==_undefV_)) otcep->setSTATE_V_INOUT(0,n,zam->ris()->STATE_V());
-    }
-    // скорость выхода
-    if (mRc2Zam.contains(otcep->RCF)){
-        m_Zam *zam=mRc2Zam[otcep->RCF];
-        int n=zam->NTP();
-        if ((otcep->STATE_V_INOUT(1,n)==_undefV_)) otcep->setSTATE_V_INOUT(1,n,zam->ris()->STATE_V());
-
-    }
-    qreal Vars=_undefV_;
-    foreach (auto rc, otcep->vBusyRc) {
-        if (!mRc2Zam.contains(rc)) continue;
-        m_Zam *zam=mRc2Zam[rc];
-        int n=zam->NTP();
-        // режим торм
-        if (zam->STATE_STUPEN()>0){
-            if (zam->STATE_STUPEN()>otcep->STATE_OT_RA(0,n)) otcep->setSTATE_OT_RA(0,n,zam->STATE_STUPEN());
-        }
-        if (zam->STATE_A()!=0){
-            otcep->setSTATE_OT_RA(1,n,zam->STATE_A());
-        }
-        if (mRc2Ris.contains(rc)){
-            m_RIS *ris=mRc2Ris[rc];
-            if (ris->controllerARS()->isValidState()){
-                Vars=ris->STATE_V();
-                if (Vars<1.3) Vars=0;
-            }
-        }
-
-    }
-    if ((qFabs(otcep->STATE_V_ARS()-Vars)>=0.4)) {
-        otcep->setSTATE_V_ARS(Vars);
-    }
-    // маршрут
-    m_RC_Gor*rc=qobject_cast<m_RC_Gor*>(otcep->RCS);
-    if ((rc==nullptr)||
-            ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)&&
-             (otcep->STATE_MAR()!=0)&&
-             ((otcep->STATE_MAR()<rc->MINWAY())||(otcep->STATE_MAR()>rc->MAXWAY()))
-             )
-            )otcep->setSTATE_ERROR(true); else otcep->setSTATE_ERROR(false);
-    int marf=0;
-    while (rc!=nullptr){
-        if (rc->MINWAY()==rc->MAXWAY()){
-            marf=rc->MINWAY();
-            break;
-        }
-        rc=qobject_cast<m_RC_Gor*>(rc->next_rc[_forw]);
-    }
-    otcep->setSTATE_MAR_F(marf);
-
-
-
-    otcep->setSTATE_LOCATION(locat);
-
-    // финализируем скорость отцепов
-    if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk){
-            o->updateV_RC(T);
-    }
-    otcep->setSTATE_V(o->STATE_V());
-
-
-//    o->calcLenByRc();
-
-
-}
-
-void TrackingOtcepSystem::resetTracking(int num)
-{
-    if (mNUM2OD.contains(num)){
-        auto otcep=mNUM2OD[num];
-        otcep->resetTracking();
-    }
     foreach (auto trc, l_tos_Rc) {
         if (trc->l_otceps.contains(num)) trc->l_otceps.removeAll(num);
         foreach (auto od, trc->l_od) {
@@ -460,11 +306,10 @@ void TrackingOtcepSystem::resetTracking(int num)
     }
 }
 
-void TrackingOtcepSystem::resetTracking()
+void tos_System_RC::resetTracking()
 {
-    foreach (auto otcep,lo){
-        otcep->resetTracking();
-    }
+    tos_System::resetTracking();
+
     foreach (auto trc, l_tos_Rc) {
         trc->l_otceps.clear();
         trc->l_od.clear();
