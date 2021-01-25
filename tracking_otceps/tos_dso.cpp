@@ -94,6 +94,7 @@ void tos_DSO::work(const QDateTime &T)
     };
 
     os_moved=_os_none;
+    int cmd=_none;
     if (!dso->is33()){
         int B0=dso->SIGNAL_B0().value_1bit();
         int B1=dso->SIGNAL_B1().value_1bit();
@@ -102,6 +103,7 @@ void tos_DSO::work(const QDateTime &T)
             dso->setSTATE_ERROR(1);
             current_sost=sost0;
         } else {
+
             // ищем переход
             int cnt=sizeof(steps)/sizeof(steps[0]);
             bool ex=false;
@@ -110,36 +112,38 @@ void tos_DSO::work(const QDateTime &T)
                         (steps[i].B1==B1)&&
                         (steps[i].cur_sost==current_sost)){
                     ex=true;
-                    current_sost=steps[i].next_sost;
-                    switch (steps[i].cmd) {
-                    case _inc_os:
-                        dso->setSTATE_ERROR_TRACK(0);
-                        inc_os(1,T);
-                        break;
-                    case _dec_os:
-                        dso->setSTATE_ERROR_TRACK(0);
-                        inc_os(-1,T);
-                        break;
-                    case _inc_os_sboy:
-                        dso->setSTATE_ERROR_TRACK(1);
-                        dso->setSTATE_ERROR_CNT(dso->STATE_ERROR_CNT()+1);
-                        inc_os(1,T);
-                        break;
-                    case _dec_os_sboy:
-                        dso->setSTATE_ERROR_TRACK(1);
-                        dso->setSTATE_ERROR_CNT(dso->STATE_ERROR_CNT()+1);
-                        inc_os(-1,T);
-                        break;
-                    case _sboy_last_d:
-                        dso->setSTATE_ERROR_TRACK(1);
-                        dso->setSTATE_ERROR_CNT(dso->STATE_ERROR_CNT()+1);
-                        if (dso->STATE_DIRECT()==0) inc_os( 1,T); else
-                                                    inc_os(-1,T);
-                        break;
-                    default:
+                    if (current_sost!=steps[i].next_sost){
+                        current_sost=steps[i].next_sost;
+                        switch (steps[i].cmd) {
+                        case _inc_os:
+                            dso->setSTATE_ERROR_TRACK(0);
+                            inc_os(1,T);
+                            break;
+                        case _dec_os:
+                            dso->setSTATE_ERROR_TRACK(0);
+                            inc_os(-1,T);
+                            break;
+                        case _inc_os_sboy:
+                            dso->setSTATE_ERROR_TRACK(1);
+                            dso->setSTATE_ERROR_CNT(dso->STATE_ERROR_CNT()+1);
+                            inc_os(1,T);
+                            break;
+                        case _dec_os_sboy:
+                            dso->setSTATE_ERROR_TRACK(1);
+                            dso->setSTATE_ERROR_CNT(dso->STATE_ERROR_CNT()+1);
+                            inc_os(-1,T);
+                            break;
+                        case _sboy_last_d:
+                            dso->setSTATE_ERROR_TRACK(1);
+                            dso->setSTATE_ERROR_CNT(dso->STATE_ERROR_CNT()+1);
+                            if (dso->STATE_DIRECT()==0) inc_os( 1,T); else
+                                inc_os(-1,T);
+                            break;
+                        default:
+                            break;
+                        }
                         break;
                     }
-                    break;
                 }
 
             }

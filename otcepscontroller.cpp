@@ -134,17 +134,39 @@ void OtcepsController::state2buffer()
             s.getBuffer()->A=S.toUtf8();
         }
     }
-    for (int i=0;i<MaxVagon;i++){
-        // рассылаем в старом
-        //if (otceps->TYPE_DESCR()==0){
-        otceps->chanelVag[i].getBuffer()->A.resize(sizeof(otceps->vagons[i]));
-        memcpy(otceps->chanelVag[i].getBuffer()->A.data(),&otceps->vagons[i],sizeof(otceps->vagons[i]));
-        //        if (otceps->TYPE_DESCR()==1){
-        //            QVariantHash m=tSlVagon2Map(otceps->vagons[i]);
-        //            QString S=MVP_System::QVariantHashToQString_str(m);
-        //            otceps->chanelVag[i]->A=S.toUtf8();
-        //        }
+
+    //updateVagons();
+
+    tSlVagon vagons0;
+    memset(&vagons0,0,sizeof(vagons0));
+    foreach (auto &s, l_chanelVag) {
+        s.setValue_data(&vagons0,sizeof(vagons0));
     }
+    int i=0;
+    foreach (auto otcep, otceps->otceps()) {
+        for (tSlVagon &v: otcep->vVag) {
+            if (i>=l_chanelVag.size()) break;
+            v.NO=otcep->NUM();
+            v.Id=otcep->STATE_ID_ROSP();
+            v.SP=otcep->STATE_SP();
+            auto &s=l_chanelVag[i];
+            s.setBufferData(&v,sizeof(v));
+            //s.setValue_data(&v,sizeof(v));
+            i++;
+        }
+    }
+
+//    for (int i=0;i<MaxVagon;i++){
+//        // рассылаем в старом
+//        //if (otceps->TYPE_DESCR()==0){
+//        otceps->chanelVag[i].getBuffer()->A.resize(sizeof(otceps->vagons[i]));
+//        memcpy(otceps->chanelVag[i].getBuffer()->A.data(),&otceps->vagons[i],sizeof(otceps->vagons[i]));
+//        //        if (otceps->TYPE_DESCR()==1){
+//        //            QVariantHash m=tSlVagon2Map(otceps->vagons[i]);
+//        //            QString S=MVP_System::QVariantHashToQString_str(m);
+//        //            otceps->chanelVag[i]->A=S.toUtf8();
+//        //        }
+//    }
 }
 
 bool OtcepsController::cmd_CLEAR_ALL(QString &acceptStr)
@@ -303,21 +325,5 @@ bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acc
 
 void OtcepsController::updateVagons()
 {
-    tSlVagon vagons0;
-    memset(&vagons0,0,sizeof(vagons0));
-    foreach (auto &s, l_chanelVag) {
-        s.setValue_data(&vagons0,sizeof(vagons0));
-    }
-    int i=0;
-    foreach (auto otcep, otceps->otceps()) {
-        for (tSlVagon &v: otcep->vVag) {
-            if (i>=l_chanelVag.size()) break;
-            v.NO=otcep->NUM();
-            v.Id=otcep->STATE_ID_ROSP();
-            v.SP=otcep->STATE_SP();
-            auto &s=l_chanelVag[i];
-            s.setValue_data(&v,sizeof(v));
-            i++;
-        }
-    }
+
 }

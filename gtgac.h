@@ -45,12 +45,14 @@ protected:
     ModelGroupGorka *modelGorka;
     m_Otceps *otceps;
     QList<GacStrel*> l_strel;
+    QList<m_RC_Gor_ZKR*> l_zkr;
     QMap<m_RC *,GacStrel*> mRC2GS;
     static bool inway(int way,int minway,int maxway)
     {
         if ((way>0)&&(way>=minway)&&(way<=maxway)) return true;
         return false;
     }
+    m_RC_Gor_ZKR*active_zkr();
 };
 
 #endif // GTGAC_H

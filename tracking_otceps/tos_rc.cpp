@@ -60,9 +60,8 @@ QList<SignalDescription> tos_Rc::acceptOutputSignals()
     rc->setSIGNAL_ERR_LS(rc->SIGNAL_ERR_LS().innerUse());
     rc->setSIGNAL_ERR_LZ(rc->SIGNAL_ERR_LZ().innerUse());
     rc->setSIGNAL_ERR_KZ(rc->SIGNAL_ERR_KZ().innerUse());
-    rc->setSIGNAL_CHECK_FREE_DB(rc->SIGNAL_CHECK_FREE_DB().innerUse());
     QList<SignalDescription> l;
-    l << rc->SIGNAL_ERR_LS()<<rc->SIGNAL_ERR_LZ()<<rc->SIGNAL_ERR_KZ()<<rc->SIGNAL_CHECK_FREE_DB();
+    l << rc->SIGNAL_ERR_LS()<<rc->SIGNAL_ERR_LZ()<<rc->SIGNAL_ERR_KZ();
     return l;
 }
 
@@ -71,7 +70,6 @@ void tos_Rc::state2buffer()
     rc->SIGNAL_ERR_LS().setValue_1bit(STATE_ERR_LS);
     rc->SIGNAL_ERR_LZ().setValue_1bit(STATE_ERR_LZ);
     rc->SIGNAL_ERR_KZ().setValue_1bit(STATE_ERR_KZ);
-    rc->SIGNAL_CHECK_FREE_DB().setValue_1bit(STATE_CHECK_FREE_DB);
 
 }
 

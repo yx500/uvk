@@ -89,7 +89,9 @@ QList<SignalDescription> tos_System_DSO::acceptOutputSignals()
 
     foreach (auto trc, l_tos_Rc) {
         trc->rc->setSIGNAL_BUSY_DSO(trc->rc->SIGNAL_BUSY_DSO().innerUse());
-        l<<trc->rc->SIGNAL_BUSY_DSO();
+        trc->rc->setSIGNAL_BUSY_DSO_ERR(trc->rc->SIGNAL_BUSY_DSO_ERR().innerUse());
+        trc->rc->setSIGNAL_INFO_DSO(trc->rc->SIGNAL_INFO_DSO().innerUse());
+        l<<trc->rc->SIGNAL_BUSY_DSO()<<trc->rc->SIGNAL_BUSY_DSO_ERR()<<trc->rc->SIGNAL_INFO_DSO();
     }
 
     foreach (auto w, l_tdso) {
@@ -109,6 +111,11 @@ void tos_System_DSO::state2buffer()
 
     foreach (auto trc, l_tos_Rc) {
         trc->rc->SIGNAL_BUSY_DSO().setValue_1bit(trc->rc->STATE_BUSY_DSO());
+        trc->rc->SIGNAL_BUSY_DSO_ERR().setValue_1bit(trc->rc->STATE_BUSY_DSO_ERR());
+        DSO_Data d;
+        d.V=trc->l_os.size();
+        trc->rc->SIGNAL_INFO_DSO().setValue_data(&d,sizeof (d));
+
     }
 
     foreach (auto w, l_tdso) {
@@ -146,6 +153,8 @@ void tos_System_DSO::work(const QDateTime &T)
 
 
     // кзп
+
+    setDSOBUSY();
 
 
     // раставляем по рц
@@ -302,7 +311,7 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,const QDateT
             moved_os=new_os;
         } else {
             moved_os=rc0->l_os.last();
-            rc1->l_os.pop_back();
+            rc0->l_os.pop_back();
 
         }
         moved_os.t=T;

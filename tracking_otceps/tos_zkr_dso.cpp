@@ -7,6 +7,7 @@
 
 tos_Zkr_DSO::tos_Zkr_DSO(tos_System_DSO *parent, tos_Rc *rc) : BaseWorker(parent)
 {
+    this->trc=rc;
     this->rc_zkr=qobject_cast<m_RC_Gor_ZKR *>(rc->rc);
     this->TOS=parent;
     for (int i=0;i<2;i++){

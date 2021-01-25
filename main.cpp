@@ -9,6 +9,9 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_WIN64
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("IBM 866"));
 #endif
+#ifdef Q_OS_WIN32
+    QTextCodec::setCodecForLocale(QTextCodec::codecForName("IBM 866"));
+#endif
 #ifdef Q_OS_LINUX
     QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 #endif
@@ -27,10 +30,10 @@ int main(int argc, char *argv[])
             };
             txtfile1.close();
         }
-        QFileInfo fi(txtfile1);
-        qFatal("fail uvk.init, see %s", qPrintable(fi.absoluteFilePath()));
-        return -1;
-    } else {
+//        QFileInfo fi(txtfile1);
+//        qFatal("fail uvk.init, see %s", qPrintable(fi.absoluteFilePath()));
+//        return -1;
+    } /*else*/ {
         uvk.start();
         return a.exec();
     }

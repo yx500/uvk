@@ -11,6 +11,7 @@ GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
         mRC2GS[strel]=gstr;
     }
     otceps=modelGorka->findChildren<m_Otceps*>().first();
+    l_zkr=modelGorka->findChildren<m_RC_Gor_ZKR*>();
 
 }
 
@@ -20,7 +21,7 @@ QList<SignalDescription> GtGac::acceptOutputSignals()
     for (auto gstr : l_strel){
         gstr->strel->setSIGNAL_UVK_PRP(gstr->strel->SIGNAL_UVK_PRP().innerUse());
         gstr->strel->setSIGNAL_UVK_PRM(gstr->strel->SIGNAL_UVK_PRM().innerUse());
-        gstr->strel->setSIGNAL_UVK_PRM(gstr->strel->SIGNAL_UVK_AV().innerUse());
+        gstr->strel->setSIGNAL_UVK_AV(gstr->strel->SIGNAL_UVK_AV().innerUse());
         gstr->strel->setTU_PRP(gstr->strel->TU_PRP().innerUse());
         gstr->strel->setTU_PRM(gstr->strel->TU_PRM().innerUse());
         l << gstr->strel->SIGNAL_UVK_PRP() << gstr->strel->SIGNAL_UVK_PRM() << gstr->strel->SIGNAL_UVK_AV();
@@ -176,6 +177,9 @@ void GtGac::work(const QDateTime &T)
         // убираем автовозврат
         if (gs->strel->STATE_A()!=1) gs->strel->setSTATE_UVK_AV(false);
     }
+
+    auto act_zkr=active_zkr();
+
     // определяем на стрелках нужное для отцепов положение pol_mar
     foreach (m_Otcep *otcep, otceps->otceps()) {
         if (!otcep->STATE_ENABLED()) continue;
@@ -188,6 +192,13 @@ void GtGac::work(const QDateTime &T)
         if ((!otceps->isFirstOtcep(otcep))&&(otcep->STATE_DIRECTION()!=_forw)) continue;
 
         auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
+        if (otceps->isFirstOtcep(otcep)){
+           rcs=nullptr;
+           if ((act_zkr!=nullptr) &&
+                   (act_zkr->STATE_BUSY()==MVP_Enums::free)&&
+                   (otceps->otcepCountOnRc(act_zkr)==0)
+               ) rcs=act_zkr;
+        }
 
         if (rcs==nullptr) continue;
         // 1 ось - первая на рц, т.е. если есть на рц отцепы с меньшим номером то пропускаем
@@ -202,20 +213,21 @@ void GtGac::work(const QDateTime &T)
         if (rcs->MINWAY()==rcs->MAXWAY()) continue;
         // на случай если хвост вышел из зоны ГАЦ
         auto rcf=qobject_cast<m_RC_Gor*>(otcep->RCF);
-        if (rcf==nullptr) continue;
-        if (rcf->MINWAY()==rcf->MAXWAY()) continue;
-        // были случаи когда затаскивали отцеп на другую гору
-        auto rc_zkr=qobject_cast<m_RC_Gor_ZKR*>(otcep->RCF);
-        if (rc_zkr!=nullptr){
-            if (rc_zkr->STATE_ROSPUSK()!=1) continue;
+        if (rcf!=nullptr) {
+            if (rcf->MINWAY()==rcf->MAXWAY()) continue;
         }
+        // были случаи когда затаскивали отцеп на другую гору
+        foreach (auto rc_zkr, l_zkr) {
+            if ((rc_zkr==rcs) && (rc_zkr->STATE_ROSPUSK()!=1)) continue;
+        }
+
         auto rc=rcs->next_rc[0];
         int recurs_count=0;
         while(rc!=nullptr){
             recurs_count++;
             if (recurs_count>200) break; // защита от бесконечного цикла при сбойном графе
 
-            if (rc->STATE_BUSY()) break;
+            if (rc->STATE_BUSY()==MVP_Enums::busy) break;
             if (otceps->otcepOnRc(rc)!=nullptr) break;
             auto grc=qobject_cast<m_RC_Gor*>(rc);
             // дальше считаем стрелок нет
@@ -312,7 +324,6 @@ void GtGac::setStateBlockPerevod(GacStrel *gs)
     if (gs->strel->STATE_BUSY()!=0) sp=true;
     gs->BL_PER_SP=sp;
 
-    gs->BL_PER_DB=gs->strel->STATE_CHECK_FREE_DB(); // это проеверка освобождения стрелки при занятой пред
 
     gs->BL_PER_TLG=false; /// ================ДОБАВИТЬ!
 
@@ -328,6 +339,13 @@ void GtGac::setStateBlockPerevod(GacStrel *gs)
             gs->BL_PER_NGBDYN |
             gs->strel->STATE_UVK_AV();
 
+}
+
+m_RC_Gor_ZKR *GtGac::active_zkr()
+{
+    foreach (auto zkr, l_zkr) {
+        if (zkr->STATE_ROSPUSK()==1) return zkr;
+    }return nullptr;
 }
 
 
