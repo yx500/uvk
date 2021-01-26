@@ -178,7 +178,7 @@ void GtGac::work(const QDateTime &T)
         if (gs->strel->STATE_A()!=1) gs->strel->setSTATE_UVK_AV(false);
     }
 
-    auto act_zkr=active_zkr();
+    auto act_zkr=modelGorka->active_zkr();
 
     // определяем на стрелках нужное для отцепов положение pol_mar
     foreach (m_Otcep *otcep, otceps->otceps()) {
@@ -340,15 +340,6 @@ void GtGac::setStateBlockPerevod(GacStrel *gs)
             gs->strel->STATE_UVK_AV();
 
 }
-
-m_RC_Gor_ZKR *GtGac::active_zkr()
-{
-    foreach (auto zkr, l_zkr) {
-        if (zkr->STATE_ROSPUSK()==1) return zkr;
-    }return nullptr;
-}
-
-
 
 void GtGac::sendCommand(GacStrel * gs, MVP_Enums::TStrelPol pol_cmd,bool force)
 {

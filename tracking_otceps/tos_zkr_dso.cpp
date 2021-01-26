@@ -217,6 +217,7 @@ void tos_Zkr_DSO::out_os(const QDateTime &T)
             if (o!=nullptr){
                 o->otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
             }
+            curr_state_zkr.sost==_otcep_unknow;
         }
         if (!trc->l_os.isEmpty()) cur_os=trc->l_os.last();
         TOS->updateOtcepsOnRc(T);

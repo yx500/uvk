@@ -47,10 +47,10 @@ public:
         int os_in;
 
         bool likeTable(const t_zkr_state &ts) const{
-            if ((ts.rtds!=_xx)||(ts.rtds!=rtds)) return false;
-            if ((ts.dso!=_xx)||(ts.dso!=dso))return false;
-            if ((ts.sost!=_xx)||(ts.sost!=sost)) return false;
-            if ((ts.os_in!=_xx)||(ts.os_in!=os_in)) return false;
+            if ((ts.rtds!=_xx)&&(ts.rtds!=rtds)) return false;
+            if ((ts.dso!=_xx)&&(ts.dso!=dso))return false;
+            if ((ts.sost!=_xx)&&(ts.sost!=sost)) return false;
+            if ((ts.os_in!=_xx)&&(ts.os_in!=os_in)) return false;
             return true;
         }
         bool equal(const t_zkr_state &ts) const {

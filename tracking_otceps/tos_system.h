@@ -42,7 +42,7 @@ public:
     virtual void resetTracking(int num);
     virtual void resetTracking();
 
-    virtual bool resetDSOBUSY(QString idtsr, QString &acceptStr){return false;};
+    virtual bool resetDSOBUSY(QString idtsr, QString &acceptStr){Q_UNUSED(idtsr);Q_UNUSED(acceptStr); return false;};
 
 
     tos_OtcepData*otcep(int num);
@@ -50,7 +50,7 @@ public:
     ModelGroupGorka *modelGorka=nullptr;
 
     QList<tos_OtcepData *> lo;
-    QList<tos_Rc *> l_tos_Rc;
+    QList<tos_Rc *> l_trc;
     QMap<m_RC*,m_Zam*> mRc2Zam;
     QMap<m_RC*,m_RIS*> mRc2Ris;
     QMap<m_RC*,m_RC_Gor_ZKR*> mRc2Zkr;

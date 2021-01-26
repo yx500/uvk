@@ -56,6 +56,8 @@ protected:
 
      QString fileNameModel;
      int trackingType;
+
+     int testRegim();
 };
 
 #endif // UVK_CENTRAL_H

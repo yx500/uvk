@@ -10,6 +10,7 @@
 #include "m_otceps.h"
 #include "m_zam.h"
 
+extern int testMode;
 
 tos_System_DSO::tos_System_DSO(QObject *parent) :
     tos_System(parent)
@@ -54,6 +55,11 @@ void tos_System_DSO::makeWorkers(ModelGroupGorka *modelGorka)
         tos_Zkr_DSO *tzkr=new tos_Zkr_DSO(this,mRc2TRC[zkr]);
         l_tzkr.push_back(tzkr);
     }
+    foreach (auto rc_park, l_park) {
+        l_trc_park.push_back(mRc2TRC[rc_park]);
+    }
+
+
 
 
 
@@ -78,6 +84,11 @@ void tos_System_DSO::resetStates()
     foreach (auto w, l_tzkr) {
         w->resetStates();
     }
+    if (testMode==0){
+        foreach (auto w, l_trc) {
+            w->rc->setSTATE_BUSY_DSO_ERR(true);
+        }
+    }
 
 
 
@@ -87,7 +98,7 @@ QList<SignalDescription> tos_System_DSO::acceptOutputSignals()
 
     auto l=tos_System::acceptOutputSignals();
 
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         trc->rc->setSIGNAL_BUSY_DSO(trc->rc->SIGNAL_BUSY_DSO().innerUse());
         trc->rc->setSIGNAL_BUSY_DSO_ERR(trc->rc->SIGNAL_BUSY_DSO_ERR().innerUse());
         trc->rc->setSIGNAL_INFO_DSO(trc->rc->SIGNAL_INFO_DSO().innerUse());
@@ -109,7 +120,7 @@ void tos_System_DSO::state2buffer()
 {
     tos_System::state2buffer();
 
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         trc->rc->SIGNAL_BUSY_DSO().setValue_1bit(trc->rc->STATE_BUSY_DSO());
         trc->rc->SIGNAL_BUSY_DSO_ERR().setValue_1bit(trc->rc->STATE_BUSY_DSO_ERR());
         DSO_Data d;
@@ -134,7 +145,7 @@ void tos_System_DSO::work(const QDateTime &T)
 {
     if (!FSTATE_ENABLED) return;
     // состояние рц
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         trc->work(T);
     }
     // датчики
@@ -158,7 +169,7 @@ void tos_System_DSO::work(const QDateTime &T)
 
 
     // раставляем по рц
-    //updateOtcepsOnRc(T);
+    updateOtcepsOnRc(T);
 
     // выставляем параметра отцепа
     foreach (auto otcep, lo) {
@@ -168,7 +179,7 @@ void tos_System_DSO::work(const QDateTime &T)
 }
 
 
-void tos_System_DSO::updateOtcepsOnRc(const QDateTime &T)
+void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
 {
     // проставялем начало и конец по номеру оси
 
@@ -178,7 +189,7 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &T)
         TOtcepDataOs s_os;
         TOtcepDataOs f_os;
 
-        foreach (auto trc, l_tos_Rc) {
+        foreach (auto trc, l_trc) {
             if (o->otcep->STATE_LOCATION()==m_Otcep::locationUnknow) continue;
             if (o->otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) continue;
             for (TOtcepDataOs &os :trc->l_os){
@@ -205,7 +216,7 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &T)
         }
     }
 
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         trc->l_otceps.clear();
         for (TOtcepDataOs &os :trc->l_os){
             if (!trc->l_otceps.contains(os.num)) {
@@ -219,7 +230,7 @@ void tos_System_DSO::resetTracking(int num)
 {
     tos_System::resetTracking(num);
 
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         if (trc->l_otceps.contains(num)) trc->l_otceps.removeAll(num);
         for (TOtcepDataOs &os :trc->l_os){
             if (os.num==num) os.num=0;
@@ -231,11 +242,15 @@ void tos_System_DSO::resetTracking()
 {
     tos_System::resetTracking();
     //
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         trc->l_otceps.clear();
         for (TOtcepDataOs &os :trc->l_os){
             os.num=0;
         }
+    }
+
+    foreach (auto trc, l_trc_park) {
+        trc->l_os.clear();
     }
 
     foreach (auto w, l_dso) {
@@ -258,9 +273,10 @@ void tos_System_DSO::resetTracking()
 bool tos_System_DSO::resetDSOBUSY(QString idtsr, QString &acceptStr)
 {
     int n=0;
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         if ((idtsr=="*") || (trc->rc->idstr()==idtsr)){
             trc->l_os.clear();
+            trc->rc->setSTATE_BUSY_DSO_ERR(false);
             n++;
         }
     }
@@ -271,7 +287,7 @@ bool tos_System_DSO::resetDSOBUSY(QString idtsr, QString &acceptStr)
 
 void tos_System_DSO::setDSOBUSY()
 {
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         if (trc->l_os.isEmpty())
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::free); else
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::busy);
@@ -330,7 +346,7 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,const QDateT
 
 tos_Rc *tos_System_DSO::getRc(TOtcepDataOs os)
 {
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         foreach (auto os1, trc->l_os) {
             if (os1==os) return  trc;
         }

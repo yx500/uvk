@@ -52,7 +52,7 @@ protected:
         if ((way>0)&&(way>=minway)&&(way<=maxway)) return true;
         return false;
     }
-    m_RC_Gor_ZKR*active_zkr();
+
 };
 
 #endif // GTGAC_H

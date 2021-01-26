@@ -3,6 +3,7 @@
 #include "do_message.hpp"
 #include "tos_system_dso.h"
 
+int testMode=0;
 
 class IUVKGetNewOtcep :public IGetNewOtcep
 {
@@ -24,13 +25,16 @@ bool UVK_Central::init(QString fileNameIni)
         qDebug() << "ini load:" << QFileInfo(fileNameIni).absoluteFilePath();
         QSettings settings(fileNameIni,QSettings::IniFormat);
         fileNameModel=settings.value("main/model","./M.xml").toString();
-//        trackingType=settings.value("main/tracking_type",1).toInt();
+        //        trackingType=settings.value("main/tracking_type",1).toInt();
+        testMode=settings.value("test/mode",0).toInt();
     } else {
         {
             QSettings settings(fileNameIni,QSettings::IniFormat);
             settings.setValue("main/model","./M.xml");
-//            settings.setValue("main/tracking_type",1);
+            //            settings.setValue("main/tracking_type",1);
             fileNameIni=settings.fileName();
+            settings.setValue("test/mode","0");
+
         }
         qDebug() << "ini created:" << QFileInfo(fileNameIni).absoluteFilePath();
         return false;
@@ -236,11 +240,21 @@ bool UVK_Central::acceptBuffers()
 void UVK_Central::work()
 {
     QDateTime T=QDateTime::currentDateTime();
+
     GORKA->updateStates();
+
+    // test
+    if (testMode==1){
+        int new_regim=testRegim();
+        QString s;
+        cmd_setRegim(new_regim,s);
+    }
+
     TOS->work(T);
     GAC->work(T);
     otcepsController->work(T);
     sendBuffers();
+
     // РРС
     if ((!GORKA->SIGNAL_RRC_TU().isNotUse())&&(!GORKA->SIGNAL_RRC_TU().isEmpty())){
         int state=0;
@@ -249,6 +263,10 @@ void UVK_Central::work()
             gac_command(GORKA->SIGNAL_RRC_TU(),state);
         }
     }
+
+
+
+
 }
 
 void UVK_Central::recv_cmd(QMap<QString, QString> m)
@@ -330,9 +348,9 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
     }
 
     if (m["CMD"]=="RESET_DSO_BUSY"){
-            if (TOS->resetDSOBUSY(m["RC"],acceptStr))
-                CMD->accept_cmd(m,1,acceptStr); else
-                CMD->accept_cmd(m,-1,acceptStr);
+        if (TOS->resetDSOBUSY(m["RC"],acceptStr))
+            CMD->accept_cmd(m,1,acceptStr); else
+            CMD->accept_cmd(m,-1,acceptStr);
     }
 
     sendBuffers();
@@ -341,12 +359,14 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
 
 void UVK_Central::gac_command(const SignalDescription &s, int state)
 {
+    if (testMode!=0) return;
     tu_cmd c;
     c.number=s.chanelOffset();
     c.on_off=state;
     do_message(&c).commit();
     udp->sendData(s.chanelType(),s.chanelName(),QByteArray((const char *)&c,sizeof(c)));
 }
+
 
 
 GtBuffer *oldestBuffer(QList<GtBuffer*> &l_buffers){
@@ -560,3 +580,11 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
 
 
 
+int UVK_Central::testRegim()
+{
+    auto zkr=GORKA->active_zkr();
+    if ((zkr!=nullptr)&&(zkr->svet()!=nullptr)){
+        if  (zkr->svet()->STATE_Z()==1) return ModelGroupGorka::regimRospusk;
+    }
+    return ModelGroupGorka::regimStop;
+}

@@ -39,6 +39,7 @@ public:
     QList<tos_DSO*> l_tdso;
     QList<tos_DsoTracking*> l_trdso;
     QList<tos_Zkr_DSO*> l_tzkr;
+    QList<tos_Rc*> l_trc_park;
     tos_Rc * getRc(TOtcepDataOs os);
 
 signals:

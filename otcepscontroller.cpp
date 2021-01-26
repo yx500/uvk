@@ -59,14 +59,14 @@ void OtcepsController::state2buffer()
                 stored_Descr.num=   otcep->NUM();                   ; // Номер отцепа 1-255 Живет в течении роспуска одного
                 stored_Descr.mar=otcep->STATE_MAR();         ;
                 stored_Descr.mar_f=otcep->STATE_MAR_F();
-                if (otcep->RCS) stored_Descr.start=otcep->RCS->SIGNAL_BUSY().chanelOffset()+1;else stored_Descr.start=0;
-                if (otcep->RCF) stored_Descr.end=otcep->RCF->SIGNAL_BUSY().chanelOffset()+1;else stored_Descr.end=0;
+                if (otcep->RCS) stored_Descr.start=otcep->RCS->SIGNAL_BUSY_DSO().chanelOffset()+1;else stored_Descr.start=0;
+                if (otcep->RCF) stored_Descr.end=otcep->RCF->SIGNAL_BUSY_DSO().chanelOffset()+1;else stored_Descr.end=0;
                 stored_Descr.ves=otcep->STATE_VES();              ; // Вес отцепа в тоннах
                 stored_Descr.osy=otcep->STATE_OSY_CNT();         ; // Длинна ( в осях)
                 stored_Descr.len=otcep->STATE_VAGON_CNT();        ; // Длинна ( в вагонах)
                 stored_Descr.baza=otcep->STATE_BAZA();           ; // Признак длиннобазности
                 stored_Descr.nagon=otcep->STATE_NAGON();          ; // Признак нагона
-                if (otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk)
+                if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)
                     stored_Descr.end_slg=0; else
                     stored_Descr.end_slg=1;// Признак конца слежения (по последней РЦ на путях)
 

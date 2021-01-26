@@ -32,7 +32,7 @@ void tos_System::makeWorkers(ModelGroupGorka *modelGorka)
     foreach (auto rc, l_rc) {
         tos_Rc*trc=new tos_Rc(this,rc);
         mRc2TRC[rc]=trc;
-        l_tos_Rc.push_back(trc);
+        l_trc.push_back(trc);
     }
     // собираем замедлители для скорости входа выхода
     auto l_zam=modelGorka->findChildren<m_Zam*>();
@@ -66,7 +66,7 @@ void tos_System::resetStates()
     foreach (auto otcep, lo) {
         otcep->resetStates();
     }
-    foreach (auto w, l_tos_Rc) {
+    foreach (auto w, l_trc) {
         w->resetStates();
     }
 
@@ -75,7 +75,7 @@ QList<SignalDescription> tos_System::acceptOutputSignals()
 {
 
     QList<SignalDescription> l;
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         l+=trc->acceptOutputSignals();
     }
     return l;
@@ -83,7 +83,7 @@ QList<SignalDescription> tos_System::acceptOutputSignals()
 void tos_System::state2buffer()
 {
 
-    foreach (auto trc, l_tos_Rc) {
+    foreach (auto trc, l_trc) {
         trc->state2buffer();
     }
     // а мы ничего не посылаем для этого есть OtcepsController
