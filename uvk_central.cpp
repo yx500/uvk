@@ -46,6 +46,7 @@ bool UVK_Central::init(QString fileNameIni)
     }
     udp=new GtBuffers_UDP_D2();
     MVP.setGetGtBufferInterface(udp);
+
     if (fileNameModel.isEmpty()) fileNameModel="./M.xml";
     QObject *O=MVP.loadObject(fileNameModel);
     GORKA=qobject_cast<ModelGroupGorka *>(O);
@@ -96,9 +97,14 @@ void UVK_Central::start()
     connect(GAC,&GtGac::uvk_command,this,&UVK_Central::gac_command);
 
     connect(CMD,&GtCommandInterface::recv_cmd,this,&UVK_Central::recv_cmd);
-    timer=new QTimer(this);
-    connect(timer,&QTimer::timeout,this,&UVK_Central::work);
-    timer->start(100);
+
+    timer_work=new QTimer(this);
+    connect(timer_work,&QTimer::timeout,this,&UVK_Central::work);
+
+    timer_send=new QTimer(this);
+    connect(timer_send,&QTimer::timeout,this,&UVK_Central::sendBuffers);
+
+
     // перебрасываем все каналы на себя
     foreach (GtBuffer *B, udp->allBuffers()) {
         if (!B->static_mode){
@@ -110,6 +116,15 @@ void UVK_Central::start()
     cmd_setPutNadvig(1,tmpstr);
     cmd_setRegim(0,tmpstr);
     sendBuffers();
+
+    // инициировали
+    foreach (GtBuffer*B, l_out_buffers) {
+        mB2A[B]=B->A;
+    }
+
+    timer_work->start(100);
+    timer_send->start(50);
+
     qDebug() << "uvk started ";
 }
 
@@ -247,13 +262,17 @@ void UVK_Central::work()
     if (testMode==1){
         int new_regim=testRegim();
         QString s;
+        if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimStop) && (new_regim==ModelGroupGorka::regimRospusk))
+                otcepsController->otceps->resetStates();
+
         cmd_setRegim(new_regim,s);
     }
 
     TOS->work(T);
     GAC->work(T);
     otcepsController->work(T);
-    sendBuffers();
+
+
 
     // РРС
     if ((!GORKA->SIGNAL_RRC_TU().isNotUse())&&(!GORKA->SIGNAL_RRC_TU().isEmpty())){
@@ -264,8 +283,8 @@ void UVK_Central::work()
         }
     }
 
-
-
+    state2buffer();
+    sendBuffers();
 
 }
 
@@ -320,7 +339,7 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
             if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
                 if (otcepsController->cmd_DEL_OTCEP(m,acceptStr)){
                     int N=m["DEL_OTCEP"].toInt();
-                    TOS->resetTracking(N);
+                    //TOS->resetTracking(N);
                     CMD->accept_cmd(m,1,acceptStr);
                 }else
                     CMD->accept_cmd(m,-1,acceptStr);
@@ -348,11 +367,15 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
     }
 
     if (m["CMD"]=="RESET_DSO_BUSY"){
-        if (TOS->resetDSOBUSY(m["RC"],acceptStr))
-            CMD->accept_cmd(m,1,acceptStr); else
-            CMD->accept_cmd(m,-1,acceptStr);
+        if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
+            if (TOS->resetDSOBUSY(m["RC"],acceptStr))
+                CMD->accept_cmd(m,1,acceptStr); else
+                CMD->accept_cmd(m,-1,acceptStr);
+        } else {
+            CMD->accept_cmd(m,-1,"Попытка снять занятость в режиме РОСПУСК");
+        }
     }
-
+    state2buffer();
     sendBuffers();
     qDebug()<< acceptStr;
 }
@@ -382,37 +405,49 @@ GtBuffer *oldestBuffer(QList<GtBuffer*> &l_buffers){
 void UVK_Central::sendBuffers()
 {
     QDateTime T=QDateTime::currentDateTime();
-    // сохранили старое значение
-    foreach (GtBuffer*B, l_out_buffers) {
-        mB2A[B]=B->A;
-    }
+
     // записали новое
-    state2buffer();
+
+    l_buffers4send.clear();
 
     foreach (GtBuffer*B, l_out_buffers) {
         if (mB2A[B]!=B->A){
             B->timeDataChanged=T;
-            B->timeDataRecived=T;
-            udp->sendGtBuffer(B);
+            if (l_buffers4send.size()<5) l_buffers4send.push_back(B);
         };
     }
+    // 1 тип шлем всегда по нему жизнеспособность опр
+    foreach (GtBuffer*B, l_out_buffers) {
+        int period=500;
+        if (B->getType()==1){
+            if ( B->timeDataRecived.msecsTo(T)>=period){
+                if (!l_buffers4send.contains(B)) l_buffers4send.push_back(B);
+            }
+        }
+    }
+
     foreach (GtBuffer*B, l_out_buffers) {
         int period=1000;
         if ((B->getType()==9)|| ((B->getType()==109))) period=10000;
         if ((B->getType()==15)) period=20000;
-        if ( B->timeDataRecived.msecsTo(T)>period){
-            B->timeDataRecived=T;
-            udp->sendGtBuffer(B);
-
-        };
+        if (l_buffers4send.size()<5){
+            if ( B->timeDataRecived.msecsTo(T)>period){
+                if (!l_buffers4send.contains(B)) l_buffers4send.push_back(B);
+            }
+        }
     }
     GtBuffer*B=oldestBuffer(l_out_buffers);
     if (B!=nullptr) {
         if ((!B->timeDataRecived.isValid())||(B->timeDataRecived.msecsTo(T)>20)){
-            udp->sendGtBuffer(B);
-            B->timeDataRecived=T;
+            l_buffers4send.push_back(B);
         }
 
+    }
+
+    foreach (GtBuffer*B, l_buffers4send) {
+        B->timeDataRecived=T;
+        mB2A[B]=B->A;
+        udp->sendGtBuffer(B);
     }
 
 }

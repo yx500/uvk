@@ -23,7 +23,6 @@ public:
     OtcepsController *otcepsController;
     GtCommandInterface *CMD;
     GtBuffers_UDP_D2 *udp;
-    QTimer *timer;
     QStringList errLog;
     void err(QString errstr);
     bool validation();
@@ -37,7 +36,7 @@ public:
     QList<m_RC_Gor_ZKR*> l_zkr;
     void state2buffer();
 
-    void sendBuffers();
+
 
     int getNewOtcep(m_RC *rc);
 
@@ -49,9 +48,14 @@ signals:
 
 public slots:
      void work();
+     void sendBuffers();
      void recv_cmd(QMap<QString,QString> m);
      void gac_command(const SignalDescription&s,int state);
 protected:
+     QTimer *timer_work;
+     QTimer *timer_send;
+     QList<GtBuffer*> l_buffers4send;
+
      int maxOtcepCurrenRospusk;
 
      QString fileNameModel;

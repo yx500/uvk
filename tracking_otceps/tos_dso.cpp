@@ -25,6 +25,13 @@ void tos_DSO::state2buffer()
     d.EV=dso->STATE_ERROR_CNT();
     dso->SIGNAL_DSODATA().setValue_data(&d,sizeof (d));
 }
+
+void tos_DSO::resetTracking()
+{
+    dso->setSTATE_OSY_COUNT(0);
+    dso->setSTATE_ERROR_TRACK(false);
+    dso->setSTATE_ERROR_CNT(0);
+}
 void tos_DSO::resetStates()
 {
     dso->resetStates();

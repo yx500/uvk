@@ -253,18 +253,16 @@ void tos_System_DSO::resetTracking()
         trc->l_os.clear();
     }
 
-    foreach (auto w, l_dso) {
-        w->resetStates();
-    }
+//    foreach (auto w, l_dso) {
+//        w->resetStates();
+//    }
     foreach (auto w, l_tdso) {
-        w->resetStates();
+        w->resetTracking();
     }
     foreach (auto w, l_trdso) {
         w->resetStates();
     }
-    foreach (auto w, l_trdso) {
-        w->resetStates();
-    }
+
     foreach (auto w, l_tzkr) {
         w->resetStates();
     }

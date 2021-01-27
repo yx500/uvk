@@ -29,6 +29,9 @@ public:
     void work(const QDateTime &T) override;
     QList<SignalDescription> acceptOutputSignals() override;
     void state2buffer() override;
+
+    void resetTracking();
+
     TDSO_statistic getStatistic(qlonglong n);
 
     m_DSO_RD_21 *dso;
