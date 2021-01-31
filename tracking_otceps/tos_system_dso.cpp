@@ -123,6 +123,8 @@ void tos_System_DSO::state2buffer()
     foreach (auto trc, l_trc) {
         trc->rc->SIGNAL_BUSY_DSO().setValue_1bit(trc->rc->STATE_BUSY_DSO());
         trc->rc->SIGNAL_BUSY_DSO_ERR().setValue_1bit(trc->rc->STATE_BUSY_DSO_ERR());
+        trc->rc->SIGNAL_ERR_LS().setValue_1bit(trc->rc->STATE_ERR_LS());
+        trc->rc->SIGNAL_ERR_LZ().setValue_1bit(trc->rc->STATE_ERR_LZ());
         DSO_Data d;
         d.V=trc->l_os.size();
         trc->rc->SIGNAL_INFO_DSO().setValue_data(&d,sizeof (d));
@@ -188,10 +190,10 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
         m_RC *rcf=nullptr;
         TOtcepDataOs s_os;
         TOtcepDataOs f_os;
-
+        if (o->otcep->STATE_LOCATION()==m_Otcep::locationUnknow) continue;
+        if (o->otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) continue;
         foreach (auto trc, l_trc) {
-            if (o->otcep->STATE_LOCATION()==m_Otcep::locationUnknow) continue;
-            if (o->otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) continue;
+
             for (TOtcepDataOs &os :trc->l_os){
                 if (os.num==o->otcep->NUM()){
                     if ((!rcs)||(os.os_otcep<s_os.os_otcep)){
@@ -236,6 +238,8 @@ void tos_System_DSO::resetTracking(int num)
             if (os.num==num) os.num=0;
         }
     }
+
+    reset_1_os(QDateTime::currentDateTime());
 }
 
 void tos_System_DSO::resetTracking()
@@ -247,6 +251,8 @@ void tos_System_DSO::resetTracking()
         for (TOtcepDataOs &os :trc->l_os){
             os.num=0;
         }
+        trc->rc->setSTATE_ERR_LZ(false);
+        trc->rc->setSTATE_ERR_LS(false);
     }
 
     foreach (auto trc, l_trc_park) {
@@ -283,6 +289,22 @@ bool tos_System_DSO::resetDSOBUSY(QString idtsr, QString &acceptStr)
     return true;
 }
 
+void tos_System_DSO::reset_1_os(const QDateTime &T)
+{
+    foreach (auto trc, l_trc) {
+        if (trc->l_os.size()==1){
+            if (((trc->next_rc[0]!=nullptr)&&trc->next_rc[0]->l_os.isEmpty())&&
+                ((trc->next_rc[1]!=nullptr)&&trc->next_rc[1]->l_os.isEmpty())){
+                auto os=trc->l_os.first();
+                if (os.t.msecsTo(T)>1000){
+                    trc->l_os.clear();
+                    trc->rc->setSTATE_ERR_LZ(true);
+                }
+            }
+        }
+    }
+}
+
 void tos_System_DSO::setDSOBUSY()
 {
     foreach (auto trc, l_trc) {
@@ -298,6 +320,8 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,const QDateT
     TOtcepDataOs moved_os;
     if (d==_forw){
         if ((rc1==nullptr) || (rc1->l_os.isEmpty())){
+            if ((rc1!=nullptr) && (rc1->l_os.isEmpty())&&(rc1->next_rc[1]!=nullptr))
+                rc1->rc->setSTATE_ERR_LS(true);
             // рождение ноаовой оси
             TOtcepDataOs new_os;
 
@@ -320,6 +344,8 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,const QDateT
     //  0 --> 1  <<D0
     if (d==_back){
         if ((rc0==nullptr) || (rc0->l_os.isEmpty())){
+            if ((rc0!=nullptr) && (rc0->l_os.isEmpty())&&(rc0->next_rc[0]!=nullptr))
+                rc0->rc->setSTATE_ERR_LS(true);
             // рождение ноаовой оси
             TOtcepDataOs new_os;
             moved_os=new_os;

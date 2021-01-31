@@ -20,10 +20,14 @@ public:
 
     bool cmd_CLEAR_ALL(QString &acceptStr);
     bool cmd_ACTIVATE_ALL(QString &acceptStr);
+    bool cmd_UPDATE_ALL(QString &acceptStr);
     bool cmd_DEL_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_INC_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_SET_OTCEP_STATE(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m,QString &acceptStr);
+
+    void resetLiveOtceps();
+    void finishLiveOtceps();
 
     void updateVagons();
     QList<SignalDescription> l_chanelVag;

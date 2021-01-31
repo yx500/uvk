@@ -30,7 +30,7 @@ void tos_DSO::resetTracking()
 {
     dso->setSTATE_OSY_COUNT(0);
     dso->setSTATE_ERROR_TRACK(false);
-    dso->setSTATE_ERROR_CNT(0);
+    //dso->setSTATE_ERROR_CNT(0);
 }
 void tos_DSO::resetStates()
 {
@@ -61,7 +61,7 @@ void tos_DSO::work(const QDateTime &T)
        { sostFree,        1 , 0  ,   sostOsEnter10,  _none }, // норм +
        { sostFree,        1 , 1  ,   sostOsEnter11,  _sboy }, // сбой
        //              ==> INC
-       { sostOsEnter10,   0 , 0  ,   sostFree,        _inc_os_sboy },// сбой, но занятие было - будем плюсовать
+       { sostOsEnter10,   0 , 0  ,   sostFree,        _none },// сбой, но занятие было - будем плюсовать
        { sostOsEnter10,   0 , 1  ,   sostOsLeave01,   _none },  // сбой, решаем что проскочили 11
        { sostOsEnter10,   1 , 0  ,   sostOsEnter10,   _none },
        { sostOsEnter10,   1 , 1  ,   sostOsEnter1011, _none },  // норм
@@ -74,10 +74,10 @@ void tos_DSO::work(const QDateTime &T)
        { sostOsLeave01,   0 , 0  ,   sostFree,         _inc_os }, // норм
        { sostOsLeave01,   0 , 1  ,   sostOsLeave01,    _none },
        { sostOsLeave01,   1 , 0  ,   sostOsEnter10,    _sboy },  // сбой или поехал обратно? я за сбой
-       { sostOsLeave01,   1 , 1  ,   sostOsEnter0111,  _sboy },  // сбой или поехал обратно? я за сбой
+       { sostOsLeave01,   1 , 1  ,   sostOsEnter1011,  _none },  //  поехал обратно? я за сбой
 
        //             <==DEC
-       { sostOsEnter01,   0 , 0  ,   sostFree,        _inc_os_sboy }, // сбой, но занятие было - будем плюсовать, так безопаснее
+       { sostOsEnter01,   0 , 0  ,   sostFree,        _none }, // сбой, но занятие было - будем плюсовать, так безопаснее
        { sostOsEnter01,   0 , 1  ,   sostOsEnter01,   _none },
        { sostOsEnter01,   1 , 0  ,   sostOsLeave10,   _sboy }, //  сбой, решаем что проскочили 11
        { sostOsEnter01,   1 , 1  ,   sostOsEnter0111, _none }, // норм
@@ -88,9 +88,9 @@ void tos_DSO::work(const QDateTime &T)
        { sostOsEnter0111, 1 , 1  ,   sostOsEnter0111, _none },
 
        { sostOsLeave10,   0 , 0  ,   sostFree,        _dec_os }, // норм
-       { sostOsLeave10,   0 , 1  ,   sostOsEnter10,   _sboy }, // сбой или поехал обратно? я за сбой
+       { sostOsLeave10,   0 , 1  ,   sostOsEnter01,   _sboy }, // сбой или поехал обратно? я за сбой
        { sostOsLeave10,   1 , 0  ,   sostOsLeave10,   _none },
-       { sostOsLeave10,   1 , 1  ,   sostOsEnter0111, _sboy }, // сбой или поехал обратно? я за сбой
+       { sostOsLeave10,   1 , 1  ,   sostOsEnter0111, _none }, // поехал обратно
 
        // непонятки
        { sostOsEnter11,   0 , 0  ,   sostFree,        _sboy_last_d },  // плюсуем по текущему напр
@@ -105,11 +105,14 @@ void tos_DSO::work(const QDateTime &T)
     if (!dso->is33()){
         int B0=dso->SIGNAL_B0().value_1bit();
         int B1=dso->SIGNAL_B1().value_1bit();
+        if (B0==0) B0=1; else B0=0;
+        if (B1==0) B1=1; else B1=0;
         int K= dso->SIGNAL_K().value_1bit();
         if (K!=1) {
-            dso->setSTATE_ERROR(1);
-            current_sost=sost0;
-        } else {
+//            dso->setSTATE_ERROR(1);
+//            current_sost=sost0;
+        }
+        {
 
             // ищем переход
             int cnt=sizeof(steps)/sizeof(steps[0]);

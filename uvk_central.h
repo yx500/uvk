@@ -51,6 +51,7 @@ public slots:
      void sendBuffers();
      void recv_cmd(QMap<QString,QString> m);
      void gac_command(const SignalDescription&s,int state);
+     void sendStatus();
 protected:
      QTimer *timer_work;
      QTimer *timer_send;
@@ -61,7 +62,10 @@ protected:
      QString fileNameModel;
      int trackingType;
 
+     time_t start_time;
+
      int testRegim();
+     void newRospusk();
 };
 
 #endif // UVK_CENTRAL_H

@@ -26,6 +26,8 @@ public:
     void resetTracking()override;
     bool resetDSOBUSY(QString idtsr, QString &acceptStr)override;
 
+    void reset_1_os(const QDateTime &T);
+
     void setDSOBUSY();
 
     TOtcepDataOs moveOs(tos_Rc *rc0, tos_Rc *rc1, int d, const QDateTime &T);

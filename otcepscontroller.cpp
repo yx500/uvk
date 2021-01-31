@@ -111,9 +111,10 @@ void OtcepsController::state2buffer()
                 //                   stored_Descr.VrospF;
                 //                   stored_Descr.V_zad2_S ; // Скорость заданная 2TP
 
-                auto &s=mO29[otcep];
-                s.setBufferData(&stored_Descr,sizeof(stored_Descr));
+
             }
+            auto &s=mO29[otcep];
+            s.setBufferData(&stored_Descr,sizeof(stored_Descr));
         }
 
         {
@@ -184,6 +185,15 @@ bool OtcepsController::cmd_ACTIVATE_ALL(QString &acceptStr)
         if (otcep->STATE_MAR()>0) otcep->setSTATE_ENABLED(true);
     }
     acceptStr="Активация списка отцепов.";
+    return true;
+}
+
+bool OtcepsController::cmd_UPDATE_ALL(QString &acceptStr)
+{
+    foreach (m_Otcep*otcep, otceps->l_otceps) {
+        otcep->setSTATE_CHANGE_COUNTER(otcep->STATE_CHANGE_COUNTER()+1);
+    }
+    acceptStr="Обновление списка отцепов.";
     return true;
 }
 
@@ -321,6 +331,24 @@ bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acc
     }
     acceptStr=QString("Ошибка добавления: Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
     return false;
+}
+
+void OtcepsController::resetLiveOtceps()
+{
+    foreach (auto otcep, otceps->otceps()) {
+        if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)
+            otcep->resetStates();
+        //otcep->setSTATE_CHANGE_COUNTER(otcep->STATE_CHANGE_COUNTER()+1);
+    }
+
+}
+
+void OtcepsController::finishLiveOtceps()
+{
+    foreach (auto otcep, otceps->otceps()) {
+        if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)
+            otcep->setSTATE_LOCATION(m_Otcep::locationUnknow); // нужно для старых
+    }
 }
 
 void OtcepsController::updateVagons()
