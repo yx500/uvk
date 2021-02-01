@@ -267,7 +267,7 @@ void UVK_Central::work()
     QDateTime T=QDateTime::currentDateTime();
 
     GORKA->updateStates();
-
+    QDateTime T1s=QDateTime::currentDateTime();
     // test
     if (testMode==1){
         int new_regim=testRegim();
@@ -281,6 +281,7 @@ void UVK_Central::work()
     TOS->work(T);
     GAC->work(T);
     otcepsController->work(T);
+    QDateTime T2w=QDateTime::currentDateTime();
 
 
 
@@ -294,7 +295,15 @@ void UVK_Central::work()
     }
 
     state2buffer();
+    QDateTime T3sb=QDateTime::currentDateTime();
     sendBuffers();
+    QDateTime T4sn=QDateTime::currentDateTime();
+    qDebug()<<
+               "u="<<T1s.msecsTo(T) <<
+               "w="<<T2w.msecsTo(T1s)<<
+               "sb="<<T3sb.msecsTo(T2w)<<
+               "u="<<T4sn.msecsTo(T3sb)
+               ;
 
 }
 

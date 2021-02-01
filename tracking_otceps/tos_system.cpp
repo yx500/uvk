@@ -186,6 +186,7 @@ void tos_System::updateOtcepParams(tos_OtcepData *o, const QDateTime &T)
              ((otcep->STATE_MAR()<rc->MINWAY())||(otcep->STATE_MAR()>rc->MAXWAY()))
              )
             )otcep->setSTATE_ERROR(true); else otcep->setSTATE_ERROR(false);
+    if ((rc==nullptr)&&(rc->MINWAY()==rc->MAXWAY())&&(rc->MINWAY()!=0)) otcep->setSTATE_MAR_R(1);else otcep->setSTATE_MAR_R(0);
     int marf=0;
     while (rc!=nullptr){
         if (rc->MINWAY()==rc->MAXWAY()){
