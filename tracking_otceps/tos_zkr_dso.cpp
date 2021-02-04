@@ -2,6 +2,7 @@
 #include <qdebug.h>
 
 #include "tos_system_dso.h"
+#include "tos_otcepdata.h"
 
 
 
@@ -10,6 +11,14 @@ tos_Zkr_DSO::tos_Zkr_DSO(tos_System_DSO *parent, tos_Rc *rc) : BaseWorker(parent
     this->trc=rc;
     this->rc_zkr=qobject_cast<m_RC_Gor_ZKR *>(rc->rc);
     this->TOS=parent;
+
+    // 0  1    <<< D0
+    // 0  1
+    // [0][0] [0][1] - датчики опр телег, причем [0][1] - dso_tracking
+    // [1][0] [1][1] - датчики определенияя заезда
+    //
+
+
     for (int i=0;i<2;i++){
         for (int j=0;j<2;j++){
             if (TOS->mDSO2TDSO.contains(rc_zkr->dso[i][j])){
@@ -24,6 +33,8 @@ tos_Zkr_DSO::tos_Zkr_DSO(tos_System_DSO *parent, tos_Rc *rc) : BaseWorker(parent
             TOS->mDSO2TRDSO[tdso[1][j]->dso]->setSTATE_ENABLED(false);
         }
     }
+
+    dsp_pair=new tos_DsoPair(parent,tdso[0][0],tdso[0][1]);
     curr_state_zkr.sost=_otcep_unknow;
 
 }
@@ -80,7 +91,7 @@ void tos_Zkr_DSO::work(const QDateTime &T)
     }
     if ((rc_zkr->rtds_1()->STATE_SRAB()==0) && (rc_zkr->rtds_2()->STATE_SRAB()==0)) rtds=0;
     curr_state_zkr.rtds=rtds;
-    curr_state_zkr.dso=work_dso()->os_moved;
+    curr_state_zkr.dso=alive_dso()->os_moved;
     if (trc->l_os.isEmpty())  curr_state_zkr.os_in=0; else curr_state_zkr.os_in=1;
 
     static t_zkr_pairs tos_zkr_steps[]={
@@ -137,10 +148,38 @@ void tos_Zkr_DSO::work(const QDateTime &T)
         break;
     }
 
+    work_dso_tlg(T);
 
 }
 
-tos_DSO *tos_Zkr_DSO::work_dso()
+void tos_Zkr_DSO::work_dso_tlg(const QDateTime &T)
+{
+    dsp_pair->work(T);
+    if (dsp_pair->sost_teleg==tos_DsoPair::_tlg_forw){
+        if (dsp_pair->teleg_os.num>0){
+            auto o=TOS->otcep(dsp_pair->teleg_os.num);
+            if (o!=nullptr){
+                int tlg=o->otcep->STATE_ZKR_TLG();
+                tlg++;
+                o->otcep->setSTATE_ZKR_TLG(tlg);
+                if (tlg%2==0) o->otcep->setSTATE_ZKR_VAGON_CNT(tlg/2); else o->otcep->setSTATE_ZKR_VAGON_CNT(tlg/2+1);
+            }
+        }
+    }
+    if (dsp_pair->sost_teleg==tos_DsoPair::_tlg_back){
+        if (dsp_pair->teleg_os.num>0){
+            auto o=TOS->otcep(dsp_pair->teleg_os.num);
+            if (o!=nullptr){
+                int tlg=o->otcep->STATE_ZKR_TLG();
+                tlg--;
+                o->otcep->setSTATE_ZKR_TLG(tlg);
+                if (tlg%2==0) o->otcep->setSTATE_ZKR_VAGON_CNT(tlg/2); else o->otcep->setSTATE_ZKR_VAGON_CNT(tlg/2+1);
+            }
+        }
+    }
+}
+
+tos_DSO *tos_Zkr_DSO::alive_dso()
 {
     if (!tdso[1][0]->dso->STATE_ERROR()) return tdso[1][0];
     return tdso[1][1];

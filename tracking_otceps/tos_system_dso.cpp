@@ -206,16 +206,19 @@ void tos_System_DSO::state2buffer()
 void tos_System_DSO::work(const QDateTime &T)
 {
     if (!FSTATE_ENABLED) return;
+
     // состояние рц
     foreach (auto trc, l_trc) {
         trc->work(T);
     }
+
     // датчики
     foreach (auto w, l_tdso) {
         w->work(T);
     }
-    // переходы
-    foreach (auto w, l_trdso) {
+
+    // телеги
+    foreach (auto w, l_tdsopair) {
         w->work(T);
     }
 
@@ -224,8 +227,13 @@ void tos_System_DSO::work(const QDateTime &T)
         w->work(T);
     }
 
+    // переходы
+    foreach (auto w, l_trdso) {
+        w->work(T);
+    }
 
     // кзп
+
     // сбрасываем сбойную ось
     reset_1_os(T);
 
@@ -234,7 +242,6 @@ void tos_System_DSO::work(const QDateTime &T)
 
     // выставляем занятость телегами
     foreach (auto w, l_tdsopair) {
-        w->work(T);
         if (w->strel!=nullptr){
             if (w->sost==tos_DsoPair::_sost_wait2t)
                 w->strel->setSTATE_UVK_TLG(true);else

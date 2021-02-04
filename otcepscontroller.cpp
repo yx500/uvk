@@ -194,7 +194,9 @@ bool OtcepsController::cmd_INC_OTCEP(QMap<QString, QString> &m, QString &acceptS
             otcep_1->setSTATE_ENABLED(otcep_0->STATE_ENABLED());
         }
         otcep->resetStates();
+
         //if (n<otceps->l_otceps.size()-1) otceps->l_otceps[n]->acceptSLStates(otceps->l_otceps[n+1]);
+        otcep->setSTATE_MAR(1);
         otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
         otcep->setSTATE_ENABLED(true);
         acceptStr=QString("Отцеп %1 добавлен.").arg(N);

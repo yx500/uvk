@@ -5,6 +5,7 @@
 #include "tos_dso.h"
 #include "tos_rc.h"
 #include "m_rc_gor_zkr.h"
+#include "tos_dso_pair.h"
 
 
 class tos_System_DSO;
@@ -36,9 +37,11 @@ public:
     void state2buffer() override;
 
     void work(const QDateTime &T) override;
+    void work_dso_tlg(const QDateTime &T);
 
     tos_Rc *trc;
     m_RC_Gor_ZKR * rc_zkr;
+    tos_DsoPair *dsp_pair;
 
     struct t_zkr_state {
         int sost;
@@ -74,7 +77,7 @@ public slots:
 protected:
     tos_DSO *tdso[2][2];
     tos_System_DSO *TOS;
-    tos_DSO * work_dso();
+    tos_DSO * alive_dso();
 
     TOtcepDataOs cur_os;
 
