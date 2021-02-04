@@ -32,6 +32,7 @@ QList<SignalDescription> OtcepsController::acceptOutputSignals()
         otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
         auto s1=otcep->SIGNAL_DATA();
         s1.setChanelType(9);
+        s1.getBuffer()->setSizeData(sizeof(t_NewDescr));
         mO29[otcep]=s1;
         l<< s1;
 //        auto s2=otcep->SIGNAL_DATA();
@@ -43,6 +44,8 @@ QList<SignalDescription> OtcepsController::acceptOutputSignals()
     otceps->setSIGNAL_DATA_VAGON_0(otceps->SIGNAL_DATA_VAGON_0().innerUse());
     for (int i=0;i<MaxVagon;i++){
         SignalDescription p=SignalDescription(15,QString("vag%1").arg(i+1),0);
+        p.acceptGtBuffer();
+        p.getBuffer()->setSizeData(sizeof(tSlVagon));
         l_chanelVag.push_back(p);
         l<<p;
     }

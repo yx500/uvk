@@ -19,6 +19,27 @@ tos_System_DSO::tos_System_DSO(QObject *parent) :
     makeWorkers(modelGorka);
 }
 
+void tos_System_DSO::validation(ListObjStr *l) const
+{
+    tos_System::validation(l);
+
+    foreach (auto w, l_dso) {
+        w->validation(l);
+    }
+    foreach (auto w, l_tdso) {
+        w->validation(l);
+    }
+    foreach (auto w, l_trdso) {
+        w->validation(l);
+    }
+    foreach (auto w, l_trdso) {
+        w->validation(l);
+    }
+    foreach (auto w, l_tzkr) {
+        w->validation(l);
+    }
+}
+
 
 void tos_System_DSO::makeWorkers(ModelGroupGorka *modelGorka)
 {
@@ -31,7 +52,7 @@ void tos_System_DSO::makeWorkers(ModelGroupGorka *modelGorka)
         tos_DSO *tdso=new tos_DSO(this,dso);
         l_tdso.push_back(tdso);
         mDSO2TDSO[dso]=tdso;
-        if ((dso->rc_next[0]!=nullptr)&&((dso->rc_next[1]!=nullptr))){
+        if ((dso->rc_next[0]!=nullptr)&&(dso->rc_next[1]!=nullptr)){
             // проверяем на повтор
             bool ex=false;
             foreach (auto trdso1, l_trdso) {
@@ -50,7 +71,16 @@ void tos_System_DSO::makeWorkers(ModelGroupGorka *modelGorka)
             }
 
         }
+
     }
+
+    foreach (auto tdso, l_tdso) {
+        if ((tdso->dso->rc!=nullptr)&&(tdso->dso->dso_pair!=nullptr)){
+            tos_DsoPair * tdsop=new tos_DsoPair(this,tdso,mDSO2TDSO[tdso->dso->dso_pair]);
+            l_tdsopair.push_back(tdsop);
+        }
+    }
+
     foreach (auto zkr, l_zkr) {
         tos_Zkr_DSO *tzkr=new tos_Zkr_DSO(this,mRc2TRC[zkr]);
         l_tzkr.push_back(tzkr);
@@ -81,9 +111,19 @@ void tos_System_DSO::resetStates()
     foreach (auto w, l_trdso) {
         w->resetStates();
     }
+    foreach (auto w, l_tdsopair) {
+        w->resetStates();
+    }
     foreach (auto w, l_tzkr) {
         w->resetStates();
     }
+
+    foreach (auto w, l_tdsopair) {
+        if (w->strel!=nullptr){
+                w->strel->setSTATE_UVK_TLG(false);
+        }
+    }
+
     if (testMode==0){
         foreach (auto w, l_trc) {
             w->rc->setSTATE_BUSY_DSO_ERR(true);
@@ -103,6 +143,7 @@ QList<SignalDescription> tos_System_DSO::acceptOutputSignals()
         trc->rc->setSIGNAL_BUSY_DSO_ERR(trc->rc->SIGNAL_BUSY_DSO_ERR().innerUse());
         trc->rc->setSIGNAL_INFO_DSO(trc->rc->SIGNAL_INFO_DSO().innerUse());
         l<<trc->rc->SIGNAL_BUSY_DSO()<<trc->rc->SIGNAL_BUSY_DSO_ERR()<<trc->rc->SIGNAL_INFO_DSO();
+        trc->rc->SIGNAL_INFO_DSO().getBuffer()->setSizeData(DSO_Data_Max*sizeof(DSO_Data));
     }
 
     foreach (auto w, l_tdso) {
@@ -114,6 +155,19 @@ QList<SignalDescription> tos_System_DSO::acceptOutputSignals()
     foreach (auto w, l_tzkr) {
         l+=w->acceptOutputSignals();
     }
+
+    foreach (auto w, l_tdsopair) {
+        if (w->strel!=nullptr){
+            w->strel->setSIGNAL_UVK_TLG(w->strel->SIGNAL_UVK_TLG().innerUse());
+            l<< w->strel->SIGNAL_UVK_TLG();
+
+            w->strel->setSIGNAL_UVK_NGBDYN_PL(w->strel->SIGNAL_UVK_NGBDYN_PL().innerUse());
+            w->strel->setSIGNAL_UVK_NGBDYN_MN(w->strel->SIGNAL_UVK_NGBDYN_MN().innerUse());
+            l<< w->strel->SIGNAL_UVK_NGBDYN_PL();
+            l<< w->strel->SIGNAL_UVK_NGBDYN_MN();
+        }
+    }
+
     return l;
 }
 void tos_System_DSO::state2buffer()
@@ -139,6 +193,12 @@ void tos_System_DSO::state2buffer()
     }
     foreach (auto w, l_tzkr) {
         w->state2buffer();
+    }
+
+    foreach (auto w, l_tdsopair) {
+        if (w->strel!=nullptr){
+                w->strel->SIGNAL_UVK_TLG().setValue_1bit(w->strel->STATE_UVK_TLG());
+        }
     }
 }
 
@@ -166,17 +226,28 @@ void tos_System_DSO::work(const QDateTime &T)
 
 
     // кзп
+    // сбрасываем сбойную ось
+    reset_1_os(T);
 
+    // выставляем занятость по осям
     setDSOBUSY();
+
+    // выставляем занятость телегами
+    foreach (auto w, l_tdsopair) {
+        w->work(T);
+        if (w->strel!=nullptr){
+            if (w->sost==tos_DsoPair::_sost_wait2t)
+                w->strel->setSTATE_UVK_TLG(true);else
+                w->strel->setSTATE_UVK_TLG(false);
+        }
+    }
 
 
     // раставляем по рц
     updateOtcepsOnRc(T);
 
-    // выставляем параметра отцепа
-    foreach (auto otcep, lo) {
-        updateOtcepParams(otcep,T);
-    }
+    // выставляем параметра отцепов
+    updateOtcepsParams(T);
 
 }
 
@@ -259,9 +330,9 @@ void tos_System_DSO::resetTracking()
         trc->l_os.clear();
     }
 
-//    foreach (auto w, l_dso) {
-//        w->resetStates();
-//    }
+    //    foreach (auto w, l_dso) {
+    //        w->resetStates();
+    //    }
     foreach (auto w, l_tdso) {
         w->resetTracking();
     }
@@ -293,13 +364,19 @@ void tos_System_DSO::reset_1_os(const QDateTime &T)
 {
     foreach (auto trc, l_trc) {
         if (trc->l_os.size()==1){
-            if (((trc->next_rc[0]!=nullptr)&&trc->next_rc[0]->l_os.isEmpty())&&
-                ((trc->next_rc[1]!=nullptr)&&trc->next_rc[1]->l_os.isEmpty())){
-                auto os=trc->l_os.first();
-                if (os.t.msecsTo(T)>1000){
-                    trc->l_os.clear();
-                    trc->rc->setSTATE_ERR_LZ(true);
-                }
+            // прихолится рассматривать по 2 от рц так как могут быиь длиннобазы
+            bool nesnimat=false;
+            for (int d=0;d<2;d++){
+                auto rc1=trc->next_rc[d];
+                if ((rc1==nullptr)||(!rc1->l_os.isEmpty())) {nesnimat=true;break;}
+                auto rc2=rc1->next_rc[d];
+                if ((rc2==nullptr)||(!rc2->l_os.isEmpty())) {nesnimat=true;break;}
+            }
+            if (nesnimat) continue;
+            auto os=trc->l_os.first();
+            if (os.t.msecsTo(T)>1000){
+                trc->l_os.clear();
+                trc->rc->setSTATE_ERR_LZ(true);
             }
         }
     }

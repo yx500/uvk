@@ -1,5 +1,8 @@
 #include "gtgac.h"
 
+
+
+
 GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
 {
     this->modelGorka=modelGorka;
@@ -7,13 +10,76 @@ GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
     foreach (m_Strel_Gor_Y*strel, l_strel_Y) {
         GacStrel *gstr=new GacStrel;
         gstr->strel=strel;
+        auto s=strel->SIGNAL_UVK_BL_PER();
+        if (!s.isEmpty()){
+            gstr->SIGNAL_UVK_BL_PER_SP=     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+1).innerUse();
+            gstr->SIGNAL_UVK_BL_PER_DB=     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+2).innerUse();
+            gstr->SIGNAL_UVK_BL_PER_OTC=    SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+3).innerUse();
+            gstr->SIGNAL_UVK_BL_PER_TLG=    SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+4).innerUse();
+            gstr->SIGNAL_UVK_BL_PER_NGBSTAT=SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+5).innerUse();
+            gstr->SIGNAL_UVK_BL_PER_NGBDYN= SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+6).innerUse();
+        }
+
+
         l_strel.push_back(gstr);
         mRC2GS[strel]=gstr;
     }
     otceps=modelGorka->findChildren<m_Otceps*>().first();
     l_zkr=modelGorka->findChildren<m_RC_Gor_ZKR*>();
 
+    // собираем маршруты
+    mP2M.clear();
+    foreach (auto zkr, l_zkr) {
+        MarsrutsOnPut mp;
+        mp.mN2M.clear();
+        foreach (auto nm, modelGorka->mMAR2SP.keys()) {
+            Marsrut *m=new Marsrut();
+            m->l_rc.clear();
+            m_RC_Gor*rcs=zkr;
+            RcInMarsrut rcm;
+            rcm.rc=nullptr;
+            while (rcs){
+                // обратная стр
+                if (rcs->getNextCount(_back)==2){
+                    if ((rcs->getNextRC(_back,0)==rcm.rc) && (rcm.rc!=nullptr)) rcm.pol=0; else
+                        if ((rcs->getNextRC(_back,1)==rcm.rc) && (rcm.rc!=nullptr)) rcm.pol=1; else
+                            rcm.pol=MVP_Enums::pol_unknow;
+                    rcm.rc=rcs;
+                    m->l_rc.push_back(rcm);
+                    rcs=qobject_cast<m_RC_Gor*>(rcs->getNextRC(0,0));
+                    continue;
+                }
+
+                rcm.pol=MVP_Enums::pol_unknow;
+                rcm.rc=rcs;
+
+                auto rcplus=qobject_cast<m_RC_Gor*>(rcs->getNextRC(0,0));
+                if ((rcplus!=nullptr)&&(inway(nm,rcplus->MINWAY(),rcplus->MAXWAY()))) {
+                    rcs=rcplus; rcm.pol=MVP_Enums::pol_plus;
+                } else {
+                    auto rcmnus=qobject_cast<m_RC_Gor*>(rcs->getNextRC(0,1));
+                    if ((rcmnus!=nullptr)&&(inway(nm,rcmnus->MINWAY(),rcmnus->MAXWAY()))) {
+                        rcs=rcmnus;  rcm.pol=MVP_Enums::pol_minus;
+                    } else {
+                        break;
+                    }
+                }
+                m->l_rc.push_back(rcm);
+            }
+            mp.mN2M[nm]=m;
+        }
+        mP2M[zkr->PUT_NADVIG()]=mp;
+    }
+
 }
+const Marsrut *GtGac::getMarshrut(int putNadvig, int nm) const
+{
+    if (!mP2M.contains(putNadvig)) return nullptr;
+    const MarsrutsOnPut & mp=mP2M[putNadvig];
+    if (!mp.mN2M.contains(nm)) return nullptr;
+    return  mp.mN2M[nm];
+}
+
 
 QList<SignalDescription> GtGac::acceptOutputSignals()
 {
@@ -25,13 +91,16 @@ QList<SignalDescription> GtGac::acceptOutputSignals()
         gstr->strel->setTU_PRP(gstr->strel->TU_PRP().innerUse());
         gstr->strel->setTU_PRM(gstr->strel->TU_PRM().innerUse());
         l << gstr->strel->SIGNAL_UVK_PRP() << gstr->strel->SIGNAL_UVK_PRM() << gstr->strel->SIGNAL_UVK_AV();
+        l << gstr->strel->TU_PRP() << gstr->strel->TU_PRM() ;
         gstr->strel->setSIGNAL_UVK_BL_PER(gstr->strel->SIGNAL_UVK_BL_PER().innerUse());
-        gstr->strel->setSIGNAL_UVK_BL_PER_SP(gstr->strel->SIGNAL_UVK_BL_PER_SP().innerUse());
-        gstr->strel->setSIGNAL_UVK_BL_PER_DB(gstr->strel->SIGNAL_UVK_BL_PER_DB().innerUse());
-        gstr->strel->setSIGNAL_UVK_BL_PER_OTC(gstr->strel->SIGNAL_UVK_BL_PER_OTC().innerUse());
-        gstr->strel->setSIGNAL_UVK_BL_PER_TLG(gstr->strel->SIGNAL_UVK_BL_PER_TLG().innerUse());
-        gstr->strel->setSIGNAL_UVK_BL_PER_NGBSTAT(gstr->strel->SIGNAL_UVK_BL_PER_NGBSTAT().innerUse());
-        gstr->strel->setSIGNAL_UVK_BL_PER_NGBDYN(gstr->strel->SIGNAL_UVK_BL_PER_NGBDYN().innerUse());
+        l << gstr->strel->SIGNAL_UVK_BL_PER();
+        l << gstr->SIGNAL_UVK_BL_PER_SP <<
+             gstr->SIGNAL_UVK_BL_PER_DB <<
+             gstr->SIGNAL_UVK_BL_PER_OTC <<
+             gstr->SIGNAL_UVK_BL_PER_TLG <<
+             gstr->SIGNAL_UVK_BL_PER_NGBSTAT <<
+             gstr->SIGNAL_UVK_BL_PER_NGBDYN;
+
     }
     return l;
 
@@ -45,12 +114,13 @@ void GtGac::state2buffer()
         gs->strel->SIGNAL_UVK_AV().setValue_1bit(gs->strel->STATE_UVK_AV());
 
         gs->strel->SIGNAL_UVK_BL_PER().setValue_1bit(gs->BL_PER);
-        gs->strel->SIGNAL_UVK_BL_PER_SP().setValue_1bit(gs->BL_PER_SP);
-        gs->strel->SIGNAL_UVK_BL_PER_DB().setValue_1bit(gs->BL_PER_DB);
-        gs->strel->SIGNAL_UVK_BL_PER_OTC().setValue_1bit(gs->BL_PER_OTC);
-        gs->strel->SIGNAL_UVK_BL_PER_TLG().setValue_1bit(gs->BL_PER_TLG);
-        gs->strel->SIGNAL_UVK_BL_PER_NGBSTAT().setValue_1bit(gs->BL_PER_NGBSTAT);
-        gs->strel->SIGNAL_UVK_BL_PER_NGBDYN().setValue_1bit(gs->BL_PER_NGBDYN);
+
+        gs->SIGNAL_UVK_BL_PER_SP.setValue_1bit(gs->BL_PER_SP);
+        gs->SIGNAL_UVK_BL_PER_DB.setValue_1bit(gs->BL_PER_DB);
+        gs->SIGNAL_UVK_BL_PER_OTC.setValue_1bit(gs->BL_PER_OTC);
+        gs->SIGNAL_UVK_BL_PER_TLG.setValue_1bit(gs->BL_PER_TLG);
+        gs->SIGNAL_UVK_BL_PER_NGBSTAT.setValue_1bit(gs->BL_PER_NGBSTAT);
+        gs->SIGNAL_UVK_BL_PER_NGBDYN.setValue_1bit(gs->BL_PER_NGBDYN);
     }
 }
 
@@ -133,6 +203,17 @@ void GtGac::validation(ListObjStr *l) const
 
         }
     }
+    foreach (auto pp, mP2M.keys()) {
+        foreach (auto nm, mP2M[pp].mN2M.keys()) {
+            auto m=getMarshrut(pp,nm);
+            foreach (auto rcm, m->l_rc) {
+                if (rcm.pol==MVP_Enums::pol_unknow){
+                    l->error(rcm.rc,QString("Проблема постороения маршрта pnadv=%1 mar=%2").arg(pp).arg(nm));
+                }
+            }
+        }
+
+    }
 
 }
 
@@ -163,6 +244,90 @@ bool isNegabarit(m_Strel_Gor_Y*strel,MVP_Enums::TStrelPol pol)
     return false;
 }
 
+void GtGac::set_STATE_GAC_ACTIVE()
+{
+    // выключем отцепы
+    auto otcep1=otceps->topOtcep();
+    foreach (m_Otcep *otcep, otceps->otceps()) {
+        if (!otcep->STATE_ENABLED()) continue;
+
+        // включем отцепы
+        if (otcep==otcep1){
+            if (otcep1!=nullptr) otcep1->setSTATE_GAC_ACTIVE(1);
+            continue;
+        }
+
+        if (!otcep->STATE_GAC_ACTIVE()) continue;
+        int act=1;
+
+        // не задан
+        if (otcep->STATE_MAR()==0) act=0;
+
+        // для первого выставляем даж когда он еще не выехал
+        if (otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk) act=0;
+
+        // не выставляем для отцепов которые едут в гору
+        if (otcep->STATE_DIRECTION()!=_forw) act=0;
+
+        if (otcep->STATE_ERROR()!=0) act=0;
+
+        // реализован
+        auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
+        if ((rcs!=nullptr)&&(rcs->MINWAY()==rcs->MAXWAY())) act=0;
+        otcep->setSTATE_GAC_ACTIVE(act);
+    }
+
+
+
+}
+
+void GtGac::set_STATE_WARN()
+{
+    auto act_zkr=modelGorka->active_zkr();
+    foreach (m_Otcep *otcep, otceps->otceps()) {
+        if (!otcep->STATE_ENABLED()) continue;
+        // стрелки в среднем положении
+        int warn1=0;
+        if (act_zkr!=nullptr){
+            if ((otcep->STATE_GAC_ACTIVE())||(otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) {
+                if (otcep->STATE_MAR()>0){
+                    auto m=getMarshrut(act_zkr->PUT_NADVIG(),otcep->STATE_MAR());
+                    // идем по маршруту
+                    bool b=false;
+                    if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) b=true;
+                    for (const RcInMarsrut&mr :m->l_rc){
+                        if (mr.rc==otcep->RCS) {
+                            b=true;
+                            continue;
+                        }
+                        if (b){
+                            m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
+                            if (str!=nullptr){
+                                if ((str->STATE_A()==0) && (str->STATE_POL()!=mr.pol)){
+                                    warn1=1;
+                                    break;
+                                }
+                                continue;
+                            }
+                            auto str1=qobject_cast<m_Strel_Gor*>(mr.rc) ;
+                            if (str1!=nullptr){
+                                if (str1->STATE_POL()!=mr.pol){
+                                    warn1=1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+        }
+        otcep->setSTATE_GAC_W_STRA(warn1);
+    }
+}
+
+
+
 void GtGac::work(const QDateTime &T)
 {
     if (!FSTATE_ENABLED) return;
@@ -178,26 +343,26 @@ void GtGac::work(const QDateTime &T)
         if (gs->strel->STATE_A()!=1) gs->strel->setSTATE_UVK_AV(false);
     }
 
+    // выключем отцепы
+    set_STATE_GAC_ACTIVE();
+
     auto act_zkr=modelGorka->active_zkr();
 
     // определяем на стрелках нужное для отцепов положение pol_mar
     foreach (m_Otcep *otcep, otceps->otceps()) {
         if (!otcep->STATE_ENABLED()) continue;
-        // не задан
-        if (otcep->STATE_MAR()==0) continue;
 
         // для первого выставляем даж когда он еще не выехал
-        if ((!otceps->isFirstOtcep(otcep))&&(otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk)) continue;
-        // не выставляем для отцепов которые едут в гору
-        if ((!otceps->isFirstOtcep(otcep))&&(otcep->STATE_DIRECTION()!=_forw)) continue;
+        if ((!otceps->isFirstOtcep(otcep))&&(!otcep->STATE_GAC_ACTIVE())) continue;
+
 
         auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
         if (otceps->isFirstOtcep(otcep)){
-           rcs=nullptr;
-           if ((act_zkr!=nullptr) &&
-                   (act_zkr->STATE_BUSY()==MVP_Enums::free)&&
-                   (otceps->otcepCountOnRc(act_zkr)==0)
-               ) rcs=act_zkr;
+            rcs=nullptr;
+            if ((act_zkr!=nullptr) &&
+                    (act_zkr->STATE_BUSY()==MVP_Enums::free)&&
+                    (otceps->otcepCountOnRc(act_zkr)==0)
+                    ) rcs=act_zkr;
         }
 
         if (rcs==nullptr) continue;
@@ -209,8 +374,7 @@ void GtGac::work(const QDateTime &T)
             }
             if (ex_min) continue;
         }
-        // реализован
-        if (rcs->MINWAY()==rcs->MAXWAY()) continue;
+
         // на случай если хвост вышел из зоны ГАЦ
         auto rcf=qobject_cast<m_RC_Gor*>(otcep->RCF);
         if (rcf!=nullptr) {
@@ -310,6 +474,9 @@ void GtGac::work(const QDateTime &T)
         if (gs->strel->STATE_POL()!=MVP_Enums::pol_w) gs->pol_cmd_w_time=QDateTime();
     }
 
+    // выставляем предупреждения
+    set_STATE_WARN();
+
 
 
 }
@@ -322,14 +489,25 @@ void GtGac::setStateBlockPerevod(GacStrel *gs)
     if ((gs->strel->get_rtds()!=nullptr)&&(gs->strel->get_rtds()->STATE_SRAB()==1)) sp=true;
     if ((gs->strel->get_ipd()!=nullptr)&&(gs->strel->get_ipd()->STATE_SRAB()==1)) sp=true;
     if (gs->strel->STATE_BUSY()!=0) sp=true;
+    if (gs->strel->STATE_BUSY_DSO()!=0) sp=true;
+    if (gs->strel->STATE_BUSY_DSO_ERR()!=0) sp=true;
     gs->BL_PER_SP=sp;
 
+    gs->BL_PER_DB=false;  // Как определить дб?
 
-    gs->BL_PER_TLG=false; /// ================ДОБАВИТЬ!
+    gs->BL_PER_TLG=gs->strel->STATE_UVK_TLG();
 
+    // добавить рассылку стэйта
     gs->BL_PER_NGBSTAT=isNegabarit(gs->strel,gs->strel->STATE_POL());
 
-    gs->BL_PER_NGBDYN=false; /// ================ДОБАВИТЬ!
+    gs->BL_PER_NGBDYN=false;
+    if (gs->strel->STATE_POL()==MVP_Enums::pol_plus){
+        if (gs->strel->STATE_UVK_NGBDYN_MN()) gs->BL_PER_NGBDYN=true;
+    }
+    if (gs->strel->STATE_POL()==MVP_Enums::pol_minus){
+        if (gs->strel->STATE_UVK_NGBDYN_PL()) gs->BL_PER_NGBDYN=true;
+    }
+
 
     gs->BL_PER=gs->BL_PER_OTC |
             gs->BL_PER_SP |
@@ -340,6 +518,7 @@ void GtGac::setStateBlockPerevod(GacStrel *gs)
             gs->strel->STATE_UVK_AV();
 
 }
+
 
 void GtGac::sendCommand(GacStrel * gs, MVP_Enums::TStrelPol pol_cmd,bool force)
 {

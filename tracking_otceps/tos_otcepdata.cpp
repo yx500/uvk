@@ -29,7 +29,12 @@ void tos_OtcepData::resetTracking()
         otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
     }
     otcep->setSTATE_MAR_F(0);
-    otcep->setSTATE_ZKR_PROGRESS(false);
+    otcep->setSTATE_ZKR_PROGRESS(0);
+    otcep->setSTATE_ZKR_S_IN(0);
+
+    otcep->setSTATE_GAC_ACTIVE(0);
+    otcep->setSTATE_GAC_W_STRA(0);
+
     otcep->setSTATE_KZP_OS(m_Otcep::kzpUnknow);
     otcep->setSTATE_V(_undefV_);
     otcep->setSTATE_V_RC(_undefV_);

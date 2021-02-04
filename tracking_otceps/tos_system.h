@@ -37,7 +37,7 @@ public:
     QList<SignalDescription> acceptOutputSignals() override;
     virtual void state2buffer() override;
     virtual void work(const QDateTime &T)override;
-    void updateOtcepParams(tos_OtcepData *o, const QDateTime &T);
+    virtual void updateOtcepsParams(const QDateTime &T);
     virtual void resetStates()override;
     virtual void resetTracking(int num);
     virtual void resetTracking();

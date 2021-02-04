@@ -42,13 +42,14 @@ public:
 
     virtual QList<SignalDescription> acceptOutputSignals() ;
 
-
+    enum {_all,_changed,_period};
+    void sendBuffers(int p);
 
 signals:
 
 public slots:
      void work();
-     void sendBuffers();
+     void sendBuffersPeriod();
      void recv_cmd(QMap<QString,QString> m);
      void gac_command(const SignalDescription&s,int state);
      void sendStatus();

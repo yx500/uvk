@@ -5,6 +5,7 @@
 #include "tos_dso.h"
 #include "tos_dsotracking.h"
 #include "tos_zkr_dso.h"
+#include "tos_dso_pair.h"
 
 class tos_System_DSO : public tos_System
 {
@@ -14,7 +15,7 @@ public:
     virtual ~tos_System_DSO(){}
 
 
-
+    void validation(ListObjStr *l) const override;
     void makeWorkers(ModelGroupGorka *modelGorka) override;
     QList<SignalDescription> acceptOutputSignals() override;
     void state2buffer() override;
@@ -40,6 +41,7 @@ public:
     QList<m_DSO_RD_21*> l_dso;
     QList<tos_DSO*> l_tdso;
     QList<tos_DsoTracking*> l_trdso;
+    QList<tos_DsoPair*> l_tdsopair;
     QList<tos_Zkr_DSO*> l_tzkr;
     QList<tos_Rc*> l_trc_park;
     tos_Rc * getRc(TOtcepDataOs os);

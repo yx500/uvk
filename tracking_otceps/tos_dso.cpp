@@ -13,6 +13,7 @@ QList<SignalDescription> tos_DSO::acceptOutputSignals()
     dso->setSIGNAL_DSODATA(dso->SIGNAL_DSODATA().innerUse());
     QList<SignalDescription> l;
     l << dso->SIGNAL_DSODATA();
+    dso->SIGNAL_DSODATA().getBuffer()->setSizeData(DSO_Data_Max*sizeof(DSO_Data));
     return l;
 }
 

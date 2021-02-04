@@ -22,8 +22,30 @@ struct GacStrel{
     bool BL_PER_NGBSTAT;
     bool BL_PER_NGBDYN;
 
+    SignalDescription SIGNAL_UVK_BL_PER_SP;
+    SignalDescription SIGNAL_UVK_BL_PER_DB;
+    SignalDescription SIGNAL_UVK_BL_PER_OTC;
+    SignalDescription SIGNAL_UVK_BL_PER_TLG;
+    SignalDescription SIGNAL_UVK_BL_PER_NGBSTAT;
+    SignalDescription SIGNAL_UVK_BL_PER_NGBDYN;
+
+
+
 
 };
+
+struct RcInMarsrut{
+    m_RC_Gor *rc;
+    int pol;
+};
+
+struct Marsrut{
+    QList<RcInMarsrut> l_rc;
+};
+struct MarsrutsOnPut{
+    QMap<int,Marsrut*> mN2M;
+};
+
 
 
 class GtGac : public BaseWorker
@@ -47,11 +69,18 @@ protected:
     QList<GacStrel*> l_strel;
     QList<m_RC_Gor_ZKR*> l_zkr;
     QMap<m_RC *,GacStrel*> mRC2GS;
+
+    QMap<int,MarsrutsOnPut> mP2M;
+
     static bool inway(int way,int minway,int maxway)
     {
         if ((way>0)&&(way>=minway)&&(way<=maxway)) return true;
         return false;
     }
+    void set_STATE_GAC_ACTIVE();
+    void set_STATE_WARN();
+
+    const Marsrut *getMarshrut(int putNadvig,int nm) const;
 
 };
 

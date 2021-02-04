@@ -81,7 +81,7 @@ bool UVK_Central::init(QString fileNameIni)
         return false;
     }
 
-//    udp->getGtBuffer(3,"uvk_status")->static_mode=true;
+    //    udp->getGtBuffer(3,"uvk_status")->static_mode=true;
 
     GORKA->resetStates();
     TOS->resetStates();
@@ -104,28 +104,30 @@ void UVK_Central::start()
     connect(timer_work,&QTimer::timeout,this,&UVK_Central::work);
 
     timer_send=new QTimer(this);
-    connect(timer_send,&QTimer::timeout,this,&UVK_Central::sendBuffers);
+    connect(timer_send,&QTimer::timeout,this,&UVK_Central::sendBuffersPeriod);
 
     auto timer_status=new QTimer(this);
     connect(timer_status,&QTimer::timeout,this,&UVK_Central::sendStatus);
 
 
     // перебрасываем все каналы на себя
+    // только 1 тип
     foreach (GtBuffer *B, udp->allBuffers()) {
-        if (!B->static_mode){
+        if ((B->type==1)&&(!B->static_mode)){
             connect(B,&GtBuffer::bufferChanged,this,&UVK_Central::work);
+            qDebug()<< "active buffer" << B->type << " "<<B->name;
         }
     }
     maxOtcepCurrenRospusk=0;
     QString tmpstr;
     cmd_setPutNadvig(1,tmpstr);
     cmd_setRegim(0,tmpstr);
-    sendBuffers();
-
     // инициировали
     foreach (GtBuffer*B, l_out_buffers) {
         mB2A[B]=B->A;
     }
+
+    sendBuffers(_all);
 
     start_time=QDateTime::currentDateTime().toTime_t();
 
@@ -182,13 +184,32 @@ bool UVK_Central::acceptBuffers()
 
 
 
+    QList<GtBuffer*> l_tu_buffers;
 
     // закрываем буфера на прием
     foreach (auto p, l) {
         if (p.isEmpty())continue;
+        auto B=p.getBuffer();
         if (l_out_buffers.indexOf(p.getBuffer())<0) {
-            l_out_buffers.push_back(p.getBuffer());
-            p.getBuffer()->static_mode=true;
+
+            // ставим период рассылки
+            switch (B->type){
+            case 0:B->setMsecPeriodLive(0); break;
+            case 1:B->setMsecPeriodLive(1000);B->setSizeData(121); break;
+            case 9:B->setMsecPeriodLive(20000); break;
+            case 15:B->setMsecPeriodLive(30000); break;
+            case 17:B->setMsecPeriodLive(1000); break;
+            default:B->setMsecPeriodLive(1000);
+            }
+            if (B->type==0){
+                if (!l_tu_buffers.contains(B)){
+                    qDebug()<< "use tu buffer " <<B->getType() << B->objectName();
+                    l_tu_buffers << B;
+                }
+            } else {
+                l_out_buffers.push_back(p.getBuffer());
+            }
+            B->static_mode=true;
         }
     }
     for (int i=0;i<l.size();i++){
@@ -236,6 +257,9 @@ bool UVK_Central::acceptBuffers()
         b->sost=GtBuffer::_alive;
         qDebug()<< "use out buffer " <<b->getType() << b->objectName();
     }
+    foreach (auto b, l_tu_buffers) {
+        qDebug()<< "use tu buffer " <<b->getType() << b->objectName();
+    }
 
     // проверяем сигналы в буфера на прием
     QList<BaseObject*> lo=GORKA->findChildren<BaseObject*>();
@@ -265,25 +289,23 @@ bool UVK_Central::acceptBuffers()
 void UVK_Central::work()
 {
     QDateTime T=QDateTime::currentDateTime();
-
     GORKA->updateStates();
-    QDateTime T1s=QDateTime::currentDateTime();
+//    QDateTime T1s=QDateTime::currentDateTime();
     // test
     if (testMode==1){
         int new_regim=testRegim();
         QString s;
         if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimStop) && (new_regim==ModelGroupGorka::regimRospusk))
-                otcepsController->otceps->resetStates();
-
+            foreach (auto otcep, otcepsController->otceps->otceps()) {
+                if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) otcep->resetStates();
+            }
         cmd_setRegim(new_regim,s);
     }
 
     TOS->work(T);
     GAC->work(T);
     otcepsController->work(T);
-    QDateTime T2w=QDateTime::currentDateTime();
-
-
+//    QDateTime T2w=QDateTime::currentDateTime();
 
     // РРС
     if ((!GORKA->SIGNAL_RRC_TU().isNotUse())&&(!GORKA->SIGNAL_RRC_TU().isEmpty())){
@@ -293,18 +315,36 @@ void UVK_Central::work()
             gac_command(GORKA->SIGNAL_RRC_TU(),state);
         }
     }
+    if (udp->emit_counter()<=1){
+        state2buffer();
+        sendBuffers(_changed);
+    } else{
+        qDebug()<< "udp->emit_counter=" <<udp->emit_counter();
+    }
 
-    state2buffer();
-    QDateTime T3sb=QDateTime::currentDateTime();
-    sendBuffers();
-    QDateTime T4sn=QDateTime::currentDateTime();
-    qDebug()<<
-               "u="<<T1s.msecsTo(T) <<
-               "w="<<T2w.msecsTo(T1s)<<
-               "sb="<<T3sb.msecsTo(T2w)<<
-               "u="<<T4sn.msecsTo(T3sb)
-               ;
+//    QDateTime T3sb=QDateTime::currentDateTime();
 
+
+//    QDateTime T4sn=QDateTime::currentDateTime();
+
+
+
+    //    qDebug()<<
+    //               "u="<<T1s.msecsTo(T) <<
+    //               "w="<<T2w.msecsTo(T1s)<<
+    //               "sb="<<T3sb.msecsTo(T2w)<<
+    //               "u="<<T4sn.msecsTo(T3sb)
+    //               ;
+
+//    QDateTime T4sn=QDateTime::currentDateTime();
+//    qDebug()<<"w="<<T4sn.msecsTo(T) ;
+
+
+}
+
+void UVK_Central::sendBuffersPeriod()
+{
+    sendBuffers(_period);
 }
 
 void UVK_Central::recv_cmd(QMap<QString, QString> m)
@@ -361,7 +401,7 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
         if (!m["DEL_OTCEP"].isEmpty()){
             if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
                 if (otcepsController->cmd_DEL_OTCEP(m,acceptStr)){
-                    int N=m["DEL_OTCEP"].toInt();
+                    //                    int N=m["DEL_OTCEP"].toInt();
                     //TOS->resetTracking(N);
                     CMD->accept_cmd(m,1,acceptStr);
                 }else
@@ -399,7 +439,7 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
         }
     }
     state2buffer();
-    sendBuffers();
+    sendBuffers(_changed);
     qDebug()<< acceptStr;
 }
 
@@ -438,46 +478,56 @@ GtBuffer *oldestBuffer(QList<GtBuffer*> &l_buffers){
     return oldb;
 }
 
-void UVK_Central::sendBuffers()
+void UVK_Central::sendBuffers(int p)
 {
     QDateTime T=QDateTime::currentDateTime();
 
-    // записали новое
-
     l_buffers4send.clear();
-
-    foreach (GtBuffer*B, l_out_buffers) {
-        if (mB2A[B]!=B->A){
-            B->timeDataChanged=T;
-            if (l_buffers4send.size()<5) l_buffers4send.push_back(B);
-        };
-    }
-    // 1 тип шлем всегда по нему жизнеспособность опр
-    foreach (GtBuffer*B, l_out_buffers) {
-        int period=500;
-        if (B->getType()==1){
-            if ( B->timeDataRecived.msecsTo(T)>=period){
-                if (!l_buffers4send.contains(B)) l_buffers4send.push_back(B);
-            }
+    if (p==_changed){
+        // записали новое
+        foreach (GtBuffer*B, l_out_buffers) {
+            if (mB2A[B]!=B->A){
+                B->timeDataChanged=T;
+                l_buffers4send.push_back(B);
+            };
         }
     }
-
-    foreach (GtBuffer*B, l_out_buffers) {
-        int period=1000;
-        if ((B->getType()==9)|| ((B->getType()==109))) period=10000;
-        if ((B->getType()==15)) period=20000;
-        if (l_buffers4send.size()<5){
-            if ( B->timeDataRecived.msecsTo(T)>period){
-                if (!l_buffers4send.contains(B)) l_buffers4send.push_back(B);
-            }
-        }
-    }
-    GtBuffer*B=oldestBuffer(l_out_buffers);
-    if (B!=nullptr) {
-        if ((!B->timeDataRecived.isValid())||(B->timeDataRecived.msecsTo(T)>20)){
+    if (p==_all){
+        foreach (GtBuffer*B, l_out_buffers) {
             l_buffers4send.push_back(B);
         }
+    }
+    if (p==_period){
 
+        foreach (GtBuffer*B, l_out_buffers) {
+            if (mB2A[B]!=B->A){
+                B->timeDataChanged=T;
+                if (l_buffers4send.size()<5) l_buffers4send.push_back(B);
+            };
+        }
+        // 1 тип шлем всегда по нему жизнеспособность опр
+        foreach (GtBuffer*B, l_out_buffers) {
+            if (B->getType()==1){
+                if ((!B->timeDataRecived.isValid())||(( B->timeDataRecived.msecsTo(T)>=B->msecPeriodLive)&&(B->msecPeriodLive>0))){
+                    if (!l_buffers4send.contains(B)) l_buffers4send.push_back(B);
+                }
+            }
+        }
+
+        foreach (GtBuffer*B, l_out_buffers) {
+            if (l_buffers4send.size()<5){
+                if ((!B->timeDataRecived.isValid())||((B->timeDataRecived.msecsTo(T)>=B->msecPeriodLive)&&(B->msecPeriodLive>0))){
+                    if (!l_buffers4send.contains(B)) l_buffers4send.push_back(B);
+                }
+            }
+        }
+        GtBuffer*B=oldestBuffer(l_out_buffers);
+        if (B!=nullptr) {
+            if ((!B->timeDataRecived.isValid())||((B->timeDataRecived.msecsTo(T)>=B->msecPeriodLive)&&(B->msecPeriodLive>0))){
+                l_buffers4send.push_back(B);
+            }
+
+        }
     }
 
     foreach (GtBuffer*B, l_buffers4send) {
@@ -497,6 +547,7 @@ int UVK_Central::getNewOtcep(m_RC*rc)
                 m_Otcep *otcep=otcepsController->otceps->topOtcep();
                 if (otcep!=nullptr)  {
                     if (otcep->NUM()>maxOtcepCurrenRospusk) maxOtcepCurrenRospusk=otcep->NUM();
+                    if (otcep->STATE_MAR()>0) otcep->setSTATE_GAC_ACTIVE(1);
                     return otcep->NUM();
                 }
                 otcep=otcepsController->otceps->otcepByNum(maxOtcepCurrenRospusk+1);
@@ -665,7 +716,7 @@ void UVK_Central::newRospusk()
 {
     otcepsController->finishLiveOtceps();
     state2buffer();
-    sendBuffers();
+    sendBuffers(_changed);
     otcepsController->resetLiveOtceps();
     maxOtcepCurrenRospusk=0;
     TOS->resetTracking();
