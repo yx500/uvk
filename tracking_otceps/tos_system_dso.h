@@ -31,7 +31,7 @@ public:
 
     void setDSOBUSY();
 
-    TOtcepDataOs moveOs(tos_Rc *rc0, tos_Rc *rc1, int d, const QDateTime &T);
+    TOtcepDataOs moveOs(tos_Rc *rc0, tos_Rc *rc1, int d, qreal os_v, const QDateTime &T);
 
 
     int zkr_id;

@@ -37,6 +37,7 @@ public:
     m_DSO_RD_21 *dso;
 
     int os_moved;
+    qreal os_v;
 signals:
 
 public slots:

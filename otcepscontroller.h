@@ -29,6 +29,8 @@ public:
     void resetLiveOtceps();
     void finishLiveOtceps();
 
+    void setNewID_ROSP(quint32 ID_ROSP);
+
     void updateVagons();
     QList<SignalDescription> l_chanelVag;
     QMap<m_Otcep*,SignalDescription> mO29;

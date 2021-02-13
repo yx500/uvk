@@ -77,7 +77,7 @@ protected:
         if ((way>0)&&(way>=minway)&&(way<=maxway)) return true;
         return false;
     }
-    void set_STATE_GAC_ACTIVE();
+    void reset_STATE_GAC_ACTIVE();
     void set_STATE_WARN();
 
     const Marsrut *getMarshrut(int putNadvig,int nm) const;

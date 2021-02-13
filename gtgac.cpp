@@ -244,18 +244,12 @@ bool isNegabarit(m_Strel_Gor_Y*strel,MVP_Enums::TStrelPol pol)
     return false;
 }
 
-void GtGac::set_STATE_GAC_ACTIVE()
+void GtGac::reset_STATE_GAC_ACTIVE()
 {
     // выключем отцепы
     auto otcep1=otceps->topOtcep();
     foreach (m_Otcep *otcep, otceps->otceps()) {
         if (!otcep->STATE_ENABLED()) continue;
-
-        // включем отцепы
-        if (otcep==otcep1){
-            if (otcep1!=nullptr) otcep1->setSTATE_GAC_ACTIVE(1);
-            continue;
-        }
 
         if (!otcep->STATE_GAC_ACTIVE()) continue;
         int act=1;
@@ -264,7 +258,11 @@ void GtGac::set_STATE_GAC_ACTIVE()
         if (otcep->STATE_MAR()==0) act=0;
 
         // для первого выставляем даж когда он еще не выехал
-        if (otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk) act=0;
+        if (otcep==otcep1){
+            if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) act=0;
+        } else {
+            if (otcep->STATE_LOCATION()!=m_Otcep::locationOnSpusk) act=0;
+        }
 
         // не выставляем для отцепов которые едут в гору
         if (otcep->STATE_DIRECTION()!=_forw) act=0;
@@ -274,6 +272,7 @@ void GtGac::set_STATE_GAC_ACTIVE()
         // реализован
         auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
         if ((rcs!=nullptr)&&(rcs->MINWAY()==rcs->MAXWAY())) act=0;
+
         otcep->setSTATE_GAC_ACTIVE(act);
     }
 
@@ -343,8 +342,12 @@ void GtGac::work(const QDateTime &T)
         if (gs->strel->STATE_A()!=1) gs->strel->setSTATE_UVK_AV(false);
     }
 
+    // включаем  1 отцеп
+    auto otcep1=otceps->topOtcep();
+    if (otcep1!=nullptr) otcep1->setSTATE_GAC_ACTIVE(1);
+
     // выключем отцепы
-    set_STATE_GAC_ACTIVE();
+    reset_STATE_GAC_ACTIVE();
 
     auto act_zkr=modelGorka->active_zkr();
 
@@ -352,12 +355,10 @@ void GtGac::work(const QDateTime &T)
     foreach (m_Otcep *otcep, otceps->otceps()) {
         if (!otcep->STATE_ENABLED()) continue;
 
-        // для первого выставляем даж когда он еще не выехал
-        if ((!otceps->isFirstOtcep(otcep))&&(!otcep->STATE_GAC_ACTIVE())) continue;
-
+        if (!otcep->STATE_GAC_ACTIVE()) continue;
 
         auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
-        if (otceps->isFirstOtcep(otcep)){
+        if (otcep==otcep1){
             rcs=nullptr;
             if ((act_zkr!=nullptr) &&
                     (act_zkr->STATE_BUSY()==MVP_Enums::free)&&
@@ -380,6 +381,7 @@ void GtGac::work(const QDateTime &T)
         if (rcf!=nullptr) {
             if (rcf->MINWAY()==rcf->MAXWAY()) continue;
         }
+
         // были случаи когда затаскивали отцеп на другую гору
         foreach (auto rc_zkr, l_zkr) {
             if ((rc_zkr==rcs) && (rc_zkr->STATE_ROSPUSK()!=1)) continue;
@@ -390,9 +392,11 @@ void GtGac::work(const QDateTime &T)
         while(rc!=nullptr){
             recurs_count++;
             if (recurs_count>200) break; // защита от бесконечного цикла при сбойном графе
+            // до первой занятости
+            if (rc->STATE_BUSY()!=MVP_Enums::free) break;
+            // до первой занятости отцепом
+            if (otceps->otcepCountOnRc(rc)!=0) break;
 
-            if (rc->STATE_BUSY()==MVP_Enums::busy) break;
-            if (otceps->otcepOnRc(rc)!=nullptr) break;
             auto grc=qobject_cast<m_RC_Gor*>(rc);
             // дальше считаем стрелок нет
             if (grc->MINWAY()==grc->MAXWAY()) break;
@@ -402,7 +406,7 @@ void GtGac::work(const QDateTime &T)
             // наша стрелка?
             if (mRC2GS.contains(rc)){
                 GacStrel*gs=mRC2GS[rc];
-                // только один отцеп решает
+                // только первый отцеп решает
                 // но по сути это ситуация когда из 2 точек есть выход на одну рц
                 if (gs->pol_mar!=MVP_Enums::pol_unknow) break;
                 bool mar_plus=false;
@@ -421,15 +425,15 @@ void GtGac::work(const QDateTime &T)
                 // до первой необходимости перевода
                 if ((gs->strel->STATE_POL()!=gs->pol_mar)) break;
             }
-            // так как только до первой стр с неправ положением - то можем брать просто след
-            // а не rcplus/rcmnus
-            rc=rc->next_rc[_forw];// getNextRCpolcfb(0);
+            // next_rc уже выставвлен по положению стрелки
+            rc=rc->next_rc[_forw];
         }
     }
 
     // определяем возможность команды на перевод
     for (auto gs : l_strel){
-        if ((modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk)&&(modelGorka->STATE_REGIM()!=ModelGroupGorka::regimPausa)) continue;
+        if ((modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk)&&
+                (modelGorka->STATE_REGIM()!=ModelGroupGorka::regimPausa)) continue;
         if (gs->pol_mar==MVP_Enums::pol_unknow) continue;
         if (gs->strel->STATE_POL()==gs->pol_mar) continue;
         if (gs->strel->STATE_A()!=1) continue;
@@ -451,6 +455,8 @@ void GtGac::work(const QDateTime &T)
             if (gs->strel->STATE_POL()==MVP_Enums::pol_w){
                 if (!gs->pol_cmd_w_time.isValid()) gs->pol_cmd_w_time=T;
             }
+            // определям общее время перевода по команде
+
 
             if (gs->pol_cmd_w_time.isValid()){
                 qint64 ms=gs->pol_cmd_w_time.msecsTo(T);

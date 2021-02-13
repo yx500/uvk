@@ -270,15 +270,20 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
         TOtcepDataOs f_os;
         if (o->otcep->STATE_LOCATION()==m_Otcep::locationUnknow) continue;
         if (o->otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) continue;
+        TOtcepDataOs lstOs;
+        lstOs.v=_undefV_;
         foreach (auto trc, l_trc) {
-
             for (TOtcepDataOs &os :trc->l_os){
                 if (os.num==o->otcep->NUM()){
+
                     if ((!rcs)||(os.os_otcep<s_os.os_otcep)){
                         rcs=trc->rc;s_os=os;
                     }
                     if ((!rcf)||(os.os_otcep>f_os.os_otcep)){
                         rcf=trc->rc;f_os=os;
+                    }
+                    if (((!lstOs.t.isValid())||(lstOs.t<os.t))&&(os.v!=_undefV_)){
+                       lstOs=os;
                     }
                 }
             }
@@ -294,6 +299,7 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
                     o->otcep->setSTATE_DIRECTION(f_os.d);
             }
         }
+        o->otcep->setSTATE_V_DISO(lstOs.v);
     }
 
     foreach (auto trc, l_trc) {
@@ -398,7 +404,7 @@ void tos_System_DSO::setDSOBUSY()
     }
 }
 
-TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,const QDateTime &T)
+TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,qreal os_v,const QDateTime &T)
 {
     //  0 <-- 1  <<D0
     TOtcepDataOs moved_os;
@@ -417,6 +423,7 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,const QDateT
         }
         moved_os.t=T;
         moved_os.d=d;
+        moved_os.v=os_v;
         if (rc0!=nullptr) {
             rc0->l_os.push_back(moved_os);
             if (moved_os.num!=0){
@@ -440,6 +447,7 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,const QDateT
         }
         moved_os.t=T;
         moved_os.d=d;
+        moved_os.v=os_v;
         if (rc1!=nullptr) {
             rc1->l_os.push_front(moved_os);
             if (moved_os.num!=0){

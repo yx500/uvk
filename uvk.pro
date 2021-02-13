@@ -1,6 +1,6 @@
 QT -= gui
 
-CONFIG += c++11 console
+CONFIG += c++17 console
 CONFIG -= app_bundle
 
 # The following define makes your compiler emit warnings if you use
@@ -42,6 +42,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 HEADERS += \
     Crc32.h \
     do_message.hpp \
+    gtapp_watchdog.h \
     gtgac.h \
     otcepscontroller.h \
     uvk_central.h

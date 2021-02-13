@@ -2,9 +2,12 @@
 #include <QFileInfo>
 #include "do_message.hpp"
 #include "tos_system_dso.h"
+#include "gtapp_watchdog.h"
+#include "tStatPc.h"
 
 int testMode=0;
 
+static gtapp_watchdog dog("dd");
 class IUVKGetNewOtcep :public IGetNewOtcep
 {
 public:
@@ -23,22 +26,37 @@ bool UVK_Central::init(QString fileNameIni)
 {
     if (QFileInfo(fileNameIni).exists()){
         qDebug() << "ini load:" << QFileInfo(fileNameIni).absoluteFilePath();
-        QSettings settings(fileNameIni,QSettings::IniFormat);
-        fileNameModel=settings.value("main/model","./M.xml").toString();
-        //        trackingType=settings.value("main/tracking_type",1).toInt();
-        testMode=settings.value("test/mode",0).toInt();
+        {
+            QSettings settings(fileNameIni,QSettings::IniFormat);
+            fileNameModel=settings.value("main/model","./M.xml").toString();
+            signal_SlaveMode.fromString(settings.value("main/signal_SlaveMode","").toString());
+            signal_Control.fromString(settings.value("main/signal_Control","").toString());
+            uvkStatusName=settings.value("main/status","").toString();
+
+            testMode=settings.value("test/mode",0).toInt();
+            watchdog=new gtapp_watchdog(qPrintable(settings.value("main/watchdog","uvk").toString()));
+            settings.beginGroup("shared_memory");
+            sl_memshared_buffers= settings.childKeys();
+
+
+        }
     } else {
         {
             QSettings settings(fileNameIni,QSettings::IniFormat);
             settings.setValue("main/model","./M.xml");
-            //            settings.setValue("main/tracking_type",1);
+            settings.setValue("main/signal_SlaveMode",SignalDescription(1,"name_buf_ts",777).toString());
+            settings.setValue("main/signal_Control",SignalDescription(1,"name_buf_tu",777).toString());
+            settings.setValue("main/status","uvk_st");
+            settings.setValue("main/watchdog","uvk");
             fileNameIni=settings.fileName();
             settings.setValue("test/mode","0");
+            settings.setValue("shared_memory/name_of_ts_buffer","1");
 
         }
         qDebug() << "ini created:" << QFileInfo(fileNameIni).absoluteFilePath();
         return false;
     }
+
 
     if (!QFileInfo(fileNameModel).exists()){
         qFatal("file not found %s",QFileInfo(fileNameModel).absoluteFilePath().toStdString().c_str());
@@ -80,13 +98,21 @@ bool UVK_Central::init(QString fileNameIni)
     {
         return false;
     }
-
+    if (!signal_SlaveMode.isEmpty()) signal_SlaveMode.acceptGtBuffer();
     //    udp->getGtBuffer(3,"uvk_status")->static_mode=true;
 
     GORKA->resetStates();
     TOS->resetStates();
     GAC->resetStates();
     otcepsController->resetStates();
+
+    qDebug() << "status:" << uvkStatusName;
+    qDebug() << "signal_SlaveMode:" << signal_SlaveMode.toString();
+    qDebug() << "signal_Control:" << signal_Control.toString();
+    if (testMode!=0) qDebug() << "testMode:" << testMode;
+
+
+
 
 
     return validation();
@@ -283,29 +309,69 @@ bool UVK_Central::acceptBuffers()
             }
         }
     }
+
+    // запихиваем в shared
+    foreach (auto buf_name, sl_memshared_buffers) {
+        auto buf=udp->getBufferEx(1,buf_name);
+        if (buf==nullptr) {
+            err(QString("no buffer in model to shared: %1").arg(buf_name));
+            noerr=false;
+        } else {
+
+            GtNetSharedMem *gtNetSB =new GtNetSharedMem(nullptr,buf);
+            if (!gtNetSB->mem->isAttached()){
+                err(QString("no buffer in memory for shared: %1").arg(buf_name));
+                delete gtNetSB;
+                noerr=false;
+            } else {
+                buf->shared_mem=true;
+                connect(gtNetSB,&GtNetSharedMem::changeBuffer,udp,&GtBuffers_UDP_D2::bufferChanged);
+                gtNetSB->start();
+                gtNetSB->setPriority(QThread::HighPriority);
+                qDebug()<< "use shared mem buffer " <<buf->getType() << buf->objectName();
+            }
+
+        }
+
+    }
+
     return noerr;
 }
 
 void UVK_Central::work()
 {
+    watchdog->gav();
     QDateTime T=QDateTime::currentDateTime();
+
+    // определяем свой статус
+    slaveMode=false;
+    if (!signal_SlaveMode.isEmpty()){
+        if (signal_SlaveMode.value_1bit()==0){
+            slaveMode=true;
+        }
+    }
+    udp->slaveMode=slaveMode;
+
     GORKA->updateStates();
-//    QDateTime T1s=QDateTime::currentDateTime();
+    //    QDateTime T1s=QDateTime::currentDateTime();
     // test
     if (testMode==1){
         int new_regim=testRegim();
         QString s;
-        if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimStop) && (new_regim==ModelGroupGorka::regimRospusk))
+        if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimStop) && (new_regim==ModelGroupGorka::regimRospusk)) {
             foreach (auto otcep, otcepsController->otceps->otceps()) {
-                if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) otcep->resetStates();
+                if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib){
+                    otcep->resetStates();
+                }
             }
+        }
         cmd_setRegim(new_regim,s);
     }
 
     TOS->work(T);
     GAC->work(T);
     otcepsController->work(T);
-//    QDateTime T2w=QDateTime::currentDateTime();
+    //    QDateTime T2w=QDateTime::currentDateTime();
 
     // РРС
     if ((!GORKA->SIGNAL_RRC_TU().isNotUse())&&(!GORKA->SIGNAL_RRC_TU().isEmpty())){
@@ -315,17 +381,17 @@ void UVK_Central::work()
             gac_command(GORKA->SIGNAL_RRC_TU(),state);
         }
     }
-    if (udp->emit_counter()<=1){
+    if (udp->get_emit_counter()<=1){
         state2buffer();
         sendBuffers(_changed);
     } else{
-        qDebug()<< "udp->emit_counter=" <<udp->emit_counter();
+        qDebug()<< "udp->emit_counter=" <<udp->get_emit_counter();
     }
 
-//    QDateTime T3sb=QDateTime::currentDateTime();
+    //    QDateTime T3sb=QDateTime::currentDateTime();
 
 
-//    QDateTime T4sn=QDateTime::currentDateTime();
+    //    QDateTime T4sn=QDateTime::currentDateTime();
 
 
 
@@ -336,9 +402,9 @@ void UVK_Central::work()
     //               "u="<<T4sn.msecsTo(T3sb)
     //               ;
 
-//    QDateTime T4sn=QDateTime::currentDateTime();
-//    qDebug()<<"w="<<T4sn.msecsTo(T) ;
-
+    //    QDateTime T4sn=QDateTime::currentDateTime();
+    //    qDebug()<<"w="<<T4sn.msecsTo(T) ;
+    watchdog->gav();
 
 }
 
@@ -443,9 +509,10 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
     qDebug()<< acceptStr;
 }
 
-void UVK_Central::gac_command(const SignalDescription &s, int state)
+void UVK_Central::gac_command(const SignalDescription &s, int state,bool force)
 {
     if (testMode!=0) return;
+    if ((slaveMode!=0)&&(!force)) return;
     tu_cmd c;
     c.number=s.chanelOffset();
     c.on_off=state;
@@ -456,13 +523,33 @@ void UVK_Central::gac_command(const SignalDescription &s, int state)
 void UVK_Central::sendStatus()
 {
     struct UVK_Status{
+
+        quint8 slaveMode;
         time_t start_time;
+
     };
     static UVK_Status c;
     c.start_time=start_time;
+    c.slaveMode=slaveMode;
 
-    udp->sendData(3,"uvk_status",QByteArray((const char *)&c,sizeof(c)));
+    udp->sendData(3,uvkStatusName,QByteArray((const char *)&c,sizeof(c)));
 
+    // контролим свой статус
+    if (!signal_Control.isEmpty()){
+        gac_command(signal_Control,1,true);
+    }
+
+    // шлем древний статус
+    static QString old_status_name="uvk_st";
+    tStatPC MyStat;
+    memset(&MyStat,0,sizeof(tStatPC));
+    MyStat.SostGen = cEndR;
+    if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk) MyStat.SostGen = cBegiR;
+    if (GORKA->STATE_REGIM()==ModelGroupGorka::regimPausa) MyStat.SostGen = cPausR;
+    MyStat.TestCP = 0;//num_train;
+    MyStat.TestLP = 0;//regim+1;
+    MyStat.SostGenCPX = 0;//num_rosp;
+    udp->sendData(3,old_status_name,QByteArray((const char *)&MyStat,sizeof(MyStat)));
 
 }
 
@@ -548,12 +635,14 @@ int UVK_Central::getNewOtcep(m_RC*rc)
                 if (otcep!=nullptr)  {
                     if (otcep->NUM()>maxOtcepCurrenRospusk) maxOtcepCurrenRospusk=otcep->NUM();
                     if (otcep->STATE_MAR()>0) otcep->setSTATE_GAC_ACTIVE(1);
+                    if (otcep->STATE_ID_ROSP()==0) otcep->setSTATE_ID_ROSP(ID_ROSP);
                     return otcep->NUM();
                 }
                 otcep=otcepsController->otceps->otcepByNum(maxOtcepCurrenRospusk+1);
                 if (otcep!=nullptr)  {
                     otcep->resetStates();
                     otcep->setSTATE_ENABLED(true);
+                    otcep->setSTATE_ID_ROSP(ID_ROSP);
                     if (otcep->NUM()>maxOtcepCurrenRospusk) maxOtcepCurrenRospusk=otcep->NUM();
                     return otcep->NUM();
                 }
@@ -652,6 +741,7 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
             GORKA->setSTATE_REGIM(p);
             GAC->resetStates();
             GAC->setSTATE_ENABLED(false);
+            ID_ROSP=0;
             return true;
         }
     } break;
@@ -723,4 +813,14 @@ void UVK_Central::newRospusk()
     GAC->resetStates();
     TOS->setSTATE_ENABLED(true);
     GAC->setSTATE_ENABLED(true);
+    ID_ROSP=otcepsController->otceps->l_otceps.first()->STATE_ID_ROSP();
+    if (ID_ROSP==0){
+        time_t n;
+        time(&n);
+        uint32 r = n * 16;
+        ID_ROSP=r;
+        otcepsController->setNewID_ROSP(ID_ROSP);
+    }
 }
+
+

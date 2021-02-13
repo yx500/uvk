@@ -7,8 +7,11 @@
 #include "gtcommandinterface.h"
 #include "modelgroupgorka.h"
 #include "gtbuffers_udp_d2.h"
+#include "gtbuffers_memshared.h"
+
 #include "mvp_system.h"
 
+class gtapp_watchdog;
 
 class UVK_Central : public QObject
 {
@@ -23,6 +26,7 @@ public:
     OtcepsController *otcepsController;
     GtCommandInterface *CMD;
     GtBuffers_UDP_D2 *udp;
+
     QStringList errLog;
     void err(QString errstr);
     bool validation();
@@ -51,22 +55,29 @@ public slots:
      void work();
      void sendBuffersPeriod();
      void recv_cmd(QMap<QString,QString> m);
-     void gac_command(const SignalDescription&s,int state);
+     void gac_command(const SignalDescription&s, int state, bool force=false);
      void sendStatus();
 protected:
      QTimer *timer_work;
      QTimer *timer_send;
      QList<GtBuffer*> l_buffers4send;
-
+     SignalDescription signal_SlaveMode;
+     SignalDescription signal_Control;
      int maxOtcepCurrenRospusk;
+     bool slaveMode=false;
 
      QString fileNameModel;
+     QString uvkStatusName;
      int trackingType;
 
      time_t start_time;
 
+     quint32 ID_ROSP=0;
+
      int testRegim();
      void newRospusk();
+     gtapp_watchdog *watchdog;
+     QStringList sl_memshared_buffers;
 };
 
 #endif // UVK_CENTRAL_H

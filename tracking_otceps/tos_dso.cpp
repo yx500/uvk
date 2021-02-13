@@ -211,10 +211,25 @@ void tos_DSO::inc_os(int p,QDateTime T)
         dso->setSTATE_DIRECT(1);
         os_moved=_os2back;
     }
+
     TDSO_statistic s;
     s.DIRECT=dso->STATE_DIRECT();
     s.OSY_COUNT=dso->STATE_OSY_COUNT();
     s.T=T;
+
+    //скорость по расстоянию тележуки
+    os_v=_undefV_;
+    if (!l_statistic.isEmpty()){
+        TDSO_statistic s1=l_statistic.first();
+        if (s1.DIRECT==s.DIRECT){
+            if (s.OSY_COUNT%2==0){
+                auto ms=s1.T.msecsTo(s.T);
+                static qreal k=1850.*3.6;
+                if (ms>0) os_v=k/ms;
+            }
+        }
+    }
+
     l_statistic.push_front(s);
     if (l_statistic.size()>=16) l_statistic.pop_back();
 }

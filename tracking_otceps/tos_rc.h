@@ -25,13 +25,14 @@ struct TOtcepData{
 };
 
 struct TOtcepDataOs{
-    TOtcepDataOs(){this->p=_pOtcepPartUnknow;this->num=0;os_otcep=0;d=0;zkr_num=0;t=QDateTime();}
-    TOtcepDataOs(const TOtcepDataOs&od){this->p=od.p;this->num=od.num;os_otcep=od.os_otcep;d=od.d;zkr_num=od.zkr_num;t=od.t;}
+    TOtcepDataOs(){this->p=_pOtcepPartUnknow;this->num=0;os_otcep=0;d=0;zkr_num=0;v=_undefV_;t=QDateTime();}
+    TOtcepDataOs(const TOtcepDataOs&od){this->p=od.p;this->num=od.num;os_otcep=od.os_otcep;d=od.d;zkr_num=od.zkr_num;v=od.v;t=od.t;}
     TOtcepPart p;
     int num;
     int d;
     int os_otcep;
     int zkr_num;
+    qreal v;
     QDateTime t;
     bool operator == (const TOtcepDataOs& r) const {
         return !memcmp(this, &r, sizeof(r));

@@ -23,10 +23,10 @@ void tos_DsoTracking::work(const QDateTime &T)
     tos_DSO *tdso1=tdso;
     if ((tdso->dso->STATE_ERROR()) && (tdso2!=nullptr)) tdso1=tdso2;
     if (tdso1->os_moved==_os2forw)       {
-        TOS->moveOs(rc_next[0],rc_next[1],_forw,T);
+        TOS->moveOs(rc_next[0],rc_next[1],_forw,tdso1->os_v,T);
     }
     if (tdso1->os_moved==_os2back)       {
-        TOS->moveOs(rc_next[0],rc_next[1],_back,T);
+        TOS->moveOs(rc_next[0],rc_next[1],_back,tdso1->os_v,T);
     }
 }
 

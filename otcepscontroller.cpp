@@ -302,6 +302,15 @@ void OtcepsController::finishLiveOtceps()
     }
 }
 
+void OtcepsController::setNewID_ROSP(quint32 ID_ROSP)
+{
+        foreach (auto otcep, otceps->otceps()) {
+            if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib){
+                otcep->setSTATE_ID_ROSP(ID_ROSP);
+            }
+        }
+}
+
 void OtcepsController::updateVagons()
 {
 
