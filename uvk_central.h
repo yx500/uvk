@@ -55,7 +55,7 @@ public slots:
      void work();
      void sendBuffersPeriod();
      void recv_cmd(QMap<QString,QString> m);
-     void gac_command(const SignalDescription&s, int state, bool force=false);
+     void gac_command(const SignalDescription&s, int state);
      void sendStatus();
 protected:
      QTimer *timer_work;

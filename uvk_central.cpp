@@ -509,10 +509,10 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
     qDebug()<< acceptStr;
 }
 
-void UVK_Central::gac_command(const SignalDescription &s, int state,bool force)
+void UVK_Central::gac_command(const SignalDescription &s, int state)
 {
     if (testMode!=0) return;
-    if ((slaveMode!=0)&&(!force)) return;
+    if (slaveMode!=0) return;
     tu_cmd c;
     c.number=s.chanelOffset();
     c.on_off=state;
@@ -536,7 +536,11 @@ void UVK_Central::sendStatus()
 
     // контролим свой статус
     if (!signal_Control.isEmpty()){
-        gac_command(signal_Control,1,true);
+        tu_cmd c;
+        c.number=signal_Control.chanelOffset();
+        c.on_off=1;
+        do_message(&c).commit();
+        udp->sendData(signal_Control.chanelType(),signal_Control.chanelName(),QByteArray((const char *)&c,sizeof(c)));
     }
 
     // шлем древний статус
