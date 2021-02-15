@@ -276,8 +276,18 @@ bool UVK_Central::acceptBuffers()
     //        }
     //    }
     foreach (auto b, udp->allBuffers()) {
-        if (!b->static_mode)
+        if (!b->static_mode){
             qDebug()<< "use in buffer " <<b->getType() << b->objectName();
+            // ставим период ТО
+            switch (b->type){
+            case 1:b->setMsecPeriodLive(2000);b->setSizeData(121); break;
+            }
+            if (testMode==1){
+                switch (b->type){
+                case 1:b->setMsecPeriodLive(0);break;
+                }
+            }
+        }
     }
     foreach (auto b, l_out_buffers) {
         b->sost=GtBuffer::_alive;
