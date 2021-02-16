@@ -157,7 +157,7 @@ void tos_Zkr_DSO::work_dso_tlg(const QDateTime &T)
     dsp_pair->work(T);
     if (dsp_pair->sost_teleg==tos_DsoPair::_tlg_forw){
         if (dsp_pair->teleg_os.num>0){
-            auto o=TOS->otcep(dsp_pair->teleg_os.num);
+            auto o=TOS->otcep_by_num(dsp_pair->teleg_os.num);
             if (o!=nullptr){
                 int tlg=o->otcep->STATE_ZKR_TLG();
                 tlg++;
@@ -168,7 +168,7 @@ void tos_Zkr_DSO::work_dso_tlg(const QDateTime &T)
     }
     if (dsp_pair->sost_teleg==tos_DsoPair::_tlg_back){
         if (dsp_pair->teleg_os.num>0){
-            auto o=TOS->otcep(dsp_pair->teleg_os.num);
+            auto o=TOS->otcep_by_num(dsp_pair->teleg_os.num);
             if (o!=nullptr){
                 int tlg=o->otcep->STATE_ZKR_TLG();
                 tlg--;
@@ -244,7 +244,7 @@ void tos_Zkr_DSO::in_os(const QDateTime &T)
     if (cur_os.num!=0){
         os.p=_pOtcepMiddle;
         os.os_otcep++;
-        auto o=TOS->otcep(os.num);
+        auto o=TOS->otcep_by_num(os.num);
         if (o!=nullptr){
             o->otcep->setSTATE_ZKR_OSY_CNT(os.os_otcep);
         }
@@ -264,7 +264,7 @@ void tos_Zkr_DSO::out_os(const QDateTime &T)
         trc->l_os.pop_back();
         if ((os.num!=0)&&(os.os_otcep==1)){
             TOS->resetTracking(os.num);
-            auto o=TOS->otcep(os.num);
+            auto o=TOS->otcep_by_num(os.num);
             if (o!=nullptr){
                 o->otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
             }

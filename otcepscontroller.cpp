@@ -15,6 +15,22 @@ void OtcepsController::resetStates()
 
 void OtcepsController::work(const QDateTime &)
 {
+    // выставляем признак текущегог отцепа
+    m_Otcep * cur_otcep=nullptr;
+    foreach (auto *otcep, otceps->l_otceps) {
+        if (!otcep->STATE_ENABLED()) continue;
+        if (otcep->STATE_ZKR_S_IN()) cur_otcep=otcep;
+    }
+    if (cur_otcep==nullptr){
+        foreach (auto *otcep, otceps->l_otceps) {
+            if (!otcep->STATE_ENABLED()) continue;
+            if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) {cur_otcep=otcep;break;}
+        }
+    }
+    foreach (auto *otcep, otceps->l_otceps) {
+        if (otcep!=cur_otcep) otcep->setSTATE_IS_CURRENT(0);
+    }
+    if (cur_otcep!=nullptr) cur_otcep->setSTATE_IS_CURRENT(1);
 
 }
 
@@ -35,10 +51,10 @@ QList<SignalDescription> OtcepsController::acceptOutputSignals()
         s1.getBuffer()->setSizeData(sizeof(t_NewDescr));
         mO29[otcep]=s1;
         l<< s1;
-//        auto s2=otcep->SIGNAL_DATA();
-//        s2.setChanelType(109);
-//        mO2109[otcep]=s2;
-//        l<< s2;
+        //        auto s2=otcep->SIGNAL_DATA();
+        //        s2.setChanelType(109);
+        //        mO2109[otcep]=s2;
+        //        l<< s2;
     }
     // 14 сортир 15 от увк
     otceps->setSIGNAL_DATA_VAGON_0(otceps->SIGNAL_DATA_VAGON_0().innerUse());
@@ -66,23 +82,23 @@ void OtcepsController::state2buffer()
             s.setBufferData(&stored_Descr,sizeof(stored_Descr));
         }
 
-//        {  Исключаю вариант - жутко тормозит с QString
-//            QString S;
-//            QVariantHash m;
-//            m["NUM"]=otcep->NUM();
-//            for (int idx = 0; idx < otcep->metaObject()->propertyCount(); idx++) {
-//                const QMetaProperty &metaProperty = otcep->metaObject()->property(idx);
-//                auto stateName=metaProperty.name();
-//                if (strncmp(stateName,__STATE_,sizeof(__STATE_)-1)!=0) continue;
-//                QString ss;
-//                ss=QString::fromLocal8Bit(&stateName[sizeof(__STATE_)-1]);
-//                QVariant V=metaProperty.read(otcep);
-//                m[ss]=V;
-//            }
-//            S=MVP_System::QVariantHashToQString_str(m);
-//            auto &s=mO2109[otcep];
-//            s.getBuffer()->A=S.toUtf8();
-//        }
+        //        {  Исключаю вариант - жутко тормозит с QString
+        //            QString S;
+        //            QVariantHash m;
+        //            m["NUM"]=otcep->NUM();
+        //            for (int idx = 0; idx < otcep->metaObject()->propertyCount(); idx++) {
+        //                const QMetaProperty &metaProperty = otcep->metaObject()->property(idx);
+        //                auto stateName=metaProperty.name();
+        //                if (strncmp(stateName,__STATE_,sizeof(__STATE_)-1)!=0) continue;
+        //                QString ss;
+        //                ss=QString::fromLocal8Bit(&stateName[sizeof(__STATE_)-1]);
+        //                QVariant V=metaProperty.read(otcep);
+        //                m[ss]=V;
+        //            }
+        //            S=MVP_System::QVariantHashToQString_str(m);
+        //            auto &s=mO2109[otcep];
+        //            s.getBuffer()->A=S.toUtf8();
+        //        }
     }
 
     //updateVagons();
@@ -106,17 +122,17 @@ void OtcepsController::state2buffer()
         }
     }
 
-//    for (int i=0;i<MaxVagon;i++){
-//        // рассылаем в старом
-//        //if (otceps->TYPE_DESCR()==0){
-//        otceps->chanelVag[i].getBuffer()->A.resize(sizeof(otceps->vagons[i]));
-//        memcpy(otceps->chanelVag[i].getBuffer()->A.data(),&otceps->vagons[i],sizeof(otceps->vagons[i]));
-//        //        if (otceps->TYPE_DESCR()==1){
-//        //            QVariantHash m=tSlVagon2Map(otceps->vagons[i]);
-//        //            QString S=MVP_System::QVariantHashToQString_str(m);
-//        //            otceps->chanelVag[i]->A=S.toUtf8();
-//        //        }
-//    }
+    //    for (int i=0;i<MaxVagon;i++){
+    //        // рассылаем в старом
+    //        //if (otceps->TYPE_DESCR()==0){
+    //        otceps->chanelVag[i].getBuffer()->A.resize(sizeof(otceps->vagons[i]));
+    //        memcpy(otceps->chanelVag[i].getBuffer()->A.data(),&otceps->vagons[i],sizeof(otceps->vagons[i]));
+    //        //        if (otceps->TYPE_DESCR()==1){
+    //        //            QVariantHash m=tSlVagon2Map(otceps->vagons[i]);
+    //        //            QString S=MVP_System::QVariantHashToQString_str(m);
+    //        //            otceps->chanelVag[i]->A=S.toUtf8();
+    //        //        }
+    //    }
 }
 
 bool OtcepsController::cmd_CLEAR_ALL(QString &acceptStr)
@@ -198,6 +214,9 @@ bool OtcepsController::cmd_INC_OTCEP(QMap<QString, QString> &m, QString &acceptS
         //if (n<otceps->l_otceps.size()-1) otceps->l_otceps[n]->acceptSLStates(otceps->l_otceps[n+1]);
         otcep->setSTATE_MAR(1);
         otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
+        // добавляем 1 пустой вагон
+         otcep->vVag.push_back(tSlVagon());
+
         otcep->setSTATE_ENABLED(true);
         acceptStr=QString("Отцеп %1 добавлен.").arg(N);
         updateVagons();
@@ -244,6 +263,9 @@ bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acc
         int N=m["N"].toInt();
         auto otcep=otceps->otcepByNum(N);
         if (otcep!=nullptr){
+
+
+
             QVariantHash mv;
             foreach (QString key, m.keys()) {
                 mv[key]=m[key];
@@ -273,7 +295,15 @@ bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acc
             //                        return false;
             //                    };
             //                }
-            otcep->vVag.push_back(v);
+
+            int NV=m["NV"].toInt();
+            if (NV>otcep->vVag.size()){
+                int add_cnt=NV-otcep->vVag.size();
+                for (int i=0;i<add_cnt;i++){
+                    otcep->vVag.push_back(tSlVagon());
+                }
+            }
+            otcep->vVag[NV-1]=v;
             //otceps->vagons[v.IV-1]=v;
             acceptStr=QString("Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
             updateVagons();
@@ -304,11 +334,11 @@ void OtcepsController::finishLiveOtceps()
 
 void OtcepsController::setNewID_ROSP(quint32 ID_ROSP)
 {
-        foreach (auto otcep, otceps->otceps()) {
-            if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib){
-                otcep->setSTATE_ID_ROSP(ID_ROSP);
-            }
+    foreach (auto otcep, otceps->otceps()) {
+        if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib){
+            otcep->setSTATE_ID_ROSP(ID_ROSP);
         }
+    }
 }
 
 void OtcepsController::updateVagons()

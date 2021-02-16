@@ -63,7 +63,7 @@ void tos_DSO::work(const QDateTime &T)
        { sostFree,        1 , 1  ,   sostOsEnter11,  _sboy }, // сбой
        //              ==> INC
        { sostOsEnter10,   0 , 0  ,   sostFree,        _none },// сбой, но занятие было - будем плюсовать
-       { sostOsEnter10,   0 , 1  ,   sostOsLeave01,   _none },  // сбой, решаем что проскочили 11
+       { sostOsEnter10,   0 , 1  ,   sostOsLeave01,   _sboy },  // сбой, решаем что проскочили 11
        { sostOsEnter10,   1 , 0  ,   sostOsEnter10,   _none },
        { sostOsEnter10,   1 , 1  ,   sostOsEnter1011, _none },  // норм
 
@@ -102,7 +102,6 @@ void tos_DSO::work(const QDateTime &T)
     };
 
     os_moved=_os_none;
-    int cmd=_none;
     if (!dso->is33()){
         int B0=dso->SIGNAL_B0().value_1bit();
         int B1=dso->SIGNAL_B1().value_1bit();

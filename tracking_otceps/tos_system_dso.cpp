@@ -120,7 +120,7 @@ void tos_System_DSO::resetStates()
 
     foreach (auto w, l_tdsopair) {
         if (w->strel!=nullptr){
-                w->strel->setSTATE_UVK_TLG(false);
+            w->strel->setSTATE_UVK_TLG(false);
         }
     }
 
@@ -139,10 +139,11 @@ QList<SignalDescription> tos_System_DSO::acceptOutputSignals()
     auto l=tos_System::acceptOutputSignals();
 
     foreach (auto trc, l_trc) {
-        trc->rc->setSIGNAL_BUSY_DSO(trc->rc->SIGNAL_BUSY_DSO().innerUse());
-        trc->rc->setSIGNAL_BUSY_DSO_ERR(trc->rc->SIGNAL_BUSY_DSO_ERR().innerUse());
-        trc->rc->setSIGNAL_INFO_DSO(trc->rc->SIGNAL_INFO_DSO().innerUse());
-        l<<trc->rc->SIGNAL_BUSY_DSO()<<trc->rc->SIGNAL_BUSY_DSO_ERR()<<trc->rc->SIGNAL_INFO_DSO();
+        trc->rc->setSIGNAL_BUSY_DSO(trc->rc->SIGNAL_BUSY_DSO().innerUse());         l<<trc->rc->SIGNAL_BUSY_DSO();
+        trc->rc->setSIGNAL_BUSY_DSO_ERR(trc->rc->SIGNAL_BUSY_DSO_ERR().innerUse()); l<<trc->rc->SIGNAL_BUSY_DSO_ERR();
+        trc->rc->setSIGNAL_INFO_DSO(trc->rc->SIGNAL_INFO_DSO().innerUse());         l<<trc->rc->SIGNAL_INFO_DSO();
+        trc->rc->setSIGNAL_BUSY_DSO_STOP(trc->rc->SIGNAL_BUSY_DSO_STOP().innerUse());l<<trc->rc->SIGNAL_BUSY_DSO_STOP();
+
         trc->rc->SIGNAL_INFO_DSO().getBuffer()->setSizeData(DSO_Data_Max*sizeof(DSO_Data));
     }
 
@@ -177,6 +178,7 @@ void tos_System_DSO::state2buffer()
     foreach (auto trc, l_trc) {
         trc->rc->SIGNAL_BUSY_DSO().setValue_1bit(trc->rc->STATE_BUSY_DSO());
         trc->rc->SIGNAL_BUSY_DSO_ERR().setValue_1bit(trc->rc->STATE_BUSY_DSO_ERR());
+        trc->rc->SIGNAL_BUSY_DSO_STOP().setValue_1bit(trc->rc->STATE_BUSY_DSO_STOP());
         trc->rc->SIGNAL_ERR_LS().setValue_1bit(trc->rc->STATE_ERR_LS());
         trc->rc->SIGNAL_ERR_LZ().setValue_1bit(trc->rc->STATE_ERR_LZ());
         DSO_Data d;
@@ -197,7 +199,9 @@ void tos_System_DSO::state2buffer()
 
     foreach (auto w, l_tdsopair) {
         if (w->strel!=nullptr){
-                w->strel->SIGNAL_UVK_TLG().setValue_1bit(w->strel->STATE_UVK_TLG());
+            w->strel->SIGNAL_UVK_TLG().setValue_1bit(w->strel->STATE_UVK_TLG());
+            w->strel->SIGNAL_UVK_NGBDYN_PL().setValue_1bit(w->strel->STATE_UVK_NGBDYN_PL());
+            w->strel->SIGNAL_UVK_NGBDYN_MN().setValue_1bit(w->strel->STATE_UVK_NGBDYN_MN());
         }
     }
 }
@@ -238,7 +242,10 @@ void tos_System_DSO::work(const QDateTime &T)
     reset_1_os(T);
 
     // выставляем занятость по осям
-    setDSOBUSY();
+    setDSOBUSY(T);
+
+    // выставляем динамический негабарит
+    setNGBDYN(T);
 
     // выставляем занятость телегами
     foreach (auto w, l_tdsopair) {
@@ -255,6 +262,9 @@ void tos_System_DSO::work(const QDateTime &T)
 
     // выставляем параметра отцепов
     updateOtcepsParams(T);
+
+    // выставляем предупреждения отцепов
+    set_otcep_STATE_WARN(T);
 
 }
 
@@ -283,7 +293,7 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
                         rcf=trc->rc;f_os=os;
                     }
                     if (((!lstOs.t.isValid())||(lstOs.t<os.t))&&(os.v!=_undefV_)){
-                       lstOs=os;
+                        lstOs=os;
                     }
                 }
             }
@@ -395,12 +405,61 @@ void tos_System_DSO::reset_1_os(const QDateTime &T)
     }
 }
 
-void tos_System_DSO::setDSOBUSY()
+void tos_System_DSO::setDSOBUSY(const QDateTime &T)
 {
     foreach (auto trc, l_trc) {
         if (trc->l_os.isEmpty())
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::free); else
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::busy);
+    }
+    // выставляем признак остановки
+    foreach (auto trc, l_trc) {
+        if (trc->l_os.isEmpty()){
+            trc->rc->setSTATE_BUSY_DSO_STOP(false);
+            continue;
+        }
+        // находим ос с макс времнем
+        auto t0=trc->l_os.first().t;
+        for (const TOtcepDataOs & os : trc->l_os){
+            if (os.t>t0) t0=os.t;
+        }
+        qreal len_rc=40;
+        if (trc->rc->LEN()!=0) len_rc=trc->rc->LEN();
+        auto ms=t0.msecsTo(T);
+        qint64 ms0=len_rc*3600; // 1 км/ч
+        if (ms>ms0) trc->rc->setSTATE_BUSY_DSO_STOP(true);
+    }
+
+}
+
+void tos_System_DSO::setNGBDYN(const QDateTime &T)
+{
+    foreach (auto trcd, l_trdso) {
+        if (trcd->tdso==nullptr) continue;
+        if (trcd->tdso->dso->NGBDYN_OFFSET()==0) continue;
+        if ((trcd->rc_next[0]==nullptr) || (trcd->rc_next[1]==nullptr)) continue;
+        auto strel=qobject_cast<m_Strel_Gor_Y*>(trcd->rc_next[1]);
+        if (strel==nullptr) continue;
+        int m=3;
+        if (strel->getNextRC(0,0)==trcd->rc_next[0]->rc) m=0;
+        if (strel->getNextRC(0,1)==trcd->rc_next[0]->rc) m=1;
+        if (m==3) continue;
+        bool ngb=false;
+        if (!trcd->rc_next[0]->l_os.isEmpty()){
+            auto os=trcd->rc_next[0]->l_os.back();
+            if ( (os.d!=_forw) &&
+                 (os.v!=_undefV_) &&
+                 (os.v>0) ){
+                auto ms=os.t.msecsTo(T);
+                if (ms>0){
+                    qint64 ms0=trcd->tdso->dso->NGBDYN_OFFSET()/os.v*3600.;
+                    if (ms<ms0) ngb=true;
+                }
+            }
+
+        }
+        if (m==0) strel->setSTATE_UVK_NGBDYN_PL(ngb);
+        if (m==1) strel->setSTATE_UVK_NGBDYN_MN(ngb);
     }
 }
 
@@ -467,4 +526,57 @@ tos_Rc *tos_System_DSO::getRc(TOtcepDataOs os)
             if (os1==os) return  trc;
         }
     }return nullptr;
+}
+
+void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
+{
+    auto act_zkr=modelGorka->active_zkr();
+    foreach (auto od, lo) {
+        auto otcep=od->otcep;
+        int warn1=0;
+        int warn2=0;
+        if (!otcep->STATE_ENABLED()) continue;
+        // стрелки в среднем положении
+        if (act_zkr!=nullptr){
+            if ((otcep->STATE_GAC_ACTIVE())||(otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) {
+                if (otcep->STATE_MAR()>0){
+                    auto m=modelGorka->getMarshrut(act_zkr->PUT_NADVIG(),otcep->STATE_MAR());
+                    // идем по маршруту
+                    bool b=false;
+                    if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) b=true;
+                    for (const RcInMarsrut&mr :m->l_rc){
+                        if (!b){
+                            if (mr.rc==otcep->RCS) {
+                                b=true;
+                                continue;
+                            }
+                        } else {
+                            if (warn1==0){
+                                m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
+                                if (str!=nullptr){
+                                    if ((str->STATE_A()==0) && (str->STATE_POL()!=mr.pol)){
+                                        warn1=1;
+                                    }
+                                }
+                                auto str1=qobject_cast<m_Strel_Gor*>(mr.rc) ;
+                                if (str1!=nullptr){
+                                    if (str1->STATE_POL()!=mr.pol){
+                                        warn1=1;
+                                    }
+                                }
+                            }
+                            if (warn2==0){
+                                if ((mr.rc->STATE_BUSY_DSO_ERR())||(mr.rc->STATE_BUSY_DSO_STOP())){
+                                    warn2=1;
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+        }
+        otcep->setSTATE_GAC_W_STRA(warn1);
+        otcep->setSTATE_GAC_W_STRB(warn2);
+    }
 }

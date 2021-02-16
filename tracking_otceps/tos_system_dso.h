@@ -29,7 +29,8 @@ public:
 
     void reset_1_os(const QDateTime &T);
 
-    void setDSOBUSY();
+    void setDSOBUSY(const QDateTime &T);
+    void setNGBDYN(const QDateTime &T);
 
     TOtcepDataOs moveOs(tos_Rc *rc0, tos_Rc *rc1, int d, qreal os_v, const QDateTime &T);
 
@@ -51,8 +52,7 @@ signals:
 public slots:
 protected:
 
-    void checkOtcepComplete();
-    void checkOtcepSplit();
+    void set_otcep_STATE_WARN(const QDateTime &T);
 
 
 

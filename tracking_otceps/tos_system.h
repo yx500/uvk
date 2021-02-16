@@ -45,7 +45,7 @@ public:
     virtual bool resetDSOBUSY(QString idtsr, QString &acceptStr){Q_UNUSED(idtsr);Q_UNUSED(acceptStr); return false;};
 
 
-    tos_OtcepData*otcep(int num);
+    tos_OtcepData*otcep_by_num(int num);
 
     ModelGroupGorka *modelGorka=nullptr;
 

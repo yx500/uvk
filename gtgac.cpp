@@ -10,7 +10,14 @@ GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
     foreach (m_Strel_Gor_Y*strel, l_strel_Y) {
         GacStrel *gstr=new GacStrel;
         gstr->strel=strel;
-        auto s=strel->SIGNAL_UVK_BL_PER();
+
+        auto s=strel->SIGNAL_UVK_AV();
+        if (!s.isEmpty()){
+            gstr->SIGNAL_UVK_ERR_PLATA=     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+1).innerUse();
+            gstr->SIGNAL_UVK_ERR_PER  =     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+2).innerUse();
+        }
+
+        s=strel->SIGNAL_UVK_BL_PER();
         if (!s.isEmpty()){
             gstr->SIGNAL_UVK_BL_PER_SP=     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+1).innerUse();
             gstr->SIGNAL_UVK_BL_PER_DB=     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+2).innerUse();
@@ -27,73 +34,23 @@ GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
     otceps=modelGorka->findChildren<m_Otceps*>().first();
     l_zkr=modelGorka->findChildren<m_RC_Gor_ZKR*>();
 
-    // собираем маршруты
-    mP2M.clear();
-    foreach (auto zkr, l_zkr) {
-        MarsrutsOnPut mp;
-        mp.mN2M.clear();
-        foreach (auto nm, modelGorka->mMAR2SP.keys()) {
-            Marsrut *m=new Marsrut();
-            m->l_rc.clear();
-            m_RC_Gor*rcs=zkr;
-            RcInMarsrut rcm;
-            rcm.rc=nullptr;
-            while (rcs){
-                // обратная стр
-                if (rcs->getNextCount(_back)==2){
-                    if ((rcs->getNextRC(_back,0)==rcm.rc) && (rcm.rc!=nullptr)) rcm.pol=0; else
-                        if ((rcs->getNextRC(_back,1)==rcm.rc) && (rcm.rc!=nullptr)) rcm.pol=1; else
-                            rcm.pol=MVP_Enums::pol_unknow;
-                    rcm.rc=rcs;
-                    m->l_rc.push_back(rcm);
-                    rcs=qobject_cast<m_RC_Gor*>(rcs->getNextRC(0,0));
-                    continue;
-                }
 
-                rcm.pol=MVP_Enums::pol_unknow;
-                rcm.rc=rcs;
-
-                auto rcplus=qobject_cast<m_RC_Gor*>(rcs->getNextRC(0,0));
-                if ((rcplus!=nullptr)&&(inway(nm,rcplus->MINWAY(),rcplus->MAXWAY()))) {
-                    rcs=rcplus; rcm.pol=MVP_Enums::pol_plus;
-                } else {
-                    auto rcmnus=qobject_cast<m_RC_Gor*>(rcs->getNextRC(0,1));
-                    if ((rcmnus!=nullptr)&&(inway(nm,rcmnus->MINWAY(),rcmnus->MAXWAY()))) {
-                        rcs=rcmnus;  rcm.pol=MVP_Enums::pol_minus;
-                    } else {
-                        break;
-                    }
-                }
-                m->l_rc.push_back(rcm);
-            }
-            mp.mN2M[nm]=m;
-        }
-        mP2M[zkr->PUT_NADVIG()]=mp;
-    }
 
 }
-const Marsrut *GtGac::getMarshrut(int putNadvig, int nm) const
-{
-    if (!mP2M.contains(putNadvig)) return nullptr;
-    const MarsrutsOnPut & mp=mP2M[putNadvig];
-    if (!mp.mN2M.contains(nm)) return nullptr;
-    return  mp.mN2M[nm];
-}
-
 
 QList<SignalDescription> GtGac::acceptOutputSignals()
 {
     QList<SignalDescription> l;
     for (auto gstr : l_strel){
-        gstr->strel->setSIGNAL_UVK_PRP(gstr->strel->SIGNAL_UVK_PRP().innerUse());
-        gstr->strel->setSIGNAL_UVK_PRM(gstr->strel->SIGNAL_UVK_PRM().innerUse());
-        gstr->strel->setSIGNAL_UVK_AV(gstr->strel->SIGNAL_UVK_AV().innerUse());
-        gstr->strel->setTU_PRP(gstr->strel->TU_PRP().innerUse());
-        gstr->strel->setTU_PRM(gstr->strel->TU_PRM().innerUse());
-        l << gstr->strel->SIGNAL_UVK_PRP() << gstr->strel->SIGNAL_UVK_PRM() << gstr->strel->SIGNAL_UVK_AV();
-        l << gstr->strel->TU_PRP() << gstr->strel->TU_PRM() ;
-        gstr->strel->setSIGNAL_UVK_BL_PER(gstr->strel->SIGNAL_UVK_BL_PER().innerUse());
-        l << gstr->strel->SIGNAL_UVK_BL_PER();
+        gstr->strel->setSIGNAL_UVK_PRP(gstr->strel->SIGNAL_UVK_PRP().innerUse());   l << gstr->strel->SIGNAL_UVK_PRP();
+        gstr->strel->setSIGNAL_UVK_PRM(gstr->strel->SIGNAL_UVK_PRM().innerUse());   l << gstr->strel->SIGNAL_UVK_PRM();
+        gstr->strel->setSIGNAL_UVK_AV(gstr->strel->SIGNAL_UVK_AV().innerUse());     l << gstr->strel->SIGNAL_UVK_AV();
+        gstr->strel->setTU_PRP(gstr->strel->TU_PRP().innerUse());                   l << gstr->strel->TU_PRP();
+        gstr->strel->setTU_PRM(gstr->strel->TU_PRM().innerUse());                   l << gstr->strel->TU_PRM();
+        gstr->strel->setSIGNAL_UVK_BL_PER(gstr->strel->SIGNAL_UVK_BL_PER().innerUse());         l << gstr->strel->SIGNAL_UVK_BL_PER();
+        l << gstr->SIGNAL_UVK_ERR_PLATA<<
+             gstr->SIGNAL_UVK_ERR_PER;
+
         l << gstr->SIGNAL_UVK_BL_PER_SP <<
              gstr->SIGNAL_UVK_BL_PER_DB <<
              gstr->SIGNAL_UVK_BL_PER_OTC <<
@@ -112,6 +69,9 @@ void GtGac::state2buffer()
         gs->strel->SIGNAL_UVK_PRP().setValue_1bit(gs->strel->STATE_UVK_PRP());
         gs->strel->SIGNAL_UVK_PRM().setValue_1bit(gs->strel->STATE_UVK_PRM());
         gs->strel->SIGNAL_UVK_AV().setValue_1bit(gs->strel->STATE_UVK_AV());
+
+        gs->SIGNAL_UVK_ERR_PLATA.setValue_1bit(gs->ERR_PLATA);
+        gs->SIGNAL_UVK_ERR_PER.setValue_1bit(gs->ERR_PER);
 
         gs->strel->SIGNAL_UVK_BL_PER().setValue_1bit(gs->BL_PER);
 
@@ -203,17 +163,7 @@ void GtGac::validation(ListObjStr *l) const
 
         }
     }
-    foreach (auto pp, mP2M.keys()) {
-        foreach (auto nm, mP2M[pp].mN2M.keys()) {
-            auto m=getMarshrut(pp,nm);
-            foreach (auto rcm, m->l_rc) {
-                if (rcm.pol==MVP_Enums::pol_unknow){
-                    l->error(rcm.rc,QString("Проблема постороения маршрта pnadv=%1 mar=%2").arg(pp).arg(nm));
-                }
-            }
-        }
 
-    }
 
 }
 
@@ -279,53 +229,6 @@ void GtGac::reset_STATE_GAC_ACTIVE()
 
 
 }
-
-void GtGac::set_STATE_WARN()
-{
-    auto act_zkr=modelGorka->active_zkr();
-    foreach (m_Otcep *otcep, otceps->otceps()) {
-        if (!otcep->STATE_ENABLED()) continue;
-        // стрелки в среднем положении
-        int warn1=0;
-        if (act_zkr!=nullptr){
-            if ((otcep->STATE_GAC_ACTIVE())||(otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) {
-                if (otcep->STATE_MAR()>0){
-                    auto m=getMarshrut(act_zkr->PUT_NADVIG(),otcep->STATE_MAR());
-                    // идем по маршруту
-                    bool b=false;
-                    if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) b=true;
-                    for (const RcInMarsrut&mr :m->l_rc){
-                        if (mr.rc==otcep->RCS) {
-                            b=true;
-                            continue;
-                        }
-                        if (b){
-                            m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
-                            if (str!=nullptr){
-                                if ((str->STATE_A()==0) && (str->STATE_POL()!=mr.pol)){
-                                    warn1=1;
-                                    break;
-                                }
-                                continue;
-                            }
-                            auto str1=qobject_cast<m_Strel_Gor*>(mr.rc) ;
-                            if (str1!=nullptr){
-                                if (str1->STATE_POL()!=mr.pol){
-                                    warn1=1;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-            }
-        }
-        otcep->setSTATE_GAC_W_STRA(warn1);
-    }
-}
-
-
 
 void GtGac::work(const QDateTime &T)
 {
@@ -453,37 +356,53 @@ void GtGac::work(const QDateTime &T)
         if (gs->pol_cmd!=MVP_Enums::pol_unknow){
             // определям начало перевода по команде
             if (gs->strel->STATE_POL()==MVP_Enums::pol_w){
+                // начало потери контроля
                 if (!gs->pol_cmd_w_time.isValid()) gs->pol_cmd_w_time=T;
             }
-            // определям общее время перевода по команде
-
-
+        }
+    }
+    // определям автовозврат
+    for (auto gs : l_strel){
             if (gs->pol_cmd_w_time.isValid()){
-                qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
                 if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
-                    // определям автовозврат
+                    qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
                     if (gs->pol_cmd!=gs->strel->STATE_POL()){
                         if ((ms>100) &&(ms<2000)) {
                             gs->strel->setSTATE_UVK_AV(true);
                         }
                     }
-                } else {
-                    if ((ms>5000)) {
-                        //strel->setSTATE_UVK_CMD_ERROR(true);
-                    }
                 }
             }
-        }
     }
+    // определям общий неперевод
+//    else {
+//    }
+
+
+//            // определям общее время перевода по команде
+
+
+//            if (gs->pol_cmd_w_time.isValid()){
+//                qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
+//                if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
+//                    // определям автовозврат
+//                    if (gs->pol_cmd!=gs->strel->STATE_POL()){
+//                        if ((ms>100) &&(ms<2000)) {
+//                            gs->strel->setSTATE_UVK_AV(true);
+//                        }
+//                    }
+//                } else {
+//                    if ((ms>5000)) {
+//                        //strel->setSTATE_UVK_CMD_ERROR(true);
+//                    }
+//                }
+//            }
+//        }
+//    }
     //сбраcываем таймер
     for (auto gs : l_strel){
         if (gs->strel->STATE_POL()!=MVP_Enums::pol_w) gs->pol_cmd_w_time=QDateTime();
     }
-
-    // выставляем предупреждения
-    set_STATE_WARN();
-
-
 
 }
 
@@ -507,11 +426,12 @@ void GtGac::setStateBlockPerevod(GacStrel *gs)
     gs->BL_PER_NGBSTAT=isNegabarit(gs->strel,gs->strel->STATE_POL());
 
     gs->BL_PER_NGBDYN=false;
+    // yнельзя переод чтоб оставлся негабарит
     if (gs->strel->STATE_POL()==MVP_Enums::pol_plus){
-        if (gs->strel->STATE_UVK_NGBDYN_MN()) gs->BL_PER_NGBDYN=true;
+        if (gs->strel->STATE_UVK_NGBDYN_PL()) gs->BL_PER_NGBDYN=true;
     }
     if (gs->strel->STATE_POL()==MVP_Enums::pol_minus){
-        if (gs->strel->STATE_UVK_NGBDYN_PL()) gs->BL_PER_NGBDYN=true;
+        if (gs->strel->STATE_UVK_NGBDYN_MN()) gs->BL_PER_NGBDYN=true;
     }
 
 
@@ -536,6 +456,7 @@ void GtGac::sendCommand(GacStrel * gs, MVP_Enums::TStrelPol pol_cmd,bool force)
             emit uvk_command(gs->strel->TU_PRM(),0);
             gs->strel->setSTATE_UVK_PRP(true);
             gs->strel->setSTATE_UVK_PRM(false);
+            gs->emit_time.restart();
 
         }
         if (gs->pol_cmd==MVP_Enums::pol_minus) {
@@ -543,23 +464,34 @@ void GtGac::sendCommand(GacStrel * gs, MVP_Enums::TStrelPol pol_cmd,bool force)
             emit uvk_command(gs->strel->TU_PRM(),1);
             gs->strel->setSTATE_UVK_PRP(false);
             gs->strel->setSTATE_UVK_PRM(true);
+            gs->emit_time.restart();
         }
         if (gs->pol_cmd==MVP_Enums::pol_unknow) {
             emit uvk_command(gs->strel->TU_PRP(),0);
             emit uvk_command(gs->strel->TU_PRM(),0);
             gs->strel->setSTATE_UVK_PRP(false);
             gs->strel->setSTATE_UVK_PRM(false);
+            gs->emit_time.restart();
         }
     } else {
         // если нет ответа от платы шлем еще
-        if ((gs->pol_cmd_time.isValid()) && (gs->pol_cmd_time.elapsed()<500)){
-            if ((gs->strel->STATE_UVK_PRP()!=gs->strel->STATE_PRP())){
+        if (((gs->strel->STATE_UVK_PRP()!=gs->strel->STATE_PRP()))||
+            ((gs->strel->STATE_UVK_PRM()!=gs->strel->STATE_PRM()))){
+            // не забиваем сеть
+            if ((gs->pol_cmd_time.isValid())||(gs->pol_cmd_time.elapsed()>20)){
                 emit uvk_command(gs->strel->TU_PRP(),gs->strel->STATE_UVK_PRP());
-            }
-            if ((gs->strel->STATE_UVK_PRM()!=gs->strel->STATE_PRM())){
                 emit uvk_command(gs->strel->TU_PRM(),gs->strel->STATE_UVK_PRM());
+                gs->emit_time.restart();
             }
+            // нет ответа от платы
+            if ((gs->pol_cmd_time.isValid()) && (gs->pol_cmd_time.elapsed()>500)){
+                gs->ERR_PLATA=true;
+                // не отключаем команду
+            }
+        } else {
+            gs->ERR_PLATA=false;
         }
+
     }
 }
 

@@ -245,7 +245,7 @@ void tos_System::resetTracking()
 
 }
 
-tos_OtcepData *tos_System::otcep(int num)
+tos_OtcepData *tos_System::otcep_by_num(int num)
 {
     if (mNUM2OD.contains(num)) return mNUM2OD[num];
     return nullptr;
