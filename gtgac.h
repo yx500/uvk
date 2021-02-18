@@ -14,6 +14,10 @@ struct GacStrel{
     MVP_Enums::TStrelPol pol_mar;
     QElapsedTimer pol_cmd_time;
     QDateTime pol_cmd_w_time;
+    QElapsedTimer emit_time;
+    bool ERR_PLATA;
+    bool ERR_PER;
+
     bool BL_PER;
     bool BL_PER_SP;
     bool BL_PER_OTC;
@@ -21,6 +25,10 @@ struct GacStrel{
     bool BL_PER_DB;
     bool BL_PER_NGBSTAT;
     bool BL_PER_NGBDYN;
+
+
+    SignalDescription SIGNAL_UVK_ERR_PLATA;
+    SignalDescription SIGNAL_UVK_ERR_PER;
 
     SignalDescription SIGNAL_UVK_BL_PER_SP;
     SignalDescription SIGNAL_UVK_BL_PER_DB;

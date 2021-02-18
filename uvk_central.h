@@ -49,6 +49,8 @@ public:
     enum {_all,_changed,_period};
     void sendBuffers(int p);
 
+    void checkFinishRospusk(const QDateTime &T);
+
 signals:
 
 public slots:
@@ -75,9 +77,11 @@ protected:
      quint32 ID_ROSP=0;
 
      int testRegim();
-     void newRospusk();
+     void setRegimRospusk();
+     void setRegimStop();
      gtapp_watchdog *watchdog;
      QStringList sl_memshared_buffers;
+     QDateTime t_STATE_GAC_FINISH;
 };
 
 #endif // UVK_CENTRAL_H

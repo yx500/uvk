@@ -232,7 +232,7 @@ void GtGac::reset_STATE_GAC_ACTIVE()
 
 void GtGac::work(const QDateTime &T)
 {
-    if (!FSTATE_ENABLED) return;
+
     // выставляем блокировку перевода
     for (auto gs : l_strel){
         setStateBlockPerevod(gs);
@@ -242,163 +242,157 @@ void GtGac::work(const QDateTime &T)
         gs->pol_zad=MVP_Enums::pol_unknow;
         gs->pol_mar=MVP_Enums::pol_unknow;
         // убираем автовозврат
-        if (gs->strel->STATE_A()!=1) gs->strel->setSTATE_UVK_AV(false);
+        if (gs->strel->STATE_A()!=1) {
+            gs->strel->setSTATE_UVK_AV(false);
+            gs->ERR_PER=false;
+        }
     }
 
     // включаем  1 отцеп
     auto otcep1=otceps->topOtcep();
-    if (otcep1!=nullptr) otcep1->setSTATE_GAC_ACTIVE(1);
-
+    if (FSTATE_ENABLED) {
+        if (otcep1!=nullptr) otcep1->setSTATE_GAC_ACTIVE(1);
+    }
     // выключем отцепы
     reset_STATE_GAC_ACTIVE();
 
     auto act_zkr=modelGorka->active_zkr();
+    if (FSTATE_ENABLED) {
+        // определяем на стрелках нужное для отцепов положение pol_mar
+        foreach (m_Otcep *otcep, otceps->otceps()) {
+            if (!otcep->STATE_ENABLED()) continue;
 
-    // определяем на стрелках нужное для отцепов положение pol_mar
-    foreach (m_Otcep *otcep, otceps->otceps()) {
-        if (!otcep->STATE_ENABLED()) continue;
+            if (!otcep->STATE_GAC_ACTIVE()) continue;
 
-        if (!otcep->STATE_GAC_ACTIVE()) continue;
-
-        auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
-        if (otcep==otcep1){
-            rcs=nullptr;
-            if ((act_zkr!=nullptr) &&
-                    (act_zkr->STATE_BUSY()==MVP_Enums::free)&&
-                    (otceps->otcepCountOnRc(act_zkr)==0)
-                    ) rcs=act_zkr;
-        }
-
-        if (rcs==nullptr) continue;
-        // 1 ось - первая на рц, т.е. если есть на рц отцепы с меньшим номером то пропускаем
-        if (otceps->otcepCountOnRc(rcs)>1){
-            bool ex_min=false;
-            foreach (auto o1, otceps->otcepsOnRc(rcs)) {
-                if (o1->NUM()<otcep->NUM()) ex_min=true;
+            auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
+            if (otcep==otcep1){
+                rcs=nullptr;
+                if ((act_zkr!=nullptr) &&
+                        (act_zkr->STATE_BUSY()==MVP_Enums::free)&&
+                        (otceps->otcepCountOnRc(act_zkr)==0)
+                        ) rcs=act_zkr;
             }
-            if (ex_min) continue;
-        }
 
-        // на случай если хвост вышел из зоны ГАЦ
-        auto rcf=qobject_cast<m_RC_Gor*>(otcep->RCF);
-        if (rcf!=nullptr) {
-            if (rcf->MINWAY()==rcf->MAXWAY()) continue;
-        }
-
-        // были случаи когда затаскивали отцеп на другую гору
-        foreach (auto rc_zkr, l_zkr) {
-            if ((rc_zkr==rcs) && (rc_zkr->STATE_ROSPUSK()!=1)) continue;
-        }
-
-        auto rc=rcs->next_rc[0];
-        int recurs_count=0;
-        while(rc!=nullptr){
-            recurs_count++;
-            if (recurs_count>200) break; // защита от бесконечного цикла при сбойном графе
-            // до первой занятости
-            if (rc->STATE_BUSY()!=MVP_Enums::free) break;
-            // до первой занятости отцепом
-            if (otceps->otcepCountOnRc(rc)!=0) break;
-
-            auto grc=qobject_cast<m_RC_Gor*>(rc);
-            // дальше считаем стрелок нет
-            if (grc->MINWAY()==grc->MAXWAY()) break;
-
-            if (grc->MINWAY()>otcep->STATE_MAR()) break;
-            if (grc->MAXWAY()<otcep->STATE_MAR()) break;
-            // наша стрелка?
-            if (mRC2GS.contains(rc)){
-                GacStrel*gs=mRC2GS[rc];
-                // только первый отцеп решает
-                // но по сути это ситуация когда из 2 точек есть выход на одну рц
-                if (gs->pol_mar!=MVP_Enums::pol_unknow) break;
-                bool mar_plus=false;
-                bool mar_mnus=false;
-                auto rcplus=qobject_cast<m_RC_Gor*>(gs->strel->getNextRC(0,0));
-                auto rcmnus=qobject_cast<m_RC_Gor*>(gs->strel->getNextRC(0,1));
-                if (rcplus!=nullptr) {
-                    if (inway(otcep->STATE_MAR(),rcplus->MINWAY(),rcplus->MAXWAY())) mar_plus=true;
+            if (rcs==nullptr) continue;
+            // 1 ось - первая на рц, т.е. если есть на рц отцепы с меньшим номером то пропускаем
+            if (otceps->otcepCountOnRc(rcs)>1){
+                bool ex_min=false;
+                foreach (auto o1, otceps->otcepsOnRc(rcs)) {
+                    if (o1->NUM()<otcep->NUM()) ex_min=true;
                 }
-                if (rcmnus!=nullptr) {
-                    if (inway(otcep->STATE_MAR(),rcmnus->MINWAY(),rcmnus->MAXWAY())) mar_mnus=true;
+                if (ex_min) continue;
+            }
+
+            // на случай если хвост вышел из зоны ГАЦ
+            auto rcf=qobject_cast<m_RC_Gor*>(otcep->RCF);
+            if (rcf!=nullptr) {
+                if (rcf->MINWAY()==rcf->MAXWAY()) continue;
+            }
+
+            // были случаи когда затаскивали отцеп на другую гору
+            foreach (auto rc_zkr, l_zkr) {
+                if ((rc_zkr==rcs) && (rc_zkr->STATE_ROSPUSK()!=1)) continue;
+            }
+
+            auto rc=rcs->next_rc[0];
+            int recurs_count=0;
+            while(rc!=nullptr){
+                recurs_count++;
+                if (recurs_count>200) break; // защита от бесконечного цикла при сбойном графе
+                // до первой занятости
+                if (rc->STATE_BUSY()!=MVP_Enums::free) break;
+                // до первой занятости отцепом
+                if (otceps->otcepCountOnRc(rc)!=0) break;
+
+                auto grc=qobject_cast<m_RC_Gor*>(rc);
+                // дальше считаем стрелок нет
+                if (grc->MINWAY()==grc->MAXWAY()) break;
+
+                if (grc->MINWAY()>otcep->STATE_MAR()) break;
+                if (grc->MAXWAY()<otcep->STATE_MAR()) break;
+                // наша стрелка?
+                if (mRC2GS.contains(rc)){
+                    GacStrel*gs=mRC2GS[rc];
+                    // только первый отцеп решает
+                    // но по сути это ситуация когда из 2 точек есть выход на одну рц
+                    if (gs->pol_mar!=MVP_Enums::pol_unknow) break;
+                    bool mar_plus=false;
+                    bool mar_mnus=false;
+                    auto rcplus=qobject_cast<m_RC_Gor*>(gs->strel->getNextRC(0,0));
+                    auto rcmnus=qobject_cast<m_RC_Gor*>(gs->strel->getNextRC(0,1));
+                    if (rcplus!=nullptr) {
+                        if (inway(otcep->STATE_MAR(),rcplus->MINWAY(),rcplus->MAXWAY())) mar_plus=true;
+                    }
+                    if (rcmnus!=nullptr) {
+                        if (inway(otcep->STATE_MAR(),rcmnus->MINWAY(),rcmnus->MAXWAY())) mar_mnus=true;
+                    }
+                    if (mar_plus==mar_mnus) break;
+                    if (mar_plus) gs->pol_mar=MVP_Enums::pol_plus;
+                    if (mar_mnus) gs->pol_mar=MVP_Enums::pol_minus;
+                    // до первой необходимости перевода
+                    if ((gs->strel->STATE_POL()!=gs->pol_mar)) break;
                 }
-                if (mar_plus==mar_mnus) break;
-                if (mar_plus) gs->pol_mar=MVP_Enums::pol_plus;
-                if (mar_mnus) gs->pol_mar=MVP_Enums::pol_minus;
-                // до первой необходимости перевода
-                if ((gs->strel->STATE_POL()!=gs->pol_mar)) break;
-            }
-            // next_rc уже выставвлен по положению стрелки
-            rc=rc->next_rc[_forw];
-        }
-    }
-
-    // определяем возможность команды на перевод
-    for (auto gs : l_strel){
-        if ((modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk)&&
-                (modelGorka->STATE_REGIM()!=ModelGroupGorka::regimPausa)) continue;
-        if (gs->pol_mar==MVP_Enums::pol_unknow) continue;
-        if (gs->strel->STATE_POL()==gs->pol_mar) continue;
-        if (gs->strel->STATE_A()!=1) continue;
-
-        if (gs->BL_PER) continue;
-
-        gs->pol_zad=gs->pol_mar;
-    }
-
-    // задаем команды
-    for (auto gs : l_strel){
-        sendCommand(gs,gs->pol_zad);
-    }
-
-    // проверки времени перевода
-    for (auto gs : l_strel){
-        if (gs->pol_cmd!=MVP_Enums::pol_unknow){
-            // определям начало перевода по команде
-            if (gs->strel->STATE_POL()==MVP_Enums::pol_w){
-                // начало потери контроля
-                if (!gs->pol_cmd_w_time.isValid()) gs->pol_cmd_w_time=T;
+                // next_rc уже выставвлен по положению стрелки
+                rc=rc->next_rc[_forw];
             }
         }
-    }
-    // определям автовозврат
-    for (auto gs : l_strel){
+
+        // определяем возможность команды на перевод
+        for (auto gs : l_strel){
+            if ((modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk)&&
+                    (modelGorka->STATE_REGIM()!=ModelGroupGorka::regimPausa)) continue;
+            if (gs->pol_mar==MVP_Enums::pol_unknow) continue;
+            if (gs->strel->STATE_POL()==gs->pol_mar) continue;
+            if (gs->strel->STATE_A()!=1) continue;
+
+            if (gs->BL_PER) continue;
+
+            gs->pol_zad=gs->pol_mar;
+        }
+
+        // задаем команды
+        for (auto gs : l_strel){
+            sendCommand(gs,gs->pol_zad);
+        }
+
+        // проверки времени перевода
+        for (auto gs : l_strel){
+            if (gs->pol_cmd!=MVP_Enums::pol_unknow){
+                // определям начало перевода по команде
+                if (gs->strel->STATE_POL()==MVP_Enums::pol_w){
+                    // начало потери контроля
+                    if (!gs->pol_cmd_w_time.isValid()) gs->pol_cmd_w_time=T;
+                }
+            }
+        }
+        // определям автовозврат
+        for (auto gs : l_strel){
             if (gs->pol_cmd_w_time.isValid()){
                 if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
-                    qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
                     if (gs->pol_cmd!=gs->strel->STATE_POL()){
+                        qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
                         if ((ms>100) &&(ms<2000)) {
                             gs->strel->setSTATE_UVK_AV(true);
                         }
+                    } else {
+                        // перевелась таки
+                        gs->ERR_PER=false;
                     }
                 }
             }
+        }
+        // определям общий неперевод
+        for (auto gs : l_strel){
+            if (gs->pol_cmd==MVP_Enums::pol_w) continue;
+            if (gs->pol_cmd!=gs->strel->STATE_POL()){
+                if ((gs->pol_cmd_time.isValid())&&(gs->pol_cmd_time.elapsed()>=5000)){
+                    gs->ERR_PER=true;
+                }
+            }
+
+        }
     }
-    // определям общий неперевод
-//    else {
-//    }
 
-
-//            // определям общее время перевода по команде
-
-
-//            if (gs->pol_cmd_w_time.isValid()){
-//                qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
-//                if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
-//                    // определям автовозврат
-//                    if (gs->pol_cmd!=gs->strel->STATE_POL()){
-//                        if ((ms>100) &&(ms<2000)) {
-//                            gs->strel->setSTATE_UVK_AV(true);
-//                        }
-//                    }
-//                } else {
-//                    if ((ms>5000)) {
-//                        //strel->setSTATE_UVK_CMD_ERROR(true);
-//                    }
-//                }
-//            }
-//        }
-//    }
     //сбраcываем таймер
     for (auto gs : l_strel){
         if (gs->strel->STATE_POL()!=MVP_Enums::pol_w) gs->pol_cmd_w_time=QDateTime();
@@ -476,7 +470,7 @@ void GtGac::sendCommand(GacStrel * gs, MVP_Enums::TStrelPol pol_cmd,bool force)
     } else {
         // если нет ответа от платы шлем еще
         if (((gs->strel->STATE_UVK_PRP()!=gs->strel->STATE_PRP()))||
-            ((gs->strel->STATE_UVK_PRM()!=gs->strel->STATE_PRM()))){
+                ((gs->strel->STATE_UVK_PRM()!=gs->strel->STATE_PRM()))){
             // не забиваем сеть
             if ((gs->pol_cmd_time.isValid())||(gs->pol_cmd_time.elapsed()>20)){
                 emit uvk_command(gs->strel->TU_PRP(),gs->strel->STATE_UVK_PRP());

@@ -6,6 +6,7 @@
 #include "tStatPc.h"
 
 int testMode=0;
+int testMode_no_send=0;
 
 static gtapp_watchdog dog("dd");
 class IUVKGetNewOtcep :public IGetNewOtcep
@@ -34,6 +35,7 @@ bool UVK_Central::init(QString fileNameIni)
             uvkStatusName=settings.value("main/status","").toString();
 
             testMode=settings.value("test/mode",0).toInt();
+            testMode_no_send=settings.value("test/no_send",0).toInt();
             watchdog=new gtapp_watchdog(qPrintable(settings.value("main/watchdog","uvk").toString()));
             settings.beginGroup("shared_memory");
             sl_memshared_buffers= settings.childKeys();
@@ -50,6 +52,7 @@ bool UVK_Central::init(QString fileNameIni)
             settings.setValue("main/watchdog","uvk");
             fileNameIni=settings.fileName();
             settings.setValue("test/mode","0");
+            settings.setValue("test/no_send","0");
             settings.setValue("shared_memory/name_of_ts_buffer","1");
 
         }
@@ -64,6 +67,7 @@ bool UVK_Central::init(QString fileNameIni)
     }
     udp=new GtBuffers_UDP_D2();
     MVP.setGetGtBufferInterface(udp);
+    if (testMode_no_send==1) udp->no_send=true;
 
     if (fileNameModel.isEmpty()) fileNameModel="./M.xml";
     QObject *O=MVP.loadObject(fileNameModel);
@@ -360,7 +364,10 @@ void UVK_Central::work()
             slaveMode=true;
         }
     }
-    udp->slaveMode=slaveMode;
+    if (udp->slaveMode!=slaveMode){
+        udp->slaveMode=slaveMode;
+        qDebug()<< "slaveMode=" <<slaveMode;
+    }
 
     GORKA->updateStates();
     //    QDateTime T1s=QDateTime::currentDateTime();
@@ -381,6 +388,7 @@ void UVK_Central::work()
     TOS->work(T);
     GAC->work(T);
     otcepsController->work(T);
+    checkFinishRospusk(T);
     //    QDateTime T2w=QDateTime::currentDateTime();
 
     // РРС
@@ -639,6 +647,40 @@ void UVK_Central::sendBuffers(int p)
 
 }
 
+void UVK_Central::checkFinishRospusk(const QDateTime &T)
+{
+    bool STATE_GAC_FINISH=false;
+    if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk){
+        bool noendex=false;
+        // ищем все конченые отцепы
+        foreach (auto otcep, otcepsController->otceps->otceps()) {
+            if ((otcep->STATE_ENABLED())&&
+               ((otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) ||(otcep->STATE_GAC_ACTIVE()==1))){
+                noendex=true;
+                break;
+            }
+        }
+
+        if (!noendex) STATE_GAC_FINISH=true;
+
+    } else {
+        if (t_STATE_GAC_FINISH.isValid()) t_STATE_GAC_FINISH=QDateTime();
+    }
+    if ((GORKA->STATE_GAC_FINISH()==false) && (STATE_GAC_FINISH==true)) t_STATE_GAC_FINISH=T;
+    GORKA->setSTATE_GAC_FINISH(STATE_GAC_FINISH);
+
+    if (STATE_GAC_FINISH==true){
+        if ((!t_STATE_GAC_FINISH.isValid())||(t_STATE_GAC_FINISH.msecsTo(T)>=3*60*1000)){
+            QString acceptStr;
+            if (testMode==0){
+            cmd_setRegim(ModelGroupGorka::regimStop,acceptStr);
+            }
+        }
+    }
+
+
+}
+
 int UVK_Central::getNewOtcep(m_RC*rc)
 {
     if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk){
@@ -673,18 +715,14 @@ int UVK_Central::getNewOtcep(m_RC*rc)
 QList<SignalDescription> UVK_Central::acceptOutputSignals()
 {
 
-
-    GORKA->setSIGNAL_ROSPUSK(GORKA->SIGNAL_ROSPUSK().innerUse());
-    GORKA->setSIGNAL_PAUSA(GORKA->SIGNAL_PAUSA().innerUse());
-    GORKA->setSIGNAL_STOP(GORKA->SIGNAL_STOP().innerUse());
-
     QList<SignalDescription> l;
-    l << GORKA->SIGNAL_ROSPUSK()
-      << GORKA->SIGNAL_PAUSA()
-      << GORKA->SIGNAL_STOP();
+    GORKA->setSIGNAL_ROSPUSK(GORKA->SIGNAL_ROSPUSK().innerUse());   l << GORKA->SIGNAL_ROSPUSK();
+    GORKA->setSIGNAL_PAUSA(GORKA->SIGNAL_PAUSA().innerUse());       l << GORKA->SIGNAL_PAUSA();
+    GORKA->setSIGNAL_STOP(GORKA->SIGNAL_STOP().innerUse());         l << GORKA->SIGNAL_STOP();
+    GORKA->setSIGNAL_STOP(GORKA->SIGNAL_GAC_FINISH().innerUse());   l << GORKA->SIGNAL_GAC_FINISH();
+
     foreach (auto zkr, l_zkr) {
-        zkr->setSIGNAL_ROSPUSK(zkr->SIGNAL_ROSPUSK().innerUse());
-        l<<zkr->SIGNAL_ROSPUSK();
+        zkr->setSIGNAL_ROSPUSK(zkr->SIGNAL_ROSPUSK().innerUse());   l<<zkr->SIGNAL_ROSPUSK();
     }
 
     return l;
@@ -696,11 +734,13 @@ void UVK_Central::state2buffer()
     GORKA->SIGNAL_ROSPUSK().setValue_1bit(0);
     GORKA->SIGNAL_PAUSA().setValue_1bit(0);
     GORKA->SIGNAL_STOP().setValue_1bit(0);
+
     switch (GORKA->STATE_REGIM()) {
     case ModelGroupGorka::regimRospusk: GORKA->SIGNAL_ROSPUSK().setValue_1bit(1); break;
     case ModelGroupGorka::regimPausa: GORKA->SIGNAL_PAUSA().setValue_1bit(1); break;
     case ModelGroupGorka::regimStop: GORKA->SIGNAL_STOP().setValue_1bit(1); break;
     }
+    GORKA->SIGNAL_GAC_FINISH().setValue_1bit(GORKA->STATE_GAC_FINISH());
     // выставляем напрямую в модели
     foreach (auto zkr, l_zkr) {
         zkr->SIGNAL_ROSPUSK().setValue_1bit(zkr->STATE_ROSPUSK());
@@ -752,10 +792,9 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
             // продолжаем следить
             // стрелк не переводим
             acceptStr=QString("Режим КОНЕЦ РОСПУСКА установлен.");
+            setRegimStop();
             GORKA->setSTATE_REGIM(p);
-            GAC->resetStates();
-            GAC->setSTATE_ENABLED(false);
-            ID_ROSP=0;
+
             return true;
         }
     } break;
@@ -772,8 +811,8 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
         case ModelGroupGorka::regimStop:
             acceptStr=QString("Режим КОНЕЦ РОСПУСКА установлен.");
             GORKA->setSTATE_REGIM(p);
-            GAC->resetStates();
-            GAC->setSTATE_ENABLED(false);
+            setRegimStop();
+            GORKA->setSTATE_REGIM(p);
             return true;
         }
     } break;
@@ -782,7 +821,7 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
         switch (p) {
         case ModelGroupGorka::regimRospusk:
 
-            newRospusk();
+            setRegimRospusk();
             GORKA->setSTATE_REGIM(p);
             acceptStr=QString("Режим РОСПУСК установлен.");
             return true;
@@ -816,7 +855,7 @@ int UVK_Central::testRegim()
     return ModelGroupGorka::regimStop;
 }
 
-void UVK_Central::newRospusk()
+void UVK_Central::setRegimRospusk()
 {
     otcepsController->finishLiveOtceps();
     state2buffer();
@@ -835,6 +874,20 @@ void UVK_Central::newRospusk()
         ID_ROSP=r;
         otcepsController->setNewID_ROSP(ID_ROSP);
     }
+}
+
+void UVK_Central::setRegimStop()
+{
+    GAC->resetStates();
+    GAC->setSTATE_ENABLED(false);
+    ID_ROSP=0;
+    // финишируем отцепы
+    foreach (auto otcep, otcepsController->otceps->otceps()) {
+        otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+        otcep->RCS=nullptr;otcep->RCF=nullptr;
+        otcep->setSTATE_GAC_ACTIVE(false);
+    }
+
 }
 
 

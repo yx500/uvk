@@ -223,6 +223,16 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
         }
         otcep->setSTATE_V(o->STATE_V());
 
+        // порядковый на рц
+        int nn=0;
+        foreach (auto o2, lo) {
+            auto otcep2=o2->otcep;
+            if ((otcep2->RCS!=nullptr)&&(otcep2->RCS==otcep->RCS)){
+                if (otcep2->NUM()>otcep->NUM()) nn++;
+            }
+        }
+        otcep->setSTATE_D_ORDER_RC(nn);
+
     }
 
 }

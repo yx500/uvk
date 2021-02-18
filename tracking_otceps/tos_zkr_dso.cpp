@@ -62,11 +62,11 @@ void tos_Zkr_DSO::state2buffer()
     rc_zkr->SIGNAL_STATE_ERROR_NERASCEP().setValue_1bit(rc_zkr->STATE_ERROR_NERASCEP());
     rc_zkr->SIGNAL_STATE_ERROR_OSYCOUNT().setValue_1bit(rc_zkr->STATE_ERROR_OSYCOUNT());
     if (curr_state_zkr.sost==_otcep_unknow) rc_zkr->SIGNAL_STATE_OTCEP_UNKNOW().setValue_1bit(1);else
-                                            rc_zkr->SIGNAL_STATE_OTCEP_UNKNOW().setValue_1bit(0);
+        rc_zkr->SIGNAL_STATE_OTCEP_UNKNOW().setValue_1bit(0);
     if (curr_state_zkr.sost==_otcep_free)   rc_zkr->SIGNAL_STATE_OTCEP_FREE().setValue_1bit(1);else
-                                            rc_zkr->SIGNAL_STATE_OTCEP_FREE().setValue_1bit(0);
+        rc_zkr->SIGNAL_STATE_OTCEP_FREE().setValue_1bit(0);
     if (curr_state_zkr.sost==_otcep_in)     rc_zkr->SIGNAL_STATE_OTCEP_IN().setValue_1bit(1);else
-                                            rc_zkr->SIGNAL_STATE_OTCEP_IN().setValue_1bit(0);
+        rc_zkr->SIGNAL_STATE_OTCEP_IN().setValue_1bit(0);
 }
 
 int _find_step(tos_Zkr_DSO::t_zkr_pairs steps[],int size_steps,const tos_Zkr_DSO::t_zkr_state &prev_state,const tos_Zkr_DSO::t_zkr_state &curr_state)
@@ -93,6 +93,14 @@ void tos_Zkr_DSO::work(const QDateTime &T)
     curr_state_zkr.rtds=rtds;
     curr_state_zkr.dso=alive_dso()->os_moved;
     if (trc->l_os.isEmpty())  curr_state_zkr.os_in=0; else curr_state_zkr.os_in=1;
+    // ошибка ртдс
+//    if ((rtds==1)&&
+//            (trc->next_rc[_forw]!=nullptr)&&
+//            (trc->rc->STATE_BUSY()==MVP_Enums::free) &&
+//            (trc->next_rc[_forw]->rc->STATE_BUSY()==MVP_Enums::free)){
+//        rc_zkr->setSTATE_ERROR_RTDS(true);
+//    }
+//    if (rtds==0) rc_zkr->setSTATE_ERROR_RTDS(false);
 
     static t_zkr_pairs tos_zkr_steps[]={
         //sost;rtds;dso;os_in
@@ -266,7 +274,9 @@ void tos_Zkr_DSO::out_os(const QDateTime &T)
             TOS->resetTracking(os.num);
             auto o=TOS->otcep_by_num(os.num);
             if (o!=nullptr){
-                o->otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
+                if (rc_zkr->STATE_ROSPUSK()==1){
+                    o->otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
+                }
             }
             curr_state_zkr.sost=_otcep_unknow;
         }
