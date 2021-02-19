@@ -566,7 +566,9 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
                                 }
                             }
                             if (warn2==0){
-                                if ((mr.rc->STATE_BUSY_DSO_ERR())||(mr.rc->STATE_BUSY_DSO_STOP())){
+                                if ((mr.rc->MINWAY()!=mr.rc->MAXWAY())&&
+                                        ((mr.rc->STATE_BUSY_DSO_ERR())||(mr.rc->STATE_BUSY_DSO_STOP()))
+                                         ){
                                     warn2=1;
                                 }
                             }

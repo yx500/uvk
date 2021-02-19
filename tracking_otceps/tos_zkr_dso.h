@@ -18,6 +18,7 @@ enum T_OTC_ZKR_cmd{
     _in,
     _otcep_end,
     _os_plus,
+    _os_plus_baza,
     _os_any_plus,
     _os_minus,
     _error_rtds
@@ -88,6 +89,7 @@ protected:
     void endOtcep(const QDateTime &T);
     void in_os(const QDateTime &T);
     void out_os(const QDateTime &T);
+    void setOtcepBaza();
 
 
 };

@@ -94,13 +94,13 @@ void tos_Zkr_DSO::work(const QDateTime &T)
     curr_state_zkr.dso=alive_dso()->os_moved;
     if (trc->l_os.isEmpty())  curr_state_zkr.os_in=0; else curr_state_zkr.os_in=1;
     // ошибка ртдс
-//    if ((rtds==1)&&
-//            (trc->next_rc[_forw]!=nullptr)&&
-//            (trc->rc->STATE_BUSY()==MVP_Enums::free) &&
-//            (trc->next_rc[_forw]->rc->STATE_BUSY()==MVP_Enums::free)){
-//        rc_zkr->setSTATE_ERROR_RTDS(true);
-//    }
-//    if (rtds==0) rc_zkr->setSTATE_ERROR_RTDS(false);
+    //    if ((rtds==1)&&
+    //            (trc->next_rc[_forw]!=nullptr)&&
+    //            (trc->rc->STATE_BUSY()==MVP_Enums::free) &&
+    //            (trc->next_rc[_forw]->rc->STATE_BUSY()==MVP_Enums::free)){
+    //        rc_zkr->setSTATE_ERROR_RTDS(true);
+    //    }
+    //    if (rtds==0) rc_zkr->setSTATE_ERROR_RTDS(false);
 
     static t_zkr_pairs tos_zkr_steps[]={
         //sost;rtds;dso;os_in
@@ -118,6 +118,9 @@ void tos_Zkr_DSO::work(const QDateTime &T)
         // выявление хвоста
         { {_otcep_in , 0 ,_os_none   ,1 } ,
           {_otcep_in , 0 ,_os_none,   0 } ,_otcep_end},
+        // нормальное движение вперед + дб
+        { {_otcep_in , 1 ,_os_none   ,0 } ,
+          {_otcep_in , 1 ,_os2forw,   0 } ,_os_plus_baza},
         // нормальное движение вперед
         { {_otcep_in , 1 ,_os_none   ,_xx } ,
           {_otcep_in , 1 ,_os2forw,   _xx  } ,_os_plus},
@@ -145,6 +148,10 @@ void tos_Zkr_DSO::work(const QDateTime &T)
         break;
     case _os_plus:
         in_os(T);
+        break;
+    case _os_plus_baza:
+        in_os(T);
+        setOtcepBaza();
         break;
     case _os_any_plus:
         in_os(T);
@@ -282,6 +289,22 @@ void tos_Zkr_DSO::out_os(const QDateTime &T)
         }
         if (!trc->l_os.isEmpty()) cur_os=trc->l_os.last();
         TOS->updateOtcepsOnRc(T);
+    }
+}
+
+void tos_Zkr_DSO::setOtcepBaza()
+{
+    // неудачно расположены датчики
+    // проверим что на первом точно ничего нет
+    if ((alive_dso()!=nullptr)&&(alive_dso()->dso->STATE_SRAB()!=0)) return;
+    if (!trc->l_os.isEmpty()){
+        TOtcepDataOs os=trc->l_os.last();
+        if ((os.num!=0)){
+            auto o=TOS->otcep_by_num(os.num);
+            if (o!=nullptr){
+                o->otcep->setSTATE_ZKR_BAZA(1);
+            }
+        }
     }
 }
 

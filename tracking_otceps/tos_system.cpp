@@ -197,7 +197,7 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
         // маршрут
         m_RC_Gor*rc=qobject_cast<m_RC_Gor*>(otcep->RCS);
         if ((rc==nullptr)||
-                ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)&&
+                (((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)||(otcep->STATE_LOCATION()==m_Otcep::locationOnPark))&&
                  (otcep->STATE_MAR()!=0)&&
                  ((otcep->STATE_MAR()<rc->MINWAY())||(otcep->STATE_MAR()>rc->MAXWAY()))
                  )

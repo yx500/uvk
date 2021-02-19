@@ -490,6 +490,8 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
                     CMD->accept_cmd(m,1,acceptStr);
                 }else
                     CMD->accept_cmd(m,-1,acceptStr);
+            } else {
+                CMD->accept_cmd(m,-1,"Попытка удалить отцеп в режиме РОСПУСК");
             }
         }
         if (!m["INC_OTCEP"].isEmpty()){
@@ -497,15 +499,18 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
                 if (otcepsController->cmd_INC_OTCEP(m,acceptStr))
                     CMD->accept_cmd(m,1,acceptStr); else
                     CMD->accept_cmd(m,-1,acceptStr);
+            } else {
+                CMD->accept_cmd(m,-1,"Попытка добавить отцеп в режиме РОСПУСК");
+
             }
         }
     }
     if (m["CMD"]=="SET_OTCEP_STATE"){
-        if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
+        //if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
             if (otcepsController->cmd_SET_OTCEP_STATE(m,acceptStr))
                 CMD->accept_cmd(m,1,acceptStr); else
                 CMD->accept_cmd(m,-1,acceptStr);
-        }
+        //}
     }
     if (m["CMD"]=="ADD_OTCEP_VAG"){
         if (otcepsController->cmd_ADD_OTCEP_VAG(m,acceptStr))
@@ -719,7 +724,7 @@ QList<SignalDescription> UVK_Central::acceptOutputSignals()
     GORKA->setSIGNAL_ROSPUSK(GORKA->SIGNAL_ROSPUSK().innerUse());   l << GORKA->SIGNAL_ROSPUSK();
     GORKA->setSIGNAL_PAUSA(GORKA->SIGNAL_PAUSA().innerUse());       l << GORKA->SIGNAL_PAUSA();
     GORKA->setSIGNAL_STOP(GORKA->SIGNAL_STOP().innerUse());         l << GORKA->SIGNAL_STOP();
-    GORKA->setSIGNAL_STOP(GORKA->SIGNAL_GAC_FINISH().innerUse());   l << GORKA->SIGNAL_GAC_FINISH();
+    GORKA->setSIGNAL_GAC_FINISH(GORKA->SIGNAL_GAC_FINISH().innerUse());   l << GORKA->SIGNAL_GAC_FINISH();
 
     foreach (auto zkr, l_zkr) {
         zkr->setSIGNAL_ROSPUSK(zkr->SIGNAL_ROSPUSK().innerUse());   l<<zkr->SIGNAL_ROSPUSK();
@@ -737,8 +742,8 @@ void UVK_Central::state2buffer()
 
     switch (GORKA->STATE_REGIM()) {
     case ModelGroupGorka::regimRospusk: GORKA->SIGNAL_ROSPUSK().setValue_1bit(1); break;
-    case ModelGroupGorka::regimPausa: GORKA->SIGNAL_PAUSA().setValue_1bit(1); break;
-    case ModelGroupGorka::regimStop: GORKA->SIGNAL_STOP().setValue_1bit(1); break;
+    case ModelGroupGorka::regimPausa:   GORKA->SIGNAL_PAUSA().setValue_1bit(1); break;
+    case ModelGroupGorka::regimStop:    GORKA->SIGNAL_STOP().setValue_1bit(1); break;
     }
     GORKA->SIGNAL_GAC_FINISH().setValue_1bit(GORKA->STATE_GAC_FINISH());
     // выставляем напрямую в модели

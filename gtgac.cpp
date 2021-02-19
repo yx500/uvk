@@ -160,11 +160,8 @@ void GtGac::validation(ListObjStr *l) const
                     l->error(gs->strel,QString("Нет реализации для mar=%1").arg(mar));
                 }
             }
-
         }
     }
-
-
 }
 
 

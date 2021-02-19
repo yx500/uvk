@@ -115,6 +115,7 @@ void OtcepsController::state2buffer()
             v.NO=otcep->NUM();
             v.Id=otcep->STATE_ID_ROSP();
             v.SP=otcep->STATE_SP();
+            v._tick=otcep->STATE_TICK();
             auto &s=l_chanelVag[i];
             s.setBufferData(&v,sizeof(v));
             //s.setValue_data(&v,sizeof(v));
@@ -178,6 +179,7 @@ bool OtcepsController::cmd_DEL_OTCEP(QMap<QString, QString> &m, QString &acceptS
             otcep_0->acceptSLStates(otcep_1);
             otcep_0->setSTATE_LOCATION(otcep_1->STATE_LOCATION());
             otcep_0->setSTATE_ENABLED(otcep_1->STATE_ENABLED());
+            otcep->inc_tick();
 
         }
         otceps->l_otceps.last()->resetStates();
@@ -199,6 +201,15 @@ bool OtcepsController::cmd_INC_OTCEP(QMap<QString, QString> &m, QString &acceptS
             acceptStr=QString("Попытка добавить отцеп перед выявленным. Отцеп %1.").arg(N);
             return false;
         }
+        if (otcep->NUM()>1){
+            auto otcep1=otceps->otcepByNum(N-1);
+            if (otcep1!=nullptr){
+                if (otcep1->STATE_LOCATION()!=m_Otcep::locationOnPrib){
+                    acceptStr=QString("Попытка добавить отцеп вне очереди. Отцеп %1.").arg(N);
+                    return false;
+                }
+            }
+        }
         int ib=otceps->l_otceps.indexOf(otcep);
         for (int i=otceps->l_otceps.size()-1;i>=ib+1;i--){
             auto otcep_0=otceps->l_otceps[i-1];
@@ -208,8 +219,10 @@ bool OtcepsController::cmd_INC_OTCEP(QMap<QString, QString> &m, QString &acceptS
             otcep_1->acceptSLStates(otcep_0);
             otcep_1->setSTATE_LOCATION(otcep_0->STATE_LOCATION());
             otcep_1->setSTATE_ENABLED(otcep_0->STATE_ENABLED());
+            otcep_1->inc_tick();
         }
         otcep->resetStates();
+
 
         //if (n<otceps->l_otceps.size()-1) otceps->l_otceps[n]->acceptSLStates(otceps->l_otceps[n+1]);
         otcep->setSTATE_MAR(1);
@@ -232,6 +245,11 @@ bool OtcepsController::cmd_SET_OTCEP_STATE(QMap<QString, QString> &m, QString &a
         int N=m["N"].toInt();
         auto otcep=otceps->otcepByNum(N);
         if (otcep!=nullptr){
+            if ((otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)&&(!otcep->STATE_IS_CURRENT())) {
+                acceptStr=QString("Отцеп %1 попытка изменить выявленный отцеп.").arg(N);
+                return false;
+            }
+            bool ex_change=false;
             foreach (QString key, m.keys()) {
                 if ((key=="CMD") || (key=="N")) continue;
                 QString stateName="STATE_"+key;
@@ -242,14 +260,19 @@ bool OtcepsController::cmd_SET_OTCEP_STATE(QMap<QString, QString> &m, QString &a
                     QMetaProperty metaProperty = otcep->metaObject()->property(idx);
                     if (metaProperty.name()!=stateName) continue;
                     QVariant V1=otcep->property(qPrintable(stateName));
-                    if (V1!=V)
+                    if (V1!=V){
                         qDebug()<< stateName << V1.toString() << V.toString();
-                    //otcep->setProperty(qPrintable(stateName),V);
-                    metaProperty.write(otcep,V);
+                        ex_change=true;
+                        //otcep->setProperty(qPrintable(stateName),V);
+                        metaProperty.write(otcep,V);
+                    }
 
                 }
             }
-            acceptStr=QString("Отцеп %1 свойства изменены.").arg(N);
+            if (ex_change){
+                acceptStr=QString("Отцеп %1 свойства изменены.").arg(N);
+                otcep->inc_tick();
+            }
             return true;
         }
     }
@@ -337,6 +360,7 @@ void OtcepsController::setNewID_ROSP(quint32 ID_ROSP)
     foreach (auto otcep, otceps->otceps()) {
         if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib){
             otcep->setSTATE_ID_ROSP(ID_ROSP);
+            otcep->inc_tick();
         }
     }
 }
