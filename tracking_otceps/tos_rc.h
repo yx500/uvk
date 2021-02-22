@@ -71,6 +71,8 @@ public:
     void remove_od(TOtcepData o);
 
     QList<TOtcepDataOs> l_os;
+    qreal v_dso;
+    void set_v_dso(const QDateTime &T);
 
 
 protected:

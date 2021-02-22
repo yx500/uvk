@@ -57,7 +57,8 @@ void tos_System::makeWorkers(ModelGroupGorka *modelGorka)
     foreach (auto p, l_park) {
         mRc2Park.insert(p,p);
     }
-
+    // собираем упр стрелки
+    l_strel_Y=modelGorka->findChildren<m_Strel_Gor_Y*>();
     resetStates();
 }
 

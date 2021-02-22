@@ -34,6 +34,16 @@ int main(int argc, char *argv[])
 //        qFatal("fail uvk.init, see %s", qPrintable(fi.absoluteFilePath()));
 //        return -1;
     } /*else*/ {
+        QString errolLofFileName="./uvk_init.log";
+        QFile txtfile1(errolLofFileName);
+        if (txtfile1.open(QFile::WriteOnly | QFile::Truncate)) {
+            QTextStream textStream(&txtfile1);
+            textStream.setCodec("Windows-1251");
+            for (int i=0;i<uvk.initLog.size();i++) {
+                textStream <<uvk.initLog[i] <<endl;
+            };
+            txtfile1.close();
+        }
         uvk.start();
         return a.exec();
     }

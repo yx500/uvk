@@ -7,6 +7,13 @@
 #include "tos_zkr_dso.h"
 #include "tos_dso_pair.h"
 
+struct NgbStrel{
+    m_Strel_Gor_Y* strel;
+    tos_Rc *trc;
+    QList<tos_Rc *> l_ngb_trc[2];
+};
+
+
 class tos_System_DSO : public tos_System
 {
     Q_OBJECT
@@ -30,7 +37,9 @@ public:
     void reset_1_os(const QDateTime &T);
 
     void setDSOBUSY(const QDateTime &T);
+    void resetNGB();
     void setNGBDYN(const QDateTime &T);
+    void setNGBSTAT(const QDateTime &T);
 
     TOtcepDataOs moveOs(tos_Rc *rc0, tos_Rc *rc1, int d, qreal os_v, const QDateTime &T);
 
@@ -45,6 +54,7 @@ public:
     QList<tos_DsoPair*> l_tdsopair;
     QList<tos_Zkr_DSO*> l_tzkr;
     QList<tos_Rc*> l_trc_park;
+    QList<NgbStrel*> l_NgbStrel;
     tos_Rc * getRc(TOtcepDataOs os);
 
 signals:

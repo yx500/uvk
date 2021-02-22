@@ -28,7 +28,9 @@ public:
     GtBuffers_UDP_D2 *udp;
 
     QStringList errLog;
+    QStringList initLog;
     void err(QString errstr);
+    void ilog(QString str);
     bool validation();
     bool acceptBuffers();
     bool cmd_setPutNadvig(int p,QString &acceptStr);

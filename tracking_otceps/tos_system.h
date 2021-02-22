@@ -57,6 +57,7 @@ public:
     QMap<m_RC*,m_RC_Gor_Park*> mRc2Park;
     QList<m_RC_Gor_Park *> l_park;
     QList<m_RC_Gor_ZKR *> l_zkr;
+    QList<m_Strel_Gor_Y *> l_strel_Y;
 
     QMap<m_RC*,tos_Rc*> mRc2TRC;
     QMap<int,tos_OtcepData*> mNUM2OD;

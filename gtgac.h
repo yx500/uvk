@@ -58,12 +58,13 @@ public:
     void state2buffer()override;
     QList<SignalDescription> acceptOutputSignals() override;
     void setStateBlockPerevod(GacStrel *gs);
+    QList<GacStrel*> l_strel;
 signals:
     void uvk_command(const SignalDescription &s,int state);
 protected:
     ModelGroupGorka *modelGorka;
     m_Otceps *otceps;
-    QList<GacStrel*> l_strel;
+
     QList<m_RC_Gor_ZKR*> l_zkr;
     QMap<m_RC *,GacStrel*> mRC2GS;
 

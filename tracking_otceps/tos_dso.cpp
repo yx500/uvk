@@ -13,17 +13,19 @@ QList<SignalDescription> tos_DSO::acceptOutputSignals()
     dso->setSIGNAL_DSODATA(dso->SIGNAL_DSODATA().innerUse());
     QList<SignalDescription> l;
     l << dso->SIGNAL_DSODATA();
-    dso->SIGNAL_DSODATA().getBuffer()->setSizeData(DSO_Data_Max*sizeof(DSO_Data));
+    dso->SIGNAL_DSODATA().getBuffer()->setSizeData(DSO_Data_Max*sizeof(t_OsyCell_21));
     return l;
 }
 
 void tos_DSO::state2buffer()
 {
-    DSO_Data d;
+    t_OsyCell_21 d;
     d.V=dso->STATE_OSY_COUNT();
     d.D=dso->STATE_DIRECT();
     d.E=dso->STATE_ERROR_TRACK();
     d.EV=dso->STATE_ERROR_CNT();
+    d.Vel=os_v*10;
+    if (os_v==_undefV_)d.Vel=0;
     dso->SIGNAL_DSODATA().setValue_data(&d,sizeof (d));
 }
 

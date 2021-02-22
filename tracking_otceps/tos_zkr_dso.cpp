@@ -120,7 +120,7 @@ void tos_Zkr_DSO::work(const QDateTime &T)
           {_otcep_in , 0 ,_os_none,   0 } ,_otcep_end},
         // нормальное движение вперед + дб
         { {_otcep_in , 1 ,_os_none   ,0 } ,
-          {_otcep_in , 1 ,_os2forw,   0 } ,_os_plus_baza},
+          {_otcep_in , 1 ,_os2forw,   0 } ,_check_end_in},
         // нормальное движение вперед
         { {_otcep_in , 1 ,_os_none   ,_xx } ,
           {_otcep_in , 1 ,_os2forw,   _xx  } ,_os_plus},
@@ -152,6 +152,9 @@ void tos_Zkr_DSO::work(const QDateTime &T)
     case _os_plus_baza:
         in_os(T);
         setOtcepBaza();
+        break;
+    case _check_end_in:
+        check_end_in(T);
         break;
     case _os_any_plus:
         in_os(T);
@@ -291,6 +294,22 @@ void tos_Zkr_DSO::out_os(const QDateTime &T)
         TOS->updateOtcepsOnRc(T);
     }
 }
+void tos_Zkr_DSO::check_end_in(const QDateTime &T)
+{
+    // неудачно расположены ртдс
+    if (cur_os.os_otcep<4){
+        in_os(T);
+        return;
+    }
+    // если хоть один ртдс свободен - режем
+    if ((rc_zkr->rtds_1()->STATE_SRAB()==0)||(rc_zkr->rtds_2()->STATE_SRAB()==0)){
+        endOtcep(T);
+        newOtcep(T);
+        return;
+    }
+    in_os(T);
+}
+
 
 void tos_Zkr_DSO::setOtcepBaza()
 {
@@ -307,6 +326,8 @@ void tos_Zkr_DSO::setOtcepBaza()
         }
     }
 }
+
+
 
 void tos_Zkr_DSO::resetStates()
 {

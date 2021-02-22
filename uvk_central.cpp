@@ -105,6 +105,21 @@ bool UVK_Central::init(QString fileNameIni)
     if (!signal_SlaveMode.isEmpty()) signal_SlaveMode.acceptGtBuffer();
     //    udp->getGtBuffer(3,"uvk_status")->static_mode=true;
 
+    // парамеры ГАЦ
+    foreach (auto gstr, GAC->l_strel) {
+        ilog(QString("%1+ Vгран=%2 НГБ РЦ=%3").arg(gstr->strel->objectName()).arg(gstr->strel->NEGAB_VGRAN_P()).arg(gstr->strel->NEGAB_RC_CNT_P()));
+        foreach (auto _rc, gstr->strel->l_ngb_rc[0]) {
+                ilog(QString("%1+ НГБ РЦ %2 LEN=%3").arg(gstr->strel->objectName()).arg(_rc->objectName()).arg(_rc->LEN()));
+        }
+        ilog(QString("%1- Vгран=%2 НГБ РЦ=%3").arg(gstr->strel->objectName()).arg(gstr->strel->NEGAB_VGRAN_M()).arg(gstr->strel->NEGAB_RC_CNT_M()));
+        foreach (auto _rc, gstr->strel->l_ngb_rc[1]) {
+                ilog(QString("%1- НГБ РЦ %2 LEN=%3").arg(gstr->strel->objectName()).arg(_rc->objectName()).arg(_rc->LEN()));
+        }
+
+    }
+
+
+
     GORKA->resetStates();
     TOS->resetStates();
     GAC->resetStates();
@@ -115,12 +130,7 @@ bool UVK_Central::init(QString fileNameIni)
     qDebug() << "signal_Control:" << signal_Control.toString();
     if (testMode!=0) qDebug() << "testMode:" << testMode;
 
-
-
-
-
     return validation();
-
 
 }
 
@@ -174,11 +184,18 @@ void UVK_Central::err( QString errstr)
     errLog.push_back(errstr);
 }
 
+void UVK_Central::ilog(QString str)
+{
+    initLog.push_back(str);
+}
+
 bool UVK_Central::validation()
 {
     ListObjStr l;
     l.clear();
     GORKA->validation(&l);
+    ilog("Validation:");
+    initLog.append(l.toStringList());
     if (l.contains_error){
         err("GORKA errors:");
         errLog.append(l.toStringList());
@@ -186,6 +203,7 @@ bool UVK_Central::validation()
     }
     l.clear();
     TOS->validation(&l);
+    initLog.append(l.toStringList());
     if (l.contains_error){
         err("TOS errors:");
         errLog.append(l.toStringList());
@@ -193,6 +211,7 @@ bool UVK_Central::validation()
     }
     l.clear();
     GAC->validation(&l);
+    initLog.append(l.toStringList());
     if (l.contains_error){
         err("GAC errors:");
         errLog.append(l.toStringList());
@@ -233,7 +252,6 @@ bool UVK_Central::acceptBuffers()
             }
             if (B->type==0){
                 if (!l_tu_buffers.contains(B)){
-                    qDebug()<< "use tu buffer " <<B->getType() << B->objectName();
                     l_tu_buffers << B;
                 }
             } else {
@@ -259,29 +277,10 @@ bool UVK_Central::acceptBuffers()
         }
     }
 
-    //    QList<BaseObject*> lo=GORKA->findChildren<BaseObject*>();
 
-    //    foreach (BaseObject *b, lo) {
-    //        // собираем буфера
-    //        for (int idx = 0; idx < b->metaObject()->propertyCount(); idx++) {
-    //            QMetaProperty metaProperty = b->metaObject()->property(idx);
-    //            int type = metaProperty.userType();
-    //            if (type == qMetaTypeId<SignalDescription>()){
-    //                QVariant val=metaProperty.read(b);
-    //                SignalDescription p = val.value<SignalDescription>();
-    //                if (p.isEmpty())continue;
-    //                if (p.isInnerUse()) {
-    //                    if (l_out_buffers.indexOf(p.getBuffer())<0) {
-    //                        l_out_buffers.push_back(p.getBuffer());
-    //                        p.getBuffer()->static_mode=true;
-    //                    }
-    //                }
-    //            }
-    //        }
-    //    }
     foreach (auto b, udp->allBuffers()) {
         if (!b->static_mode){
-            qDebug()<< "use in buffer " <<b->getType() << b->objectName();
+            ilog(QString("use in buffer %1 %2").arg(b->getType()).arg(b->objectName()));
             // ставим период ТО
             switch (b->type){
             case 1:b->setMsecPeriodLive(2000);b->setSizeData(121); break;
@@ -295,10 +294,10 @@ bool UVK_Central::acceptBuffers()
     }
     foreach (auto b, l_out_buffers) {
         b->sost=GtBuffer::_alive;
-        qDebug()<< "use out buffer " <<b->getType() << b->objectName();
+        ilog(QString("use out buffer %1 %2").arg(b->getType()).arg(b->objectName()));
     }
     foreach (auto b, l_tu_buffers) {
-        qDebug()<< "use tu buffer " <<b->getType() << b->objectName();
+        ilog(QString("use tu buffer %1 %2").arg(b->getType()).arg(b->objectName()));
     }
 
     // проверяем сигналы в буфера на прием
@@ -342,7 +341,7 @@ bool UVK_Central::acceptBuffers()
                 connect(gtNetSB,&GtNetSharedMem::changeBuffer,udp,&GtBuffers_UDP_D2::bufferChanged);
                 gtNetSB->start();
                 gtNetSB->setPriority(QThread::HighPriority);
-                qDebug()<< "use shared mem buffer " <<buf->getType() << buf->objectName();
+                ilog(QString("use shared mem buffer %1 %2").arg(buf->getType()).arg(buf->objectName()));
             }
 
         }

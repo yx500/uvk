@@ -88,10 +88,18 @@ void tos_System_DSO::makeWorkers(ModelGroupGorka *modelGorka)
     foreach (auto rc_park, l_park) {
         l_trc_park.push_back(mRc2TRC[rc_park]);
     }
-
-
-
-
+    foreach (auto strel_Y, l_strel_Y) {
+        NgbStrel *ngb=new NgbStrel;
+        ngb->strel=strel_Y;
+        ngb->trc=mRc2TRC[strel_Y];
+        for (int m=0;m<2;m++){
+            ngb->l_ngb_trc[m].clear();
+            foreach (auto rc, strel_Y->l_ngb_rc[m]) {
+                ngb->l_ngb_trc[m].push_back(mRc2TRC[rc]);
+            }
+        }
+        l_NgbStrel.push_back(ngb);
+    }
 
     resetStates();
 }
@@ -138,14 +146,9 @@ QList<SignalDescription> tos_System_DSO::acceptOutputSignals()
 
     auto l=tos_System::acceptOutputSignals();
 
-    foreach (auto trc, l_trc) {
-        trc->rc->setSIGNAL_BUSY_DSO(trc->rc->SIGNAL_BUSY_DSO().innerUse());         l<<trc->rc->SIGNAL_BUSY_DSO();
-        trc->rc->setSIGNAL_BUSY_DSO_ERR(trc->rc->SIGNAL_BUSY_DSO_ERR().innerUse()); l<<trc->rc->SIGNAL_BUSY_DSO_ERR();
-        trc->rc->setSIGNAL_INFO_DSO(trc->rc->SIGNAL_INFO_DSO().innerUse());         l<<trc->rc->SIGNAL_INFO_DSO();
-        trc->rc->setSIGNAL_BUSY_DSO_STOP(trc->rc->SIGNAL_BUSY_DSO_STOP().innerUse());l<<trc->rc->SIGNAL_BUSY_DSO_STOP();
-
-        trc->rc->SIGNAL_INFO_DSO().getBuffer()->setSizeData(DSO_Data_Max*sizeof(DSO_Data));
-    }
+//    foreach (auto trc, l_trc) {
+//        >>tos_System::acceptOutputSignals();
+//    }
 
     foreach (auto w, l_tdso) {
         l+=w->acceptOutputSignals();
@@ -176,15 +179,7 @@ void tos_System_DSO::state2buffer()
     tos_System::state2buffer();
 
     foreach (auto trc, l_trc) {
-        trc->rc->SIGNAL_BUSY_DSO().setValue_1bit(trc->rc->STATE_BUSY_DSO());
-        trc->rc->SIGNAL_BUSY_DSO_ERR().setValue_1bit(trc->rc->STATE_BUSY_DSO_ERR());
-        trc->rc->SIGNAL_BUSY_DSO_STOP().setValue_1bit(trc->rc->STATE_BUSY_DSO_STOP());
-        trc->rc->SIGNAL_ERR_LS().setValue_1bit(trc->rc->STATE_ERR_LS());
-        trc->rc->SIGNAL_ERR_LZ().setValue_1bit(trc->rc->STATE_ERR_LZ());
-        DSO_Data d;
-        d.V=trc->l_os.size();
-        trc->rc->SIGNAL_INFO_DSO().setValue_data(&d,sizeof (d));
-
+        trc->state2buffer();
     }
 
     foreach (auto w, l_tdso) {
@@ -244,6 +239,8 @@ void tos_System_DSO::work(const QDateTime &T)
     // выставляем занятость по осям
     setDSOBUSY(T);
 
+    // снимаем  негабариты
+    resetNGB();
     // выставляем динамический негабарит
     setNGBDYN(T);
 
@@ -388,12 +385,11 @@ void tos_System_DSO::reset_1_os(const QDateTime &T)
     foreach (auto trc, l_trc) {
         if (trc->l_os.size()==1){
             // прихолится рассматривать по 2 от рц так как могут быиь длиннобазы
+            // 1  не может быть одна -  достаточно по 1 рц
             bool nesnimat=false;
             for (int d=0;d<2;d++){
                 auto rc1=trc->next_rc[d];
                 if ((rc1==nullptr)||(!rc1->l_os.isEmpty())) {nesnimat=true;break;}
-                auto rc2=rc1->next_rc[d];
-                if ((rc2==nullptr)||(!rc2->l_os.isEmpty())) {nesnimat=true;break;}
             }
             if (nesnimat) continue;
             auto os=trc->l_os.first();
@@ -405,62 +401,67 @@ void tos_System_DSO::reset_1_os(const QDateTime &T)
     }
 }
 
-void tos_System_DSO::setDSOBUSY(const QDateTime &T)
+void tos_System_DSO::setDSOBUSY(const QDateTime &)
 {
     foreach (auto trc, l_trc) {
         if (trc->l_os.isEmpty())
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::free); else
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::busy);
     }
-    // выставляем признак остановки
-    foreach (auto trc, l_trc) {
-        if (trc->l_os.isEmpty()){
-            trc->rc->setSTATE_BUSY_DSO_STOP(false);
-            continue;
-        }
-        // находим ос с макс времнем
-        auto t0=trc->l_os.first().t;
-        for (const TOtcepDataOs & os : trc->l_os){
-            if (os.t>t0) t0=os.t;
-        }
-        qreal len_rc=40;
-        if (trc->rc->LEN()!=0) len_rc=trc->rc->LEN();
-        auto ms=t0.msecsTo(T);
-        qint64 ms0=len_rc*3600; // 1 км/ч
-        if (ms>ms0) trc->rc->setSTATE_BUSY_DSO_STOP(true);
-    }
-
 }
 
-void tos_System_DSO::setNGBDYN(const QDateTime &T)
+void tos_System_DSO::resetNGB()
 {
-    foreach (auto trcd, l_trdso) {
-        if (trcd->tdso==nullptr) continue;
-        if (trcd->tdso->dso->NGBDYN_OFFSET()==0) continue;
-        if ((trcd->rc_next[0]==nullptr) || (trcd->rc_next[1]==nullptr)) continue;
-        auto strel=qobject_cast<m_Strel_Gor_Y*>(trcd->rc_next[1]);
-        if (strel==nullptr) continue;
-        int m=3;
-        if (strel->getNextRC(0,0)==trcd->rc_next[0]->rc) m=0;
-        if (strel->getNextRC(0,1)==trcd->rc_next[0]->rc) m=1;
-        if (m==3) continue;
-        bool ngb=false;
-        if (!trcd->rc_next[0]->l_os.isEmpty()){
-            auto os=trcd->rc_next[0]->l_os.back();
-            if ( (os.d!=_forw) &&
-                 (os.v!=_undefV_) &&
-                 (os.v>0) ){
-                auto ms=os.t.msecsTo(T);
-                if (ms>0){
-                    qint64 ms0=trcd->tdso->dso->NGBDYN_OFFSET()/os.v*3600.;
-                    if (ms<ms0) ngb=true;
+    foreach (auto strel, l_strel_Y) {
+        bool  ex_busy=false;
+        foreach (auto rc, strel->l_ngb_rc[0]) {
+            if (rc->STATE_BUSY()==1) ex_busy=true;
+        }
+        if (!ex_busy){
+            strel->setSTATE_UVK_NGBDYN_PL(false);
+            strel->setSTATE_UVK_NGBSTAT_PL(false);
+        }
+        ex_busy=false;
+        foreach (auto rc, strel->l_ngb_rc[1]) {
+            if (rc->STATE_BUSY()==1) ex_busy=true;
+        }
+        if (!ex_busy){
+            strel->setSTATE_UVK_NGBDYN_MN(false);
+            strel->setSTATE_UVK_NGBSTAT_MN(false);
+        }
+    }
+}
+
+void tos_System_DSO::setNGBDYN(const QDateTime &)
+{
+    // выставляем для стрелок где скорость меньше гран
+    foreach (auto ngb, l_NgbStrel) {
+        if (ngb->trc->l_os.isEmpty()) continue;
+        if ((ngb->trc->v_dso!=_undefV_) && (ngb->trc->v_dso>=0)){
+            auto strel=qobject_cast<m_Strel_Gor_Y*>(ngb->trc->rc);
+            if (strel->STATE_POL()==MVP_Enums::pol_plus){
+                if (ngb->trc->v_dso<strel->NEGAB_VGRAN_P()) strel->setSTATE_UVK_NGBDYN_PL(true);
+            }
+            if (strel->STATE_POL()==MVP_Enums::pol_minus){
+                if (ngb->trc->v_dso<strel->NEGAB_VGRAN_M()) strel->setSTATE_UVK_NGBDYN_MN(true);
+            }
+        }
+    }
+}
+
+void tos_System_DSO::setNGBSTAT(const QDateTime &)
+{
+    foreach (auto ngb, l_NgbStrel) {
+        for (int m=0;m<2;m++){
+            foreach (auto trc, ngb->l_ngb_trc[m]) {
+                if ((trc->rc->STATE_BUSY_DSO_STOP())|| (trc->rc->STATE_BUSY_DSO_OSTOP())){
+                    if (m==0) ngb->strel->setSTATE_UVK_NGBSTAT_PL(true);
+                    if (m==1) ngb->strel->setSTATE_UVK_NGBSTAT_MN(true);
                 }
             }
-
         }
-        if (m==0) strel->setSTATE_UVK_NGBDYN_PL(ngb);
-        if (m==1) strel->setSTATE_UVK_NGBDYN_MN(ngb);
     }
+
 }
 
 TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,qreal os_v,const QDateTime &T)
