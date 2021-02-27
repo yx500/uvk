@@ -41,6 +41,8 @@ public:
     void setNGBDYN(const QDateTime &T);
     void setNGBSTAT(const QDateTime &T);
 
+    void set_otcep_STATE_WARN(const QDateTime &T);
+
     TOtcepDataOs moveOs(tos_Rc *rc0, tos_Rc *rc1, int d, qreal os_v, const QDateTime &T);
 
 
@@ -62,7 +64,7 @@ signals:
 public slots:
 protected:
 
-    void set_otcep_STATE_WARN(const QDateTime &T);
+
 
 
 

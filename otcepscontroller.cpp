@@ -245,7 +245,8 @@ bool OtcepsController::cmd_SET_OTCEP_STATE(QMap<QString, QString> &m, QString &a
         int N=m["N"].toInt();
         auto otcep=otceps->otcepByNum(N);
         if (otcep!=nullptr){
-            if ((otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)&&(!otcep->STATE_IS_CURRENT())) {
+            if (((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)||(otcep->STATE_LOCATION()==m_Otcep::locationOnPark))
+                    &&(!otcep->STATE_IS_CURRENT())) {
                 acceptStr=QString("Отцеп %1 попытка изменить выявленный отцеп.").arg(N);
                 return false;
             }

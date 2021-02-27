@@ -15,8 +15,11 @@ struct GacStrel{
     QElapsedTimer pol_cmd_time;
     QDateTime pol_cmd_w_time;
     QElapsedTimer emit_time;
+    QDateTime sred_pol_time;
     bool ERR_PLATA;
     bool ERR_PER;
+    bool BL_PER_DONE;
+    MVP_Enums::TStrelPol pol_UVK_BL_PER_DONE;
 
     bool BL_PER;
     bool BL_PER_SP;
@@ -25,10 +28,15 @@ struct GacStrel{
     bool BL_PER_DB;
     bool BL_PER_NGBSTAT;
     bool BL_PER_NGBDYN;
+    bool BL_SRPOL_TO;
 
 
     SignalDescription SIGNAL_UVK_ERR_PLATA;
     SignalDescription SIGNAL_UVK_ERR_PER;
+    SignalDescription SIGNAL_UVK_PRP_MAR;
+    SignalDescription SIGNAL_UVK_PRM_MAR;
+    SignalDescription SIGNAL_UVK_BL_PER_DONE;
+
 
     SignalDescription SIGNAL_UVK_BL_PER_SP;
     SignalDescription SIGNAL_UVK_BL_PER_DB;
@@ -36,6 +44,8 @@ struct GacStrel{
     SignalDescription SIGNAL_UVK_BL_PER_TLG;
     SignalDescription SIGNAL_UVK_BL_PER_NGBSTAT;
     SignalDescription SIGNAL_UVK_BL_PER_NGBDYN;
+    SignalDescription SIGNAL_UVK_BL_SRPOL_TO;
+
 
 
 
@@ -57,7 +67,7 @@ public:
     void sendCommand(GacStrel *gs, MVP_Enums::TStrelPol pol_cmd, bool force=false);
     void state2buffer()override;
     QList<SignalDescription> acceptOutputSignals() override;
-    void setStateBlockPerevod(GacStrel *gs);
+    void setStateBlockPerevod(GacStrel *gs,const QDateTime &T);
     QList<GacStrel*> l_strel;
 signals:
     void uvk_command(const SignalDescription &s,int state);

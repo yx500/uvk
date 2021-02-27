@@ -146,9 +146,9 @@ QList<SignalDescription> tos_System_DSO::acceptOutputSignals()
 
     auto l=tos_System::acceptOutputSignals();
 
-//    foreach (auto trc, l_trc) {
-//        >>tos_System::acceptOutputSignals();
-//    }
+    //    foreach (auto trc, l_trc) {
+    //        >>tos_System::acceptOutputSignals();
+    //    }
 
     foreach (auto w, l_tdso) {
         l+=w->acceptOutputSignals();
@@ -440,10 +440,14 @@ void tos_System_DSO::setNGBDYN(const QDateTime &)
         if ((ngb->trc->v_dso!=_undefV_) && (ngb->trc->v_dso>=0)){
             auto strel=qobject_cast<m_Strel_Gor_Y*>(ngb->trc->rc);
             if (strel->STATE_POL()==MVP_Enums::pol_plus){
-                if (ngb->trc->v_dso<strel->NEGAB_VGRAN_P()) strel->setSTATE_UVK_NGBDYN_PL(true);
+                if ((!ngb->l_ngb_trc[0].isEmpty())&&(ngb->l_ngb_trc[0].first()->rc->STATE_BUSY()==MVP_Enums::busy)){
+                    if (ngb->trc->v_dso<strel->NEGAB_VGRAN_P()) strel->setSTATE_UVK_NGBDYN_PL(true); else  strel->setSTATE_UVK_NGBDYN_PL(false);
+                }
             }
             if (strel->STATE_POL()==MVP_Enums::pol_minus){
-                if (ngb->trc->v_dso<strel->NEGAB_VGRAN_M()) strel->setSTATE_UVK_NGBDYN_MN(true);
+                if ((!ngb->l_ngb_trc[1].isEmpty())&&(ngb->l_ngb_trc[1].first()->rc->STATE_BUSY()==MVP_Enums::busy)){
+                    if (ngb->trc->v_dso<strel->NEGAB_VGRAN_M()) strel->setSTATE_UVK_NGBDYN_MN(true);else  strel->setSTATE_UVK_NGBDYN_MN(false);
+                }
             }
         }
     }
@@ -537,46 +541,52 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
         int warn1=0;
         int warn2=0;
         if (!otcep->STATE_ENABLED()) continue;
-        // стрелки в среднем положении
+
         if (act_zkr!=nullptr){
-            if ((otcep->STATE_GAC_ACTIVE())||(otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) {
-                if (otcep->STATE_MAR()>0){
-                    auto m=modelGorka->getMarshrut(act_zkr->PUT_NADVIG(),otcep->STATE_MAR());
-                    // идем по маршруту
-                    bool b=false;
-                    if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib) b=true;
-                    for (const RcInMarsrut&mr :m->l_rc){
-                        if (!b){
-                            if (mr.rc==otcep->RCS) {
-                                b=true;
-                                continue;
+            if ((otcep->STATE_MAR()>0)&&((otcep->STATE_GAC_ACTIVE())||(otcep->STATE_LOCATION()==m_Otcep::locationOnPrib))) {
+                auto m=modelGorka->getMarshrut(act_zkr->PUT_NADVIG(),otcep->STATE_MAR());
+                // идем по маршруту
+                bool begin_found=false;
+                if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) begin_found=true;
+                for (const RcInMarsrut&mr :m->l_rc){
+                    // идем по маршруту с головы отцепа
+                    if (!begin_found){
+                        if (mr.rc==otcep->RCS) begin_found=true;
+                        continue;
+                    }
+                    if (warn1==0){
+                        // стрелки в среднем положении
+                        m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
+                        if (str!=nullptr){
+                            if ((str->STATE_A()==0) && (str->STATE_POL()!=mr.pol)){
+                                warn1=1;
                             }
-                        } else {
-                            if (warn1==0){
-                                m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
-                                if (str!=nullptr){
-                                    if ((str->STATE_A()==0) && (str->STATE_POL()!=mr.pol)){
-                                        warn1=1;
-                                    }
-                                }
-                                auto str1=qobject_cast<m_Strel_Gor*>(mr.rc) ;
-                                if (str1!=nullptr){
-                                    if (str1->STATE_POL()!=mr.pol){
-                                        warn1=1;
-                                    }
-                                }
-                            }
-                            if (warn2==0){
-                                if ((mr.rc->MINWAY()!=mr.rc->MAXWAY())&&
-                                        ((mr.rc->STATE_BUSY_DSO_ERR())||(mr.rc->STATE_BUSY_DSO_STOP()))
-                                         ){
-                                    warn2=1;
-                                }
+                        }
+                        auto str1=qobject_cast<m_Strel_Gor*>(mr.rc) ;
+                        if (str1!=nullptr){
+                            if (str1->STATE_POL()!=mr.pol){
+                                warn1=1;
                             }
                         }
                     }
-                }
+                    if (warn2==0){
+                        // что то стоит на пути
+                        if ((mr.rc->MINWAY()!=mr.rc->MAXWAY())&&
+                                ((mr.rc->STATE_BUSY_DSO_ERR())||(mr.rc->STATE_BUSY_DSO_STOP()))
+                                ){
+                            warn2=1;
+                        }
+                        // негабаритность
+                        m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
+                        if (str!=nullptr){
+                            if ((str->STATE_UVK_NGBDYN_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) warn1=1;
+                            if ((str->STATE_UVK_NGBDYN_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  warn1=1;
+                            if ((str->STATE_UVK_NGBSTAT_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) warn1=1;
+                            if ((str->STATE_UVK_NGBSTAT_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  warn1=1;
+                        }
 
+                    }
+                }
             }
         }
         otcep->setSTATE_GAC_W_STRA(warn1);

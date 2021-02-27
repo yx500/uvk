@@ -15,6 +15,10 @@ GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
         if (!s.isEmpty()){
             gstr->SIGNAL_UVK_ERR_PLATA=     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+1).innerUse();
             gstr->SIGNAL_UVK_ERR_PER  =     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+2).innerUse();
+            gstr->SIGNAL_UVK_PRP_MAR  =     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+3).innerUse();
+            gstr->SIGNAL_UVK_PRM_MAR  =     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+4).innerUse();
+            gstr->SIGNAL_UVK_BL_PER_DONE  = SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+5).innerUse();
+
         }
 
         s=strel->SIGNAL_UVK_BL_PER();
@@ -25,6 +29,7 @@ GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
             gstr->SIGNAL_UVK_BL_PER_TLG=    SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+4).innerUse();
             gstr->SIGNAL_UVK_BL_PER_NGBSTAT=SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+5).innerUse();
             gstr->SIGNAL_UVK_BL_PER_NGBDYN= SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+6).innerUse();
+            gstr->SIGNAL_UVK_BL_SRPOL_TO=   SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+7).innerUse();
         }
 
 
@@ -49,14 +54,19 @@ QList<SignalDescription> GtGac::acceptOutputSignals()
         gstr->strel->setTU_PRM(gstr->strel->TU_PRM().innerUse());                   l << gstr->strel->TU_PRM();
         gstr->strel->setSIGNAL_UVK_BL_PER(gstr->strel->SIGNAL_UVK_BL_PER().innerUse());         l << gstr->strel->SIGNAL_UVK_BL_PER();
         l << gstr->SIGNAL_UVK_ERR_PLATA<<
-             gstr->SIGNAL_UVK_ERR_PER;
+             gstr->SIGNAL_UVK_ERR_PER<<
+             gstr->SIGNAL_UVK_PRP_MAR<<
+             gstr->SIGNAL_UVK_PRM_MAR<<
+             gstr->SIGNAL_UVK_BL_PER_DONE;
+
 
         l << gstr->SIGNAL_UVK_BL_PER_SP <<
              gstr->SIGNAL_UVK_BL_PER_DB <<
              gstr->SIGNAL_UVK_BL_PER_OTC <<
              gstr->SIGNAL_UVK_BL_PER_TLG <<
              gstr->SIGNAL_UVK_BL_PER_NGBSTAT <<
-             gstr->SIGNAL_UVK_BL_PER_NGBDYN;
+             gstr->SIGNAL_UVK_BL_PER_NGBDYN<<
+             gstr->SIGNAL_UVK_BL_SRPOL_TO;
 
     }
     return l;
@@ -73,6 +83,17 @@ void GtGac::state2buffer()
         gs->SIGNAL_UVK_ERR_PLATA.setValue_1bit(gs->ERR_PLATA);
         gs->SIGNAL_UVK_ERR_PER.setValue_1bit(gs->ERR_PER);
 
+        bool pol_plus=false;
+        bool pol_minus=false;
+        if (gs->pol_mar==MVP_Enums::pol_plus) pol_plus=true;
+        if (gs->pol_mar==MVP_Enums::pol_minus) pol_minus=true;
+        gs->SIGNAL_UVK_PRP_MAR.setValue_1bit(pol_plus);
+        gs->SIGNAL_UVK_PRM_MAR.setValue_1bit(pol_minus);
+        gs->SIGNAL_UVK_BL_PER_DONE.setValue_1bit(gs->BL_PER_DONE);
+
+
+
+
         gs->strel->SIGNAL_UVK_BL_PER().setValue_1bit(gs->BL_PER);
 
         gs->SIGNAL_UVK_BL_PER_SP.setValue_1bit(gs->BL_PER_SP);
@@ -81,6 +102,7 @@ void GtGac::state2buffer()
         gs->SIGNAL_UVK_BL_PER_TLG.setValue_1bit(gs->BL_PER_TLG);
         gs->SIGNAL_UVK_BL_PER_NGBSTAT.setValue_1bit(gs->BL_PER_NGBSTAT);
         gs->SIGNAL_UVK_BL_PER_NGBDYN.setValue_1bit(gs->BL_PER_NGBDYN);
+        gs->SIGNAL_UVK_BL_SRPOL_TO.setValue_1bit(gs->BL_SRPOL_TO);
     }
 }
 
@@ -91,9 +113,15 @@ void GtGac::state2buffer()
 void GtGac::resetStates()
 {
     for (auto gs : l_strel){
+        gs->ERR_PLATA=false;
+        gs->ERR_PER=false;
+        gs->sred_pol_time=QDateTime();
+        gs->pol_cmd_w_time=QDateTime();
+        gs->BL_PER_DONE=false;
         gs->pol_zad=MVP_Enums::pol_unknow;
         sendCommand(gs,MVP_Enums::pol_unknow,true);
     }
+
 }
 
 bool collectTree(m_RC * rc,QList<m_RC_Gor*> &l)
@@ -166,30 +194,7 @@ void GtGac::validation(ListObjStr *l) const
 
 
 
-bool isNegabarit(m_Strel_Gor_Y*strel,MVP_Enums::TStrelPol pol)
-{
-    if (pol==MVP_Enums::pol_plus){
-        if (strel->NEGAB_RC_CNT_M()>0){
-            m_RC* rc=strel->getNextRC(0,1);
-            for(int i=0;i<strel->NEGAB_RC_CNT_M();i++){
-                if (rc==nullptr) return false;
-                if (rc->STATE_BUSY()==1) return true;
-                rc=rc->getNextRC(0,0);
-            }
-        }
-    }
-    if (pol==MVP_Enums::pol_minus){
-        if (strel->NEGAB_RC_CNT_P()>0){
-            m_RC* rc=strel->getNextRC(0,0);
-            for(int i=0;i<strel->NEGAB_RC_CNT_P();i++){
-                if (rc==nullptr) return false;
-                if (rc->STATE_BUSY()==1) return true;
-                rc=rc->getNextRC(0,0);
-            }
-        }
-    }
-    return false;
-}
+
 
 void GtGac::reset_STATE_GAC_ACTIVE()
 {
@@ -232,16 +237,26 @@ void GtGac::work(const QDateTime &T)
 
     // выставляем блокировку перевода
     for (auto gs : l_strel){
-        setStateBlockPerevod(gs);
+        setStateBlockPerevod(gs,T);
     }
 
     for (auto gs : l_strel){
         gs->pol_zad=MVP_Enums::pol_unknow;
         gs->pol_mar=MVP_Enums::pol_unknow;
-        // убираем автовозврат
-        if (gs->strel->STATE_A()!=1) {
+
+        if (gs->strel->STATE_A()==1) {
+            // выставляем время ср
+            if (!gs->sred_pol_time.isValid()) gs->sred_pol_time=T;
+        } else {
+            gs->sred_pol_time=QDateTime();
+            // убираем автовозврат
             gs->strel->setSTATE_UVK_AV(false);
             gs->ERR_PER=false;
+            gs->BL_PER_DONE=false;
+        }
+        // снимаем признак отхлопывания
+        if (gs->BL_PER_DONE) {
+            if (gs->pol_UVK_BL_PER_DONE!=gs->strel->STATE_POL())gs->BL_PER_DONE=false;
         }
     }
 
@@ -258,6 +273,8 @@ void GtGac::work(const QDateTime &T)
         // определяем на стрелках нужное для отцепов положение pol_mar
         foreach (m_Otcep *otcep, otceps->otceps()) {
             if (!otcep->STATE_ENABLED()) continue;
+            if ((modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk)&&
+                    (modelGorka->STATE_REGIM()!=ModelGroupGorka::regimPausa)) continue;
 
             if (!otcep->STATE_GAC_ACTIVE()) continue;
 
@@ -333,61 +350,73 @@ void GtGac::work(const QDateTime &T)
                 rc=rc->next_rc[_forw];
             }
         }
+    }
 
-        // определяем возможность команды на перевод
-        for (auto gs : l_strel){
-            if ((modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk)&&
-                    (modelGorka->STATE_REGIM()!=ModelGroupGorka::regimPausa)) continue;
-            if (gs->pol_mar==MVP_Enums::pol_unknow) continue;
-            if (gs->strel->STATE_POL()==gs->pol_mar) continue;
-            if (gs->strel->STATE_A()!=1) continue;
+    // определяем возможность команды на перевод
+    for (auto gs : l_strel){
+        if (gs->strel->STATE_A()!=1) continue;
+        if (gs->BL_PER) continue;
 
-            if (gs->BL_PER) continue;
-
-            gs->pol_zad=gs->pol_mar;
+        // перевод при блокировке
+        if ((gs->strel->STATE_UVK_NGBSTAT_PL())&&(gs->strel->STATE_POL()!=MVP_Enums::pol_plus)){
+            gs->pol_zad=MVP_Enums::pol_plus;
+            gs->pol_UVK_BL_PER_DONE=gs->pol_zad;
+            gs->BL_PER_DONE=true;
+            continue;
         }
-
-        // задаем команды
-        for (auto gs : l_strel){
-            sendCommand(gs,gs->pol_zad);
+        // перевод при блокировке
+        if ((gs->strel->STATE_UVK_NGBSTAT_MN())&&(gs->strel->STATE_POL()!=MVP_Enums::pol_minus)){
+            gs->pol_zad=MVP_Enums::pol_minus;
+            gs->pol_UVK_BL_PER_DONE=gs->pol_zad;
+            gs->BL_PER_DONE=true;
+            continue;
         }
+        // перевод по маршруту
+        if (gs->pol_mar==MVP_Enums::pol_unknow) continue;
+        if (gs->strel->STATE_POL()==gs->pol_mar) continue;
+        gs->pol_zad=gs->pol_mar;
+    }
 
-        // проверки времени перевода
-        for (auto gs : l_strel){
-            if (gs->pol_cmd!=MVP_Enums::pol_unknow){
-                // определям начало перевода по команде
-                if (gs->strel->STATE_POL()==MVP_Enums::pol_w){
-                    // начало потери контроля
-                    if (!gs->pol_cmd_w_time.isValid()) gs->pol_cmd_w_time=T;
-                }
+    // задаем команды
+    for (auto gs : l_strel){
+        sendCommand(gs,gs->pol_zad);
+    }
+
+    // проверки времени перевода
+    for (auto gs : l_strel){
+        if (gs->pol_cmd!=MVP_Enums::pol_unknow){
+            // определям начало перевода по команде
+            if (gs->strel->STATE_POL()==MVP_Enums::pol_w){
+                // начало потери контроля
+                if (!gs->pol_cmd_w_time.isValid()) gs->pol_cmd_w_time=T;
             }
         }
-        // определям автовозврат
-        for (auto gs : l_strel){
-            if (gs->pol_cmd_w_time.isValid()){
-                if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
-                    if (gs->pol_cmd!=gs->strel->STATE_POL()){
-                        qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
-                        if ((ms>100) &&(ms<2000)) {
-                            gs->strel->setSTATE_UVK_AV(true);
-                        }
-                    } else {
-                        // перевелась таки
-                        gs->ERR_PER=false;
+    }
+    // определям автовозврат
+    for (auto gs : l_strel){
+        if (gs->pol_cmd_w_time.isValid()){
+            if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
+                if (gs->pol_cmd!=gs->strel->STATE_POL()){
+                    qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
+                    if ((ms>100) &&(ms<2000)) {
+                        gs->strel->setSTATE_UVK_AV(true);
                     }
+                } else {
+                    // перевелась таки
+                    gs->ERR_PER=false;
                 }
             }
         }
-        // определям общий неперевод
-        for (auto gs : l_strel){
-            if (gs->pol_cmd==MVP_Enums::pol_w) continue;
-            if (gs->pol_cmd!=gs->strel->STATE_POL()){
-                if ((gs->pol_cmd_time.isValid())&&(gs->pol_cmd_time.elapsed()>=5000)){
-                    gs->ERR_PER=true;
-                }
+    }
+    // определям общий неперевод
+    for (auto gs : l_strel){
+        if (gs->pol_cmd==MVP_Enums::pol_unknow) continue;
+        if (gs->pol_cmd!=gs->strel->STATE_POL()){
+            if ((gs->pol_cmd_time.isValid())&&(gs->pol_cmd_time.elapsed()>=5000)){
+                gs->ERR_PER=true;
             }
+        }
 
-        }
     }
 
     //сбраcываем таймер
@@ -398,7 +427,7 @@ void GtGac::work(const QDateTime &T)
 }
 
 
-void GtGac::setStateBlockPerevod(GacStrel *gs)
+void GtGac::setStateBlockPerevod(GacStrel *gs,const QDateTime &T)
 {
     if (otceps->otcepOnRc(gs->strel)!=nullptr) gs->BL_PER_OTC=true;else gs->BL_PER_OTC=false;
     bool sp=false;
@@ -413,26 +442,31 @@ void GtGac::setStateBlockPerevod(GacStrel *gs)
 
     gs->BL_PER_TLG=gs->strel->STATE_UVK_TLG();
 
-    // добавить рассылку стэйта
-    gs->BL_PER_NGBSTAT=isNegabarit(gs->strel,gs->strel->STATE_POL());
-
     gs->BL_PER_NGBDYN=false;
+    gs->BL_PER_NGBSTAT=false;
     // yнельзя переод чтоб оставлся негабарит
-    if (gs->strel->STATE_POL()==MVP_Enums::pol_plus){
-        if (gs->strel->STATE_UVK_NGBDYN_PL()) gs->BL_PER_NGBDYN=true;
-    }
-    if (gs->strel->STATE_POL()==MVP_Enums::pol_minus){
-        if (gs->strel->STATE_UVK_NGBDYN_MN()) gs->BL_PER_NGBDYN=true;
-    }
+    if ((gs->strel->STATE_UVK_NGBDYN_PL())&&(gs->strel->STATE_POL()==MVP_Enums::pol_plus)) gs->BL_PER_NGBDYN=true;
+    if ((gs->strel->STATE_UVK_NGBDYN_MN())&&(gs->strel->STATE_POL()==MVP_Enums::pol_minus)) gs->BL_PER_NGBDYN=true;
+    if ((gs->strel->STATE_UVK_NGBSTAT_PL())&&(gs->strel->STATE_POL()==MVP_Enums::pol_plus)) gs->BL_PER_NGBSTAT=true;
+    if ((gs->strel->STATE_UVK_NGBSTAT_MN())&&(gs->strel->STATE_POL()==MVP_Enums::pol_minus)) gs->BL_PER_NGBSTAT=true;
 
+    // задержка на выставление ссреднего положения стрелки
+    gs->BL_SRPOL_TO=false;
+    if (gs->strel->STATE_A()==1) {
+        if ((!gs->sred_pol_time.isValid())||(gs->sred_pol_time.msecsTo(T)<500)) gs->BL_SRPOL_TO=true;
+    }
 
     gs->BL_PER=gs->BL_PER_OTC |
             gs->BL_PER_SP |
             gs->BL_PER_DB |
-            gs->BL_PER_TLG |
             gs->BL_PER_NGBSTAT |
             gs->BL_PER_NGBDYN |
+            gs->BL_SRPOL_TO |
             gs->strel->STATE_UVK_AV();
+
+
+
+    //gs->BL_PER=gs->BL_PER |gs->BL_PER_TLG ;
 
 }
 
