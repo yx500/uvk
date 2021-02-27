@@ -32,8 +32,9 @@ void tos_OtcepData::resetTracking()
     otcep->setSTATE_ZKR_PROGRESS(0);
     otcep->setSTATE_ZKR_S_IN(0);
 
-    otcep->setSTATE_GAC_ACTIVE(0);
+    //otcep->setSTATE_GAC_ACTIVE(0);
     otcep->setSTATE_GAC_W_STRA(0);
+    otcep->setSTATE_GAC_W_STRB(0);
 
     otcep->setSTATE_KZP_OS(m_Otcep::kzpUnknow);
     otcep->setSTATE_V(_undefV_);

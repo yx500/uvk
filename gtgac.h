@@ -78,7 +78,7 @@ protected:
     QList<m_RC_Gor_ZKR*> l_zkr;
     QMap<m_RC *,GacStrel*> mRC2GS;
 
-    void reset_STATE_GAC_ACTIVE();
+    void set_STATE_GAC_ACTIVE();
 
 
 };

@@ -7,6 +7,7 @@
 
 int testMode=0;
 int testMode_no_send=0;
+int testMode_no_check_alive=0;
 
 static gtapp_watchdog dog("dd");
 class IUVKGetNewOtcep :public IGetNewOtcep
@@ -25,7 +26,7 @@ UVK_Central::UVK_Central(QObject *parent) : QObject(parent)
 
 bool UVK_Central::init(QString fileNameIni)
 {
-    if (QFileInfo(fileNameIni).exists()){
+    if (QFileInfo::exists(fileNameIni)){
         qDebug() << "ini load:" << QFileInfo(fileNameIni).absoluteFilePath();
         {
             QSettings settings(fileNameIni,QSettings::IniFormat);
@@ -36,6 +37,7 @@ bool UVK_Central::init(QString fileNameIni)
 
             testMode=settings.value("test/mode",0).toInt();
             testMode_no_send=settings.value("test/no_send",0).toInt();
+            testMode_no_check_alive=settings.value("test/no_check_alive",0).toInt();
             watchdog=new gtapp_watchdog(qPrintable(settings.value("main/watchdog","uvk").toString()));
             settings.beginGroup("shared_memory");
             sl_memshared_buffers= settings.childKeys();
@@ -53,6 +55,7 @@ bool UVK_Central::init(QString fileNameIni)
             fileNameIni=settings.fileName();
             settings.setValue("test/mode","0");
             settings.setValue("test/no_send","0");
+            settings.setValue("test/no_check_alive","0");
             settings.setValue("shared_memory/name_of_ts_buffer","1");
 
         }
@@ -61,7 +64,7 @@ bool UVK_Central::init(QString fileNameIni)
     }
 
 
-    if (!QFileInfo(fileNameModel).exists()){
+    if (!QFileInfo::exists(fileNameModel)){
         qFatal("file not found %s",QFileInfo(fileNameModel).absoluteFilePath().toStdString().c_str());
         return false;
     }
@@ -169,7 +172,7 @@ void UVK_Central::start()
 
     sendBuffers(_all);
 
-    start_time=QDateTime::currentDateTime().toTime_t();
+    start_time=QDateTime::currentDateTimeUtc().toTime_t();
 
     timer_work->start(100);
     timer_send->start(50);
@@ -285,7 +288,7 @@ bool UVK_Central::acceptBuffers()
             switch (b->type){
             case 1:b->setMsecPeriodLive(2000);b->setSizeData(121); break;
             }
-            if (testMode==1){
+            if (testMode_no_check_alive==1){
                 switch (b->type){
                 case 1:b->setMsecPeriodLive(0);break;
                 }

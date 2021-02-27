@@ -47,7 +47,7 @@ GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
 QList<SignalDescription> GtGac::acceptOutputSignals()
 {
     QList<SignalDescription> l;
-    for (auto gstr : l_strel){
+    foreach (auto gstr ,l_strel){
         gstr->strel->setSIGNAL_UVK_PRP(gstr->strel->SIGNAL_UVK_PRP().innerUse());   l << gstr->strel->SIGNAL_UVK_PRP();
         gstr->strel->setSIGNAL_UVK_PRM(gstr->strel->SIGNAL_UVK_PRM().innerUse());   l << gstr->strel->SIGNAL_UVK_PRM();
         gstr->strel->setSIGNAL_UVK_AV(gstr->strel->SIGNAL_UVK_AV().innerUse());     l << gstr->strel->SIGNAL_UVK_AV();
@@ -76,7 +76,7 @@ QList<SignalDescription> GtGac::acceptOutputSignals()
 
 void GtGac::state2buffer()
 {
-    for (auto gs : l_strel){
+    foreach (auto gs ,l_strel){
         gs->strel->SIGNAL_UVK_PRP().setValue_1bit(gs->strel->STATE_UVK_PRP());
         gs->strel->SIGNAL_UVK_PRM().setValue_1bit(gs->strel->STATE_UVK_PRM());
         gs->strel->SIGNAL_UVK_AV().setValue_1bit(gs->strel->STATE_UVK_AV());
@@ -113,7 +113,7 @@ void GtGac::state2buffer()
 
 void GtGac::resetStates()
 {
-    for (auto gs : l_strel){
+    foreach (auto gs ,l_strel){
         gs->ERR_PLATA=false;
         gs->ERR_PER=false;
         gs->sred_pol_time=QDateTime();
@@ -197,13 +197,28 @@ void GtGac::validation(ListObjStr *l) const
 
 
 
-void GtGac::reset_STATE_GAC_ACTIVE()
+void GtGac::set_STATE_GAC_ACTIVE()
 {
-    // выключем отцепы
+    if (!FSTATE_ENABLED) {
+        foreach (m_Otcep *otcep, otceps->otceps())   otcep->setSTATE_GAC_ACTIVE(0);
+        return;
+    }
+
+    // включаем  1 отцеп
     auto otcep1=otceps->topOtcep();
     foreach (m_Otcep *otcep, otceps->otceps()) {
-        if (!otcep->STATE_ENABLED()) continue;
+        if (otcep->STATE_ENABLED()){
+            if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib){
+                if (otcep==otcep1)
+                    otcep->setSTATE_GAC_ACTIVE(1); else
+                    otcep->setSTATE_GAC_ACTIVE(0);
+            }
+        }else  otcep->setSTATE_GAC_ACTIVE(0);
+    }
 
+    // выключем отцепы
+    foreach (m_Otcep *otcep, otceps->otceps()) {
+        if (!otcep->STATE_ENABLED()) continue;
         if (!otcep->STATE_GAC_ACTIVE()) continue;
         int act=1;
 
@@ -225,8 +240,11 @@ void GtGac::reset_STATE_GAC_ACTIVE()
         // реализован
         auto rcs=qobject_cast<m_RC_Gor*>(otcep->RCS);
         if ((rcs!=nullptr)&&(rcs->MINWAY()==rcs->MAXWAY())) act=0;
+        if (act!=otcep->STATE_GAC_ACTIVE()){
+            otcep->setSTATE_GAC_ACTIVE(act);
+        }
 
-        otcep->setSTATE_GAC_ACTIVE(act);
+
     }
 
 
@@ -237,11 +255,11 @@ void GtGac::work(const QDateTime &T)
 {
 
     // выставляем блокировку перевода
-    for (auto gs : l_strel){
+    foreach (auto gs ,l_strel){
         setStateBlockPerevod(gs,T);
     }
 
-    for (auto gs : l_strel){
+    foreach (auto gs ,l_strel){
         gs->pol_zad=MVP_Enums::pol_unknow;
         gs->pol_mar=MVP_Enums::pol_unknow;
 
@@ -261,13 +279,11 @@ void GtGac::work(const QDateTime &T)
         }
     }
 
-    // включаем  1 отцеп
+    //   1 отцеп
     auto otcep1=otceps->topOtcep();
-    if (FSTATE_ENABLED) {
-        if (otcep1!=nullptr) otcep1->setSTATE_GAC_ACTIVE(1);
-    }
+
     // выключем отцепы
-    reset_STATE_GAC_ACTIVE();
+    set_STATE_GAC_ACTIVE();
 
     auto act_zkr=modelGorka->active_zkr();
     if (FSTATE_ENABLED) {
@@ -354,7 +370,7 @@ void GtGac::work(const QDateTime &T)
     }
 
     // определяем возможность команды на перевод
-    for (auto gs : l_strel){
+    foreach (auto gs ,l_strel){
         if (gs->strel->STATE_A()!=1) continue;
         if (gs->BL_PER) continue;
 
@@ -379,12 +395,12 @@ void GtGac::work(const QDateTime &T)
     }
 
     // задаем команды
-    for (auto gs : l_strel){
+    foreach (auto gs ,l_strel){
         sendCommand(gs,gs->pol_zad);
     }
 
     // проверки времени перевода
-    for (auto gs : l_strel){
+    foreach (auto gs ,l_strel){
         if (gs->pol_cmd!=MVP_Enums::pol_unknow){
             // определям начало перевода по команде
             if (gs->strel->STATE_POL()==MVP_Enums::pol_w){
@@ -394,23 +410,26 @@ void GtGac::work(const QDateTime &T)
         }
     }
     // определям автовозврат
-    for (auto gs : l_strel){
-        if (gs->pol_cmd_w_time.isValid()){
-            if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
-                if (gs->pol_cmd!=gs->strel->STATE_POL()){
-                    qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
-                    if ((ms>100) &&(ms<2000)) {
-                        gs->strel->setSTATE_UVK_AV(true);
+    foreach (auto gs ,l_strel){
+        if (gs->pol_cmd!=MVP_Enums::pol_unknow){
+            if (gs->pol_cmd_w_time.isValid()){
+                if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
+                    if (gs->pol_cmd!=gs->strel->STATE_POL()){
+                        qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
+                        if ((ms>100) &&(ms<2000)) {
+                            gs->strel->setSTATE_UVK_AV(true);
+                        }
+                    } else {
+                        // перевелась таки
+                        gs->ERR_PER=false;
                     }
-                } else {
-                    // перевелась таки
-                    gs->ERR_PER=false;
                 }
+
             }
         }
     }
     // определям общий неперевод
-    for (auto gs : l_strel){
+    foreach (auto gs ,l_strel){
         if (gs->pol_cmd==MVP_Enums::pol_unknow) continue;
         if (gs->pol_cmd!=gs->strel->STATE_POL()){
             if ((gs->pol_cmd_time.isValid())&&(gs->pol_cmd_time.elapsed()>=5000)){
@@ -421,7 +440,7 @@ void GtGac::work(const QDateTime &T)
     }
 
     //сбраcываем таймер
-    for (auto gs : l_strel){
+    foreach (auto gs ,l_strel){
         if (gs->strel->STATE_POL()!=MVP_Enums::pol_w) gs->pol_cmd_w_time=QDateTime();
     }
 
@@ -504,7 +523,7 @@ void GtGac::sendCommand(GacStrel * gs, MVP_Enums::TStrelPol pol_cmd,bool force)
         if (((gs->strel->STATE_UVK_PRP()!=gs->strel->STATE_PRP()))||
                 ((gs->strel->STATE_UVK_PRM()!=gs->strel->STATE_PRM()))){
             // не забиваем сеть
-            if ((gs->pol_cmd_time.isValid())||(gs->pol_cmd_time.elapsed()>20)){
+            if ((gs->pol_cmd_time.isValid())||(gs->emit_time.elapsed()>20)){
                 emit uvk_command(gs->strel->TU_PRP(),gs->strel->STATE_UVK_PRP());
                 emit uvk_command(gs->strel->TU_PRM(),gs->strel->STATE_UVK_PRM());
                 gs->emit_time.restart();

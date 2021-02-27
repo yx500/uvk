@@ -84,9 +84,7 @@ QList<SignalDescription> tos_System::acceptOutputSignals()
 void tos_System::state2buffer()
 {
 
-    foreach (auto trc, l_trc) {
-        trc->state2buffer();
-    }
+
     // а мы ничего не посылаем для этого есть OtcepsController
     //    foreach (auto otcep, lo) {
     //        otcep->tos->state2buffer();

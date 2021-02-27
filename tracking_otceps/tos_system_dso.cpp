@@ -410,6 +410,10 @@ void tos_System_DSO::reset_1_os(const QDateTime &T)
 void tos_System_DSO::setDSOBUSY(const QDateTime &)
 {
     foreach (auto trc, l_trc) {
+        if (trc->rc->STATE_BUSY_DSO_ERR()){
+            trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::busy);
+            continue;
+        }
         if (trc->l_os.isEmpty())
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::free); else
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::busy);
@@ -561,18 +565,19 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
                         continue;
                     }
                     if (warn1==0){
-                        // стрелки в среднем положении
-                        m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
-                        if (str!=nullptr){
-                            if ((str->STATE_A()==0) && (str->STATE_POL()!=mr.pol)){
-                                warn1=1;
-                            }
-                        }
+
                         auto str1=qobject_cast<m_Strel_Gor*>(mr.rc) ;
                         if (str1!=nullptr){
+                            bool bw=false;
                             if (str1->STATE_POL()!=mr.pol){
-                                warn1=1;
+                                bw=true;
+                                // стрелки в среднем положении
+                                m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(str1) ;
+                                if (str!=nullptr){
+                                    if (str->STATE_A()==1) bw=false;
+                                }
                             }
+                            if (bw) warn1=1;
                         }
                     }
                     if (warn2==0){

@@ -139,7 +139,7 @@ void tos_Rc::set_v_dso(const QDateTime &T)
     // находим ос с макс времнем
     if (!l_os.isEmpty()) {
         auto os0=l_os.first();
-        for (const TOtcepDataOs & os : l_os){
+        for (const TOtcepDataOs & os : qAsConst(l_os)){
             if ((os.v!=_undefV_)&&(os.t>os0.t)) os0=os;
         }
         if (os0.v!=_undefV_){
