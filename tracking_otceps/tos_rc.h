@@ -22,6 +22,10 @@ struct TOtcepData{
     bool operator != (const TOtcepData& r) const {
         return memcmp(this, &r, sizeof(r));
     }
+    TOtcepData& operator = (const TOtcepData& r)  {
+        memcpy(this, &r, sizeof(r));
+        return *this;
+    }
 };
 
 struct TOtcepDataOs{

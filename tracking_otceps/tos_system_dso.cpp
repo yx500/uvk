@@ -162,13 +162,15 @@ QList<SignalDescription> tos_System_DSO::acceptOutputSignals()
 
     foreach (auto w, l_tdsopair) {
         if (w->strel!=nullptr){
-            w->strel->setSIGNAL_UVK_TLG(w->strel->SIGNAL_UVK_TLG().innerUse());
-            l<< w->strel->SIGNAL_UVK_TLG();
+            w->strel->setSIGNAL_UVK_TLG(w->strel->SIGNAL_UVK_TLG().innerUse());l<< w->strel->SIGNAL_UVK_TLG();
 
-            w->strel->setSIGNAL_UVK_NGBDYN_PL(w->strel->SIGNAL_UVK_NGBDYN_PL().innerUse());
-            w->strel->setSIGNAL_UVK_NGBDYN_MN(w->strel->SIGNAL_UVK_NGBDYN_MN().innerUse());
-            l<< w->strel->SIGNAL_UVK_NGBDYN_PL();
-            l<< w->strel->SIGNAL_UVK_NGBDYN_MN();
+
+            w->strel->setSIGNAL_UVK_NGBDYN_PL(w->strel->SIGNAL_UVK_NGBDYN_PL().innerUse());l<< w->strel->SIGNAL_UVK_NGBDYN_PL();
+            w->strel->setSIGNAL_UVK_NGBDYN_MN(w->strel->SIGNAL_UVK_NGBDYN_MN().innerUse());l<< w->strel->SIGNAL_UVK_NGBDYN_MN();
+            w->strel->setSIGNAL_UVK_NGBSTAT_PL(w->strel->SIGNAL_UVK_NGBSTAT_PL().innerUse());l<< w->strel->SIGNAL_UVK_NGBSTAT_PL();
+            w->strel->setSIGNAL_UVK_NGBSTAT_MN(w->strel->SIGNAL_UVK_NGBSTAT_MN().innerUse());l<< w->strel->SIGNAL_UVK_NGBSTAT_MN();
+
+
         }
     }
 
@@ -197,6 +199,8 @@ void tos_System_DSO::state2buffer()
             w->strel->SIGNAL_UVK_TLG().setValue_1bit(w->strel->STATE_UVK_TLG());
             w->strel->SIGNAL_UVK_NGBDYN_PL().setValue_1bit(w->strel->STATE_UVK_NGBDYN_PL());
             w->strel->SIGNAL_UVK_NGBDYN_MN().setValue_1bit(w->strel->STATE_UVK_NGBDYN_MN());
+            w->strel->SIGNAL_UVK_NGBSTAT_PL().setValue_1bit(w->strel->STATE_UVK_NGBSTAT_PL());
+            w->strel->SIGNAL_UVK_NGBSTAT_MN().setValue_1bit(w->strel->STATE_UVK_NGBSTAT_MN());
         }
     }
 }
@@ -243,6 +247,8 @@ void tos_System_DSO::work(const QDateTime &T)
     resetNGB();
     // выставляем динамический негабарит
     setNGBDYN(T);
+    // выставляем статическмй негабарит
+    setNGBSTAT(T);
 
     // выставляем занятость телегами
     foreach (auto w, l_tdsopair) {
@@ -579,10 +585,10 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
                         // негабаритность
                         m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
                         if (str!=nullptr){
-                            if ((str->STATE_UVK_NGBDYN_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) warn1=1;
-                            if ((str->STATE_UVK_NGBDYN_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  warn1=1;
-                            if ((str->STATE_UVK_NGBSTAT_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) warn1=1;
-                            if ((str->STATE_UVK_NGBSTAT_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  warn1=1;
+                            if ((str->STATE_UVK_NGBDYN_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) warn2=1;
+                            if ((str->STATE_UVK_NGBDYN_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  warn2=1;
+                            if ((str->STATE_UVK_NGBSTAT_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) warn2=1;
+                            if ((str->STATE_UVK_NGBSTAT_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  warn2=1;
                         }
 
                     }

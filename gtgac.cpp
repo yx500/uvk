@@ -36,7 +36,8 @@ GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
         l_strel.push_back(gstr);
         mRC2GS[strel]=gstr;
     }
-    otceps=modelGorka->findChildren<m_Otceps*>().first();
+    auto l_otceps=modelGorka->findChildren<m_Otceps*>();
+    otceps=l_otceps.first();
     l_zkr=modelGorka->findChildren<m_RC_Gor_ZKR*>();
 
 
