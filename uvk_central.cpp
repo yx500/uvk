@@ -677,7 +677,7 @@ void UVK_Central::checkFinishRospusk(const QDateTime &T)
     GORKA->setSTATE_GAC_FINISH(STATE_GAC_FINISH);
 
     if (STATE_GAC_FINISH==true){
-        if ((!t_STATE_GAC_FINISH.isValid())||(t_STATE_GAC_FINISH.msecsTo(T)>=3*60*1000)){
+        if ((!t_STATE_GAC_FINISH.isValid())||(t_STATE_GAC_FINISH.msecsTo(T)>=1*60*1000)){
             QString acceptStr;
             if (testMode==0){
             cmd_setRegim(ModelGroupGorka::regimStop,acceptStr);

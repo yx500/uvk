@@ -160,18 +160,28 @@ QList<SignalDescription> tos_System_DSO::acceptOutputSignals()
         l+=w->acceptOutputSignals();
     }
 
-    foreach (auto w, l_tdsopair) {
-        if (w->strel!=nullptr){
-            w->strel->setSIGNAL_UVK_TLG(w->strel->SIGNAL_UVK_TLG().innerUse());l<< w->strel->SIGNAL_UVK_TLG();
+    //    foreach (auto w, l_tdsopair) {
+    //        if (w->strel!=nullptr){
+    //            w->strel->setSIGNAL_UVK_TLG(w->strel->SIGNAL_UVK_TLG().innerUse());l<< w->strel->SIGNAL_UVK_TLG();
 
 
-            w->strel->setSIGNAL_UVK_NGBDYN_PL(w->strel->SIGNAL_UVK_NGBDYN_PL().innerUse());l<< w->strel->SIGNAL_UVK_NGBDYN_PL();
-            w->strel->setSIGNAL_UVK_NGBDYN_MN(w->strel->SIGNAL_UVK_NGBDYN_MN().innerUse());l<< w->strel->SIGNAL_UVK_NGBDYN_MN();
-            w->strel->setSIGNAL_UVK_NGBSTAT_PL(w->strel->SIGNAL_UVK_NGBSTAT_PL().innerUse());l<< w->strel->SIGNAL_UVK_NGBSTAT_PL();
-            w->strel->setSIGNAL_UVK_NGBSTAT_MN(w->strel->SIGNAL_UVK_NGBSTAT_MN().innerUse());l<< w->strel->SIGNAL_UVK_NGBSTAT_MN();
+    //            w->strel->setSIGNAL_UVK_NGBDYN_PL(w->strel->SIGNAL_UVK_NGBDYN_PL().innerUse());l<< w->strel->SIGNAL_UVK_NGBDYN_PL();
+    //            w->strel->setSIGNAL_UVK_NGBDYN_MN(w->strel->SIGNAL_UVK_NGBDYN_MN().innerUse());l<< w->strel->SIGNAL_UVK_NGBDYN_MN();
+    //            w->strel->setSIGNAL_UVK_NGBSTAT_PL(w->strel->SIGNAL_UVK_NGBSTAT_PL().innerUse());l<< w->strel->SIGNAL_UVK_NGBSTAT_PL();
+    //            w->strel->setSIGNAL_UVK_NGBSTAT_MN(w->strel->SIGNAL_UVK_NGBSTAT_MN().innerUse());l<< w->strel->SIGNAL_UVK_NGBSTAT_MN();
 
 
-        }
+    //        }
+    //    }
+    foreach (auto strel, l_strel_Y) {
+        strel->setSIGNAL_UVK_TLG(strel->SIGNAL_UVK_TLG().innerUse());l<< strel->SIGNAL_UVK_TLG();
+        strel->setSIGNAL_UVK_NGBDYN_PL(strel->SIGNAL_UVK_NGBDYN_PL().innerUse());l<< strel->SIGNAL_UVK_NGBDYN_PL();
+        strel->setSIGNAL_UVK_NGBDYN_MN(strel->SIGNAL_UVK_NGBDYN_MN().innerUse());l<< strel->SIGNAL_UVK_NGBDYN_MN();
+        strel->setSIGNAL_UVK_NGBSTAT_PL(strel->SIGNAL_UVK_NGBSTAT_PL().innerUse());l<< strel->SIGNAL_UVK_NGBSTAT_PL();
+        strel->setSIGNAL_UVK_NGBSTAT_MN(strel->SIGNAL_UVK_NGBSTAT_MN().innerUse());l<< strel->SIGNAL_UVK_NGBSTAT_MN();
+        strel->setSIGNAL_UVK_WSTRA(strel->SIGNAL_UVK_WSTRA().innerUse());l<< strel->SIGNAL_UVK_WSTRA();
+        strel->setSIGNAL_UVK_WSTRB(strel->SIGNAL_UVK_WSTRB().innerUse());l<< strel->SIGNAL_UVK_WSTRB();
+
     }
 
     return l;
@@ -194,14 +204,16 @@ void tos_System_DSO::state2buffer()
         w->state2buffer();
     }
 
-    foreach (auto w, l_tdsopair) {
-        if (w->strel!=nullptr){
-            w->strel->SIGNAL_UVK_TLG().setValue_1bit(w->strel->STATE_UVK_TLG());
-            w->strel->SIGNAL_UVK_NGBDYN_PL().setValue_1bit(w->strel->STATE_UVK_NGBDYN_PL());
-            w->strel->SIGNAL_UVK_NGBDYN_MN().setValue_1bit(w->strel->STATE_UVK_NGBDYN_MN());
-            w->strel->SIGNAL_UVK_NGBSTAT_PL().setValue_1bit(w->strel->STATE_UVK_NGBSTAT_PL());
-            w->strel->SIGNAL_UVK_NGBSTAT_MN().setValue_1bit(w->strel->STATE_UVK_NGBSTAT_MN());
-        }
+    //    foreach (auto w, l_tdsopair) {
+    //        if (w->strel!=nullptr){
+    foreach (auto strel, l_strel_Y) {
+        strel->SIGNAL_UVK_TLG().setValue_1bit(strel->STATE_UVK_TLG());
+        strel->SIGNAL_UVK_NGBDYN_PL().setValue_1bit(strel->STATE_UVK_NGBDYN_PL());
+        strel->SIGNAL_UVK_NGBDYN_MN().setValue_1bit(strel->STATE_UVK_NGBDYN_MN());
+        strel->SIGNAL_UVK_NGBSTAT_PL().setValue_1bit(strel->STATE_UVK_NGBSTAT_PL());
+        strel->SIGNAL_UVK_NGBSTAT_MN().setValue_1bit(strel->STATE_UVK_NGBSTAT_MN());
+        strel->SIGNAL_UVK_WSTRA().setValue_1bit(strel->STATE_UVK_WSTRA());
+        strel->SIGNAL_UVK_WSTRB().setValue_1bit(strel->STATE_UVK_WSTRB());
     }
 }
 
@@ -545,6 +557,11 @@ tos_Rc *tos_System_DSO::getRc(TOtcepDataOs os)
 
 void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
 {
+    foreach (auto strel, l_strel_Y) {
+        strel->setSTATE_UVK_WSTRA(false);
+        strel->setSTATE_UVK_WSTRB(false);
+    }
+
     auto act_zkr=modelGorka->active_zkr();
     foreach (auto od, lo) {
         auto otcep=od->otcep;
@@ -575,6 +592,7 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
                                 m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(str1) ;
                                 if (str!=nullptr){
                                     if (str->STATE_A()==1) bw=false;
+                                    if (bw)str->setSTATE_UVK_WSTRA(true);
                                 }
                             }
                             if (bw) warn1=1;
@@ -590,10 +608,13 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
                         // негабаритность
                         m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
                         if (str!=nullptr){
-                            if ((str->STATE_UVK_NGBDYN_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) warn2=1;
-                            if ((str->STATE_UVK_NGBDYN_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  warn2=1;
-                            if ((str->STATE_UVK_NGBSTAT_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) warn2=1;
-                            if ((str->STATE_UVK_NGBSTAT_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  warn2=1;
+                            bool bw=false;
+                            if ((str->STATE_UVK_NGBDYN_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) bw=true;
+                            if ((str->STATE_UVK_NGBDYN_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  bw=true;
+                            if ((str->STATE_UVK_NGBSTAT_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) bw=true;
+                            if ((str->STATE_UVK_NGBSTAT_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  bw=true;
+                            if (bw) warn2=1;
+                            if (bw)str->setSTATE_UVK_WSTRB(true);
                         }
 
                     }
