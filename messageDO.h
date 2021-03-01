@@ -2,10 +2,10 @@
 
 #include <numeric>
 #include <memory>
-#include "utils/Crc32.h"
+#include "Crc32.h"
 
 
-#pragma pack(push, 1)
+#pragma pack(1)
 struct cmd_DO
 {
   uint8_t   magic[2];
@@ -15,7 +15,7 @@ struct cmd_DO
   uint32_t  id;
   uint32_t  crc;
 };
-#pragma pack(pop)
+#pragma pack()
 
 
 class message_DO

@@ -41,7 +41,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     Crc32.h \
-    do_message.hpp \
+    messageDO.h \
     gtapp_watchdog.h \
     gtgac.h \
     otcepscontroller.h \

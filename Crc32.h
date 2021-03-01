@@ -41,7 +41,7 @@ public:
     return this->crc32;
   }
 
-  static  uint32_t calculate(const void *data, size_t length, uint32_t crc32 = 0) {
+  static constexpr uint32_t calculate(const void *data, size_t length, uint32_t crc32 = 0) {
     crc32 ^= 0xFFFFFFFF;
     for (size_t i = 0; i < length; ++i) {
       crc32 = table[(crc32 ^ ((const uint8_t*) data)[i]) & 0xFF] ^ (crc32 >> 8);

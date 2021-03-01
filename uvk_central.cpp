@@ -1,6 +1,6 @@
 #include "uvk_central.h"
 #include <QFileInfo>
-#include "do_message.hpp"
+#include "messageDO.h"
 #include "tos_system_dso.h"
 #include "gtapp_watchdog.h"
 #include "tStatPc.h"
@@ -110,11 +110,11 @@ bool UVK_Central::init(QString fileNameIni)
 
     // парамеры ГАЦ
     foreach (auto gstr, GAC->l_strel) {
-        ilog(QString("%1+ Vгран=%2 НГБ РЦ=%3").arg(gstr->strel->objectName()).arg(gstr->strel->NEGAB_VGRAN_P()).arg(gstr->strel->NEGAB_RC_CNT_P()));
+        ilog(QString("%1+ Vгран=%2 НГБ РЦ=%3").arg(gstr->strel->objectName()).arg(gstr->strel->NEGAB_VGRAN_P()).arg(gstr->strel->l_ngb_rc[0].size()));
         foreach (auto _rc, gstr->strel->l_ngb_rc[0]) {
                 ilog(QString("%1+ НГБ РЦ %2 LEN=%3").arg(gstr->strel->objectName()).arg(_rc->objectName()).arg(_rc->LEN()));
         }
-        ilog(QString("%1- Vгран=%2 НГБ РЦ=%3").arg(gstr->strel->objectName()).arg(gstr->strel->NEGAB_VGRAN_M()).arg(gstr->strel->NEGAB_RC_CNT_M()));
+        ilog(QString("%1- Vгран=%2 НГБ РЦ=%3").arg(gstr->strel->objectName()).arg(gstr->strel->NEGAB_VGRAN_M()).arg(gstr->strel->l_ngb_rc[1].size()));
         foreach (auto _rc, gstr->strel->l_ngb_rc[1]) {
                 ilog(QString("%1- НГБ РЦ %2 LEN=%3").arg(gstr->strel->objectName()).arg(_rc->objectName()).arg(_rc->LEN()));
         }
@@ -538,10 +538,13 @@ void UVK_Central::gac_command(const SignalDescription &s, int state)
 {
     if (testMode!=0) return;
     if (slaveMode!=0) return;
-    tu_cmd c;
+    message_DO c;
+//    memset(&c,0,sizeof(c));
+    c.flag=0;
     c.number=s.chanelOffset();
-    c.on_off=state;
-    do_message(&c).commit();
+    c.data[0]=state;
+    c.commit();
+//    qDebug() << "gac_command" << c.is_valid();
     udp->sendData(s.chanelType(),s.chanelName(),QByteArray((const char *)&c,sizeof(c)));
 }
 
@@ -561,10 +564,11 @@ void UVK_Central::sendStatus()
 
     // контролим свой статус
     if (!signal_Control.isEmpty()){
-        tu_cmd c;
+        cmd_DO c;
+        c.flag=0;
         c.number=signal_Control.chanelOffset();
-        c.on_off=1;
-        do_message(&c).commit();
+        c.data[0]=1;
+        message_DO(&c).commit();
         udp->sendData(signal_Control.chanelType(),signal_Control.chanelName(),QByteArray((const char *)&c,sizeof(c)));
     }
 
