@@ -14,7 +14,8 @@ class IUVKGetNewOtcep :public IGetNewOtcep
 {
 public:
     IUVKGetNewOtcep(UVK_Central *uvk){this->uvk=uvk;}
-    virtual int getNewOtcep(m_RC*rc){return uvk->getNewOtcep(rc);}
+    virtual int getNewOtcep(m_RC*rc,int drobl){return uvk->getNewOtcep(rc,drobl);}
+    virtual int resetOtcep2prib(int num){return uvk->resetOtcep2prib(num);}
     UVK_Central *uvk;
 };
 
@@ -112,11 +113,11 @@ bool UVK_Central::init(QString fileNameIni)
     foreach (auto gstr, GAC->l_strel) {
         ilog(QString("%1+ Vгран=%2 НГБ РЦ=%3").arg(gstr->strel->objectName()).arg(gstr->strel->NEGAB_VGRAN_P()).arg(gstr->strel->l_ngb_rc[0].size()));
         foreach (auto _rc, gstr->strel->l_ngb_rc[0]) {
-                ilog(QString("%1+ НГБ РЦ %2 LEN=%3").arg(gstr->strel->objectName()).arg(_rc->objectName()).arg(_rc->LEN()));
+            ilog(QString("%1+ НГБ РЦ %2 LEN=%3").arg(gstr->strel->objectName()).arg(_rc->objectName()).arg(_rc->LEN()));
         }
         ilog(QString("%1- Vгран=%2 НГБ РЦ=%3").arg(gstr->strel->objectName()).arg(gstr->strel->NEGAB_VGRAN_M()).arg(gstr->strel->l_ngb_rc[1].size()));
         foreach (auto _rc, gstr->strel->l_ngb_rc[1]) {
-                ilog(QString("%1- НГБ РЦ %2 LEN=%3").arg(gstr->strel->objectName()).arg(_rc->objectName()).arg(_rc->LEN()));
+            ilog(QString("%1- НГБ РЦ %2 LEN=%3").arg(gstr->strel->objectName()).arg(_rc->objectName()).arg(_rc->LEN()));
         }
 
     }
@@ -384,7 +385,8 @@ void UVK_Central::work()
                 }
             }
         }
-        cmd_setRegim(new_regim,s);
+        if (GORKA->STATE_REGIM()!=new_regim)
+            cmd_setRegim(new_regim,s);
     }
 
     TOS->work(T);
@@ -394,11 +396,16 @@ void UVK_Central::work()
     //    QDateTime T2w=QDateTime::currentDateTime();
 
     // РРС
+    static QElapsedTimer rrc_emit;
     if ((!GORKA->SIGNAL_RRC_TU().isNotUse())&&(!GORKA->SIGNAL_RRC_TU().isEmpty())){
         int state=0;
         if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimStop) state=1;
-        if (!GORKA->STATE_RRC()!=state){
-            gac_command(GORKA->SIGNAL_RRC_TU(),state);
+        if (GORKA->STATE_RRC()!=state){
+            if ((!rrc_emit.isValid())||(rrc_emit.elapsed()>1000)){
+                gac_command(GORKA->SIGNAL_RRC_TU(),state);
+                rrc_emit.restart();
+            }
+
         }
     }
     if (udp->get_emit_counter()<=1){
@@ -506,12 +513,22 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
 
             }
         }
+        if (!m["SET_CUR_OTCEP"].isEmpty()){
+            if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
+                if (otcepsController->cmd_SET_CUR_OTCEP(m,acceptStr))
+                    CMD->accept_cmd(m,1,acceptStr); else
+                    CMD->accept_cmd(m,-1,acceptStr);
+            } else {
+                CMD->accept_cmd(m,-1,"Попытка добавить отцеп в режиме РОСПУСК");
+
+            }
+        }
     }
     if (m["CMD"]=="SET_OTCEP_STATE"){
         //if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
-            if (otcepsController->cmd_SET_OTCEP_STATE(m,acceptStr))
-                CMD->accept_cmd(m,1,acceptStr); else
-                CMD->accept_cmd(m,-1,acceptStr);
+        if (otcepsController->cmd_SET_OTCEP_STATE(m,acceptStr))
+            CMD->accept_cmd(m,1,acceptStr); else
+            CMD->accept_cmd(m,-1,acceptStr);
         //}
     }
     if (m["CMD"]=="ADD_OTCEP_VAG"){
@@ -539,12 +556,12 @@ void UVK_Central::gac_command(const SignalDescription &s, int state)
     if (testMode!=0) return;
     if (slaveMode!=0) return;
     message_DO c;
-//    memset(&c,0,sizeof(c));
+    //    memset(&c,0,sizeof(c));
     c.flag=0;
     c.number=s.chanelOffset();
     c.data[0]=state;
     c.commit();
-//    qDebug() << "gac_command" << c.is_valid();
+    //    qDebug() << "gac_command" << c.is_valid();
     udp->sendData(s.chanelType(),s.chanelName(),QByteArray((const char *)&c,sizeof(c)));
 }
 
@@ -665,10 +682,15 @@ void UVK_Central::checkFinishRospusk(const QDateTime &T)
         bool noendex=false;
         // ищем все конченые отцепы
         foreach (auto otcep, otcepsController->otceps->otceps()) {
-            if ((otcep->STATE_ENABLED())&&
-               ((otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) ||(otcep->STATE_GAC_ACTIVE()==1))){
-                noendex=true;
-                break;
+            if (otcep->STATE_ENABLED()){
+                if ((otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) ||(otcep->STATE_GAC_ACTIVE()==1)){
+                    noendex=true;
+                    break;
+                }
+                if ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk) ||(otcep->STATE_V()==0)){
+                    noendex=true;
+                    break;
+                }
             }
         }
 
@@ -684,7 +706,7 @@ void UVK_Central::checkFinishRospusk(const QDateTime &T)
         if ((!t_STATE_GAC_FINISH.isValid())||(t_STATE_GAC_FINISH.msecsTo(T)>=1*60*1000)){
             QString acceptStr;
             if (testMode==0){
-            cmd_setRegim(ModelGroupGorka::regimStop,acceptStr);
+                cmd_setRegim(ModelGroupGorka::regimStop,acceptStr);
             }
         }
     }
@@ -692,12 +714,42 @@ void UVK_Central::checkFinishRospusk(const QDateTime &T)
 
 }
 
-int UVK_Central::getNewOtcep(m_RC*rc)
+
+int UVK_Central::getNewOtcep(m_RC*rc,int drobl)
 {
     if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk){
+        if (maxOtcepCurrenRospusk+1>otcepsController->otceps->l_otceps.size()) return 0;
         // проверим что едем с нужной зкр
         foreach (auto zkr, l_zkr) {
             if ((rc==zkr) && (zkr->STATE_ROSPUSK()==1)){
+                auto otcep_first=otcepsController->otceps->l_otceps.first();
+                ID_ROSP=otcep_first->STATE_ID_ROSP();
+                if (drobl>0){
+                    // ищем пред отцеп
+                    if (maxOtcepCurrenRospusk>=1){
+                        auto pred_otcep=otcepsController->otceps->otcepByNum(maxOtcepCurrenRospusk);
+                        if ((pred_otcep!=nullptr)&&(pred_otcep->STATE_SL_VAGON_CNT()>1)){
+                            if ((pred_otcep->STATE_ZKR_VAGON_CNT()>0)&&(pred_otcep->STATE_ZKR_VAGON_CNT()<pred_otcep->STATE_SL_VAGON_CNT())){
+                                auto new_otcep=otcepsController->inc_otcep(maxOtcepCurrenRospusk+1,
+                                                                           pred_otcep->STATE_MAR(),
+                                                                           pred_otcep->STATE_SL_VAGON_CNT()-pred_otcep->STATE_ZKR_VAGON_CNT());
+                                if (new_otcep!=nullptr) {
+                                    zkr->setSTATE_OTCEP_VAGADD(true);
+                                    new_otcep->setSTATE_ENABLED(true);
+                                    new_otcep->setSTATE_ID_ROSP(ID_ROSP);
+                                    new_otcep->setSTATE_GAC_ACTIVE(1);
+                                    if (pred_otcep->STATE_SL_OSY_CNT()>pred_otcep->STATE_ZKR_OSY_CNT()) new_otcep->setSTATE_SL_OSY_CNT(pred_otcep->STATE_SL_OSY_CNT()-pred_otcep->STATE_ZKR_OSY_CNT());
+                                    maxOtcepCurrenRospusk=new_otcep->NUM();
+                                    auto next_otcep=otcepsController->otceps->otcepByNum(maxOtcepCurrenRospusk+1);
+                                    if (next_otcep!=nullptr) next_otcep->setSTATE_GAC_ACTIVE(0);
+                                    return new_otcep->NUM();
+                                }
+                            }
+
+                        }
+                    }
+                }
+
                 m_Otcep *otcep=otcepsController->otceps->topOtcep();
                 if (otcep!=nullptr)  {
                     if (otcep->NUM()>maxOtcepCurrenRospusk) maxOtcepCurrenRospusk=otcep->NUM();
@@ -719,6 +771,19 @@ int UVK_Central::getNewOtcep(m_RC*rc)
             }
         }
 
+    }
+    return 0;
+}
+
+int UVK_Central::resetOtcep2prib(int num)
+{
+    if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk)||(GORKA->STATE_REGIM()==ModelGroupGorka::regimPausa)) {
+    auto otcep=otcepsController->otceps->otcepByNum(num);
+      if (otcep!=nullptr){
+          TOS->resetTracking(num);
+          otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
+          return num;
+      }
     }
     return 0;
 }
@@ -877,14 +942,7 @@ void UVK_Central::setRegimRospusk()
     GAC->resetStates();
     TOS->setSTATE_ENABLED(true);
     GAC->setSTATE_ENABLED(true);
-    ID_ROSP=otcepsController->otceps->l_otceps.first()->STATE_ID_ROSP();
-    if (ID_ROSP==0){
-        time_t n;
-        time(&n);
-        uint32 r = n * 16;
-        ID_ROSP=r;
-        otcepsController->setNewID_ROSP(ID_ROSP);
-    }
+
 }
 
 void UVK_Central::setRegimStop()

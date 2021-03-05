@@ -52,6 +52,7 @@ class tos_Rc : public BaseWorker
 {
 public:
     tos_Rc(tos_System *TOS,m_RC *rc);
+    virtual ~tos_Rc(){}
     m_RC *rc;
 
     void work(const QDateTime &T) override;
@@ -60,19 +61,20 @@ public:
     QList<SignalDescription> acceptOutputSignals() override;
     void state2buffer() override;
 
-    TOtcepData od(int sf) const;
-    QList<TOtcepData> l_od;
-    MVP_Enums::TRCBusy STATE_BUSY;
+//    TOtcepData od(int sf) const;
+//    QList<TOtcepData> l_od;
+//    MVP_Enums::TRCBusy STATE_BUSY;
     bool STATE_ERR_LS;
     bool STATE_ERR_LZ;
     bool STATE_ERR_KZ;
-    bool STATE_CHECK_FREE_DB;
+//    bool STATE_CHECK_FREE_DB;
     QList<int> l_otceps;
     tos_Rc *next_rc[2];
-    bool useRcTracking;
+//    bool useRcTracking;
 
-    tos_OtcepData *otcepOnRc(int sf);
-    void remove_od(TOtcepData o);
+//    tos_OtcepData *otcepOnRc(int sf);
+//    void remove_od(TOtcepData o);
+    void reset_num(int num);
 
     QList<TOtcepDataOs> l_os;
     qreal v_dso;
@@ -81,7 +83,7 @@ public:
 
 protected:
     tos_System *TOS;
-    QDateTime time_STATE_BUSY;
+//    QDateTime time_STATE_BUSY;
 
 };
 

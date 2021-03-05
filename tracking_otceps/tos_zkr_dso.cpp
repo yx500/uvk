@@ -47,13 +47,17 @@ QList<SignalDescription> tos_Zkr_DSO::acceptOutputSignals()
     rc_zkr->setSIGNAL_STATE_OTCEP_UNKNOW(rc_zkr->SIGNAL_STATE_OTCEP_UNKNOW().innerUse());
     rc_zkr->setSIGNAL_STATE_OTCEP_FREE(rc_zkr->SIGNAL_STATE_OTCEP_FREE().innerUse());
     rc_zkr->setSIGNAL_STATE_OTCEP_IN(rc_zkr->SIGNAL_STATE_OTCEP_IN().innerUse());
+    rc_zkr->setSIGNAL_STATE_OTCEP_VAGADD(rc_zkr->SIGNAL_STATE_OTCEP_VAGADD().innerUse());
+    rc_zkr->setSIGNAL_STATE_OTCEP_BEVAGADD(rc_zkr->SIGNAL_STATE_OTCEP_BEVAGADD().innerUse());
     QList<SignalDescription> l;
     l<< rc_zkr->SIGNAL_STATE_ERROR_RTDS() <<
         rc_zkr->SIGNAL_STATE_ERROR_NERASCEP() <<
         rc_zkr->SIGNAL_STATE_ERROR_OSYCOUNT()<<
         rc_zkr->SIGNAL_STATE_OTCEP_UNKNOW()<<
         rc_zkr->SIGNAL_STATE_OTCEP_FREE()<<
-        rc_zkr->SIGNAL_STATE_OTCEP_IN();
+        rc_zkr->SIGNAL_STATE_OTCEP_IN()<<
+        rc_zkr->SIGNAL_STATE_OTCEP_VAGADD()<<
+    rc_zkr->SIGNAL_STATE_OTCEP_BEVAGADD();
     return l;
 }
 void tos_Zkr_DSO::state2buffer()
@@ -67,6 +71,9 @@ void tos_Zkr_DSO::state2buffer()
         rc_zkr->SIGNAL_STATE_OTCEP_FREE().setValue_1bit(0);
     if (curr_state_zkr.sost==_otcep_in)     rc_zkr->SIGNAL_STATE_OTCEP_IN().setValue_1bit(1);else
         rc_zkr->SIGNAL_STATE_OTCEP_IN().setValue_1bit(0);
+
+    rc_zkr->SIGNAL_STATE_OTCEP_VAGADD().setValue_1bit(rc_zkr->STATE_OTCEP_VAGADD());
+    rc_zkr->SIGNAL_STATE_OTCEP_BEVAGADD().setValue_1bit(rc_zkr->STATE_OTCEP_BEVAGADD());
 }
 
 int _find_step(tos_Zkr_DSO::t_zkr_pairs steps[],int size_steps,const tos_Zkr_DSO::t_zkr_state &prev_state,const tos_Zkr_DSO::t_zkr_state &curr_state)
@@ -145,6 +152,7 @@ void tos_Zkr_DSO::work(const QDateTime &T)
     case _otcep_end:
         endOtcep(T);
         curr_state_zkr.sost=_otcep_free;
+
         break;
     case _os_plus:
         in_os(T);
@@ -205,6 +213,7 @@ tos_DSO *tos_Zkr_DSO::alive_dso()
 
 void tos_Zkr_DSO::newOtcep(const QDateTime &T)
 {
+    rc_zkr->setSTATE_OTCEP_BEVAGADD(false);
     curr_state_zkr.sost=_otcep_in;
 
     TOtcepDataOs os;
@@ -214,7 +223,7 @@ void tos_Zkr_DSO::newOtcep(const QDateTime &T)
     rc_zkr->setSTATE_ERROR_NERASCEP(false);
     rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
 
-    auto *otcep=TOS->getNewOtcep(trc);
+    auto *otcep=TOS->getNewOtcep(trc,0);
     if (otcep!=nullptr){
         otcep->resetTracking();
         os.num=otcep->otcep->NUM();
@@ -242,6 +251,20 @@ void tos_Zkr_DSO::newOtcep(const QDateTime &T)
 
 void tos_Zkr_DSO::endOtcep(const QDateTime &T)
 {
+
+    rc_zkr->setSTATE_OTCEP_VAGADD(false);
+    if ((cur_os.num!=0)&&(cur_os.d==_forw)){
+        auto o=TOS->otcep_by_num(cur_os.num);
+        if (o!=nullptr){
+            if ((o->otcep->STATE_SL_VAGON_CNT()>1)){
+                if ((o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()<o->otcep->STATE_SL_VAGON_CNT())){
+                    rc_zkr->setSTATE_OTCEP_BEVAGADD(true);
+                    TOS->getNewOtcep(trc,o->otcep->STATE_SL_VAGON_CNT()-o->otcep->STATE_ZKR_VAGON_CNT());
+                }
+            }
+        }
+    }
+
     cur_os=TOtcepDataOs();
     curr_state_zkr.sost=_otcep_free;
     if (!trc->l_os.isEmpty()){
@@ -249,6 +272,9 @@ void tos_Zkr_DSO::endOtcep(const QDateTime &T)
         os.p=_pOtcepStartEnd;
     }
     TOS->updateOtcepsOnRc(T);
+
+
+    rc_zkr->setSTATE_ERROR_NERASCEP(false);
 
 }
 
@@ -265,6 +291,9 @@ void tos_Zkr_DSO::in_os(const QDateTime &T)
         auto o=TOS->otcep_by_num(os.num);
         if (o!=nullptr){
             o->otcep->setSTATE_ZKR_OSY_CNT(os.os_otcep);
+            if ((o->otcep->STATE_SL_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>o->otcep->STATE_SL_VAGON_CNT())){
+                rc_zkr->setSTATE_ERROR_NERASCEP(true);
+            }
         }
         os.p=_pOtcepMiddle;
     }
@@ -286,6 +315,7 @@ void tos_Zkr_DSO::out_os(const QDateTime &T)
             if (o!=nullptr){
                 if (rc_zkr->STATE_ROSPUSK()==1){
                     o->otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
+                    TOS->resetOtcep2prib(os.num);
                 }
             }
             curr_state_zkr.sost=_otcep_unknow;
@@ -340,6 +370,7 @@ void tos_Zkr_DSO::resetStates()
     rc_zkr->setSTATE_OTCEP_UNKNOW(false);
     rc_zkr->setSTATE_OTCEP_FREE(false);
     rc_zkr->setSTATE_OTCEP_IN(false);
+    rc_zkr->setSTATE_OTCEP_VAGADD(false);
 
 }
 

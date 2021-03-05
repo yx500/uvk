@@ -91,10 +91,10 @@ void tos_System::state2buffer()
     //    }
 }
 
-tos_OtcepData *tos_System::getNewOtcep(tos_Rc *trc)
+tos_OtcepData *tos_System::getNewOtcep(tos_Rc *trc,int drobl)
 {
     if (iGetNewOtcep!=nullptr){
-        int num=iGetNewOtcep->getNewOtcep(trc->rc);
+        int num=iGetNewOtcep->getNewOtcep(trc->rc,drobl);
         if (num>0){
             return mNUM2OD[num];
         }
@@ -102,8 +102,13 @@ tos_OtcepData *tos_System::getNewOtcep(tos_Rc *trc)
     return nullptr;
 }
 
-
-
+int tos_System::resetOtcep2prib(int num)
+{
+    if (iGetNewOtcep!=nullptr){
+        int num=iGetNewOtcep->resetOtcep2prib(num);
+    }
+    return num;
+}
 
 void tos_System::work(const QDateTime &)
 {

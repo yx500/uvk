@@ -12,6 +12,7 @@ struct GacStrel{
     MVP_Enums::TStrelPol pol_zad;
     MVP_Enums::TStrelPol pol_cmd;
     MVP_Enums::TStrelPol pol_mar;
+    MVP_Enums::TStrelPol pol_av;
     QElapsedTimer pol_cmd_time;
     QDateTime pol_cmd_w_time;
     QElapsedTimer emit_time;
@@ -69,6 +70,9 @@ public:
     QList<SignalDescription> acceptOutputSignals() override;
     void setStateBlockPerevod(GacStrel *gs,const QDateTime &T);
     QList<GacStrel*> l_strel;
+
+    bool PER_NGB_enabled=false;
+
 signals:
     void uvk_command(const SignalDescription &s,int state);
 protected:

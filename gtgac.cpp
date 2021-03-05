@@ -120,6 +120,7 @@ void GtGac::resetStates()
         gs->pol_cmd_w_time=QDateTime();
         gs->BL_PER_DONE=false;
         gs->pol_zad=MVP_Enums::pol_unknow;
+        gs->pol_av=MVP_Enums::pol_unknow;
         sendCommand(gs,MVP_Enums::pol_unknow,true);
     }
 
@@ -209,8 +210,9 @@ void GtGac::set_STATE_GAC_ACTIVE()
     foreach (m_Otcep *otcep, otceps->otceps()) {
         if (otcep->STATE_ENABLED()){
             if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib){
-                if (otcep==otcep1)
-                    otcep->setSTATE_GAC_ACTIVE(1); else
+                if (otcep==otcep1){
+                        if (otcep->STATE_MAR()>0) otcep->setSTATE_GAC_ACTIVE(1);
+                } else
                     otcep->setSTATE_GAC_ACTIVE(0);
             }
         }else  otcep->setSTATE_GAC_ACTIVE(0);
@@ -254,10 +256,7 @@ void GtGac::set_STATE_GAC_ACTIVE()
 void GtGac::work(const QDateTime &T)
 {
 
-    // выставляем блокировку перевода
-    foreach (auto gs ,l_strel){
-        setStateBlockPerevod(gs,T);
-    }
+
 
     foreach (auto gs ,l_strel){
         gs->pol_zad=MVP_Enums::pol_unknow;
@@ -268,15 +267,29 @@ void GtGac::work(const QDateTime &T)
             if (!gs->sred_pol_time.isValid()) gs->sred_pol_time=T;
         } else {
             gs->sred_pol_time=QDateTime();
-            // убираем автовозврат
-            gs->strel->setSTATE_UVK_AV(false);
+
+
             gs->ERR_PER=false;
             gs->BL_PER_DONE=false;
+        }
+        // убираем автовозврат
+        if (gs->pol_av!=MVP_Enums::pol_unknow){
+            if (((gs->pol_av==MVP_Enums::pol_plus)&&(gs->strel->STATE_POL()==MVP_Enums::pol_minus)) ||
+                    ((gs->pol_av==MVP_Enums::pol_minus)&&(gs->strel->STATE_POL()==MVP_Enums::pol_plus)))
+            {
+                gs->strel->setSTATE_UVK_AV(false);
+                gs->pol_av=MVP_Enums::pol_unknow;
+            }
         }
         // снимаем признак отхлопывания
         if (gs->BL_PER_DONE) {
             if (gs->pol_UVK_BL_PER_DONE!=gs->strel->STATE_POL())gs->BL_PER_DONE=false;
         }
+    }
+
+    // выставляем блокировку перевода
+    foreach (auto gs ,l_strel){
+        setStateBlockPerevod(gs,T);
     }
 
     //   1 отцеп
@@ -375,23 +388,42 @@ void GtGac::work(const QDateTime &T)
         if (gs->BL_PER) continue;
 
         // перевод при блокировке
+
         if ((gs->strel->STATE_UVK_NGBSTAT_PL())&&(gs->strel->STATE_POL()!=MVP_Enums::pol_plus)){
-            gs->pol_zad=MVP_Enums::pol_plus;
-            gs->pol_UVK_BL_PER_DONE=gs->pol_zad;
+            gs->pol_UVK_BL_PER_DONE=MVP_Enums::pol_plus;
             gs->BL_PER_DONE=true;
-            continue;
+            if (PER_NGB_enabled) {
+                gs->pol_zad=MVP_Enums::pol_plus;
+                continue;
+            }
         }
         // перевод при блокировке
         if ((gs->strel->STATE_UVK_NGBSTAT_MN())&&(gs->strel->STATE_POL()!=MVP_Enums::pol_minus)){
-            gs->pol_zad=MVP_Enums::pol_minus;
-            gs->pol_UVK_BL_PER_DONE=gs->pol_zad;
+            gs->pol_UVK_BL_PER_DONE=MVP_Enums::pol_minus;
             gs->BL_PER_DONE=true;
+            if (PER_NGB_enabled) {
+                gs->pol_zad=MVP_Enums::pol_minus;
+                continue;
+            }
+        }
+
+        // перевод при АВ
+        if ((gs->strel->STATE_UVK_ANTVZ_PL())&&(gs->strel->STATE_POL()!=MVP_Enums::pol_plus)){
+            gs->pol_zad=MVP_Enums::pol_plus;
             continue;
         }
+        if ((gs->strel->STATE_UVK_ANTVZ_MN())&&(gs->strel->STATE_POL()!=MVP_Enums::pol_minus)){
+            gs->pol_zad=MVP_Enums::pol_minus;
+            continue;
+        }
+
         // перевод по маршруту
         if (gs->pol_mar==MVP_Enums::pol_unknow) continue;
         if (gs->strel->STATE_POL()==gs->pol_mar) continue;
         gs->pol_zad=gs->pol_mar;
+
+
+
     }
 
     // задаем команды
@@ -416,8 +448,9 @@ void GtGac::work(const QDateTime &T)
                 if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
                     if (gs->pol_cmd!=gs->strel->STATE_POL()){
                         qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
-                        if ((ms>100) &&(ms<2000)) {
+                        if ((ms>100) &&(ms<2800)) {
                             gs->strel->setSTATE_UVK_AV(true);
+                            gs->pol_av=gs->strel->STATE_POL();
                         }
                     } else {
                         // перевелась таки

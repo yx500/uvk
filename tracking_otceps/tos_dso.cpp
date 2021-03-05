@@ -35,6 +35,7 @@ void tos_DSO::resetTracking()
     dso->setSTATE_ERROR_TRACK(false);
     //dso->setSTATE_ERROR_CNT(0);
 }
+
 void tos_DSO::resetStates()
 {
     dso->resetStates();

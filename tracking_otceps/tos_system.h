@@ -18,7 +18,8 @@ enum{_tos_rc,_tos_dso};
 class IGetNewOtcep
 {
     public:
-    virtual int getNewOtcep(m_RC*rc)=0;
+    virtual int getNewOtcep(m_RC*rc,int drobl)=0;
+    virtual int resetOtcep2prib(int num)=0;
 };
 
 
@@ -30,7 +31,8 @@ public:
     virtual ~tos_System(){}
 
     void setIGetNewOtcep(IGetNewOtcep *i){iGetNewOtcep=i;}
-    tos_OtcepData *getNewOtcep(tos_Rc *trc);
+    tos_OtcepData *getNewOtcep(tos_Rc *trc, int drobl);
+    int resetOtcep2prib(int num);
 
     virtual void makeWorkers(ModelGroupGorka *modelGorka);
 

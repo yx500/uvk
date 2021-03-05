@@ -25,6 +25,7 @@ public:
     bool cmd_INC_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_SET_OTCEP_STATE(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m,QString &acceptStr);
+    bool cmd_SET_CUR_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
 
     void resetLiveOtceps();
     void finishLiveOtceps();
@@ -32,6 +33,7 @@ public:
     void setNewID_ROSP(quint32 ID_ROSP);
 
     void updateVagons();
+    m_Otcep *inc_otcep(int N, int mar, int kv);
     QList<SignalDescription> l_chanelVag;
     QMap<m_Otcep*,SignalDescription> mO29;
     QMap<m_Otcep*,SignalDescription> mO2109;

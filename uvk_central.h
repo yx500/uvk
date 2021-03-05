@@ -44,7 +44,8 @@ public:
 
 
 
-    int getNewOtcep(m_RC *rc);
+    int getNewOtcep(m_RC *rc, int drobl);
+    int resetOtcep2prib(int num);
 
     virtual QList<SignalDescription> acceptOutputSignals() ;
 
