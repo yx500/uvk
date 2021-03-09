@@ -197,6 +197,7 @@ bool OtcepsController::cmd_DEL_OTCEP(QMap<QString, QString> &m, QString &acceptS
             auto otcep_0=otceps->l_otceps[i];
             auto otcep_1=otceps->l_otceps[i+1];
             otcep_0->acceptSLStates(otcep_1);
+            otcep_0->setSTATE_EXTNUM(otcep_1->STATE_EXTNUM());
             otcep_0->setSTATE_LOCATION(otcep_1->STATE_LOCATION());
             otcep_0->setSTATE_ENABLED(otcep_1->STATE_ENABLED());
             otcep->inc_tick();
@@ -211,7 +212,7 @@ bool OtcepsController::cmd_DEL_OTCEP(QMap<QString, QString> &m, QString &acceptS
     acceptStr=QString("Ошибка удаления отцепа %1.").arg(m["N"]);
     return false;
 }
-m_Otcep* OtcepsController::inc_otcep(int N,int mar,int kv)
+m_Otcep* OtcepsController::inc_otcep(int N,int mar)
 {
     auto otcep=otceps->otcepByNum(N);
     if (otcep!=nullptr){
@@ -222,6 +223,7 @@ m_Otcep* OtcepsController::inc_otcep(int N,int mar,int kv)
             if ((otcep_0->STATE_ENABLED()) && (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) break;
             if ((otcep_1->STATE_ENABLED()) && (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) break;
             otcep_1->acceptSLStates(otcep_0);
+            otcep_1->setSTATE_EXTNUM(otcep_0->STATE_EXTNUM());
             otcep_1->setSTATE_LOCATION(otcep_0->STATE_LOCATION());
             otcep_1->setSTATE_ENABLED(otcep_0->STATE_ENABLED());
             otcep_1->inc_tick();
@@ -230,12 +232,45 @@ m_Otcep* OtcepsController::inc_otcep(int N,int mar,int kv)
         //if (n<otceps->l_otceps.size()-1) otceps->l_otceps[n]->acceptSLStates(otceps->l_otceps[n+1]);
         otcep->setSTATE_MAR(mar);
         otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
-        otcep->setSTATE_SL_VAGON_CNT(kv);
+
         // добавляем 1 пустой вагон
         //otcep->vVag.push_back(tSlVagon());
         otcep->setSTATE_ENABLED(true);
     }
     return otcep;
+}
+
+m_Otcep *OtcepsController::inc_otcep_drobl(int N,int kv)
+{
+    auto otcep=otceps->otcepByNum(N);
+    if (otcep!=nullptr){
+        auto part=otcep->STATE_EXTNUMPART();
+        if (part==0){
+            part=1;
+            otcep->setSTATE_EXTNUMPART(part);
+            // проставляем EXTNUM
+            int n=otceps->l_otceps.indexOf(otcep);
+            if (n>=0){
+                for (int i=n;i<otceps->l_otceps.size();i++){
+                    auto otcep_1=otceps->l_otceps[i];
+                    if (otcep_1->STATE_ENABLED()){
+                        if (otcep_1->STATE_EXTNUM()==0) otcep_1->setSTATE_EXTNUM(otcep_1->NUM());
+                    }
+                }
+            }
+        }
+        auto new_otcep=inc_otcep(N+1,otcep->STATE_MAR());
+        if (new_otcep!=nullptr){
+            part++;
+            new_otcep->setSTATE_EXTNUMPART(part);
+            new_otcep->setSTATE_EXTNUM(otcep->STATE_EXTNUM());
+            otcep->setSTATE_SL_VAGON_CNT(kv);
+            if (otcep->STATE_SL_OSY_CNT()>otcep->STATE_ZKR_OSY_CNT()) new_otcep->setSTATE_SL_OSY_CNT(otcep->STATE_SL_OSY_CNT()-otcep->STATE_ZKR_OSY_CNT());
+
+            return new_otcep;
+        }
+    }
+    return nullptr;
 }
 
 bool OtcepsController::cmd_INC_OTCEP(QMap<QString, QString> &m, QString &acceptStr)
@@ -256,7 +291,7 @@ bool OtcepsController::cmd_INC_OTCEP(QMap<QString, QString> &m, QString &acceptS
                 }
             }
         }
-        inc_otcep(N,1,0);
+        inc_otcep(N,1);
 
         acceptStr=QString("Отцеп %1 добавлен.").arg(N);
         updateVagons();

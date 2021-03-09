@@ -1,11 +1,14 @@
 #include "tos_rc.h"
 #include "tos_system.h"
 
-tos_Rc::tos_Rc(tos_System *TOS, m_RC *rc) : BaseWorker(TOS)
+tos_Rc::tos_Rc(tos_System *TOS, m_RC *rc)
 {
 
     this->TOS=TOS;
     this->rc=rc;
+    tdso[0]=nullptr;
+    tdso[1]=nullptr;
+    l_os.reserve(128);
 //    STATE_BUSY=MVP_Enums::busy_unknow;
 //    useRcTracking=false;
 }
@@ -45,7 +48,6 @@ void tos_Rc::work(const QDateTime &T)
 
 void tos_Rc::resetStates()
 {
-    BaseWorker::resetStates();
 //    STATE_BUSY=MVP_Enums::busy_unknow;
 //    time_STATE_BUSY=QDateTime();
     STATE_ERR_LS=false;
@@ -54,6 +56,7 @@ void tos_Rc::resetStates()
 //    STATE_CHECK_FREE_DB=false;
 //    l_od.clear();
     l_otceps.clear();
+    l_os.clear();
 
 }
 

@@ -105,7 +105,15 @@ tos_OtcepData *tos_System::getNewOtcep(tos_Rc *trc,int drobl)
 int tos_System::resetOtcep2prib(int num)
 {
     if (iGetNewOtcep!=nullptr){
-        int num=iGetNewOtcep->resetOtcep2prib(num);
+        num=iGetNewOtcep->resetOtcep2prib(num);
+    }
+    return num;
+}
+
+int tos_System::nerascep(int num)
+{
+    if (iGetNewOtcep!=nullptr){
+        num=iGetNewOtcep->nerascep(num);
     }
     return num;
 }
@@ -165,13 +173,13 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
         if (mRc2Zam.contains(otcep->RCS)){
             m_Zam *zam=mRc2Zam[otcep->RCS];
             int n=zam->NTP();
-            if ((zam->TIPZM()==1) &&(otcep->STATE_V_INOUT(0,n)==_undefV_)) otcep->setSTATE_V_INOUT(0,n,zam->ris()->STATE_V());
+            if ((zam->TIPZM()==1) &&(otcep->STATE_V_INOUT(0,n)==_undefV_)&&(zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(0,n,zam->ris()->STATE_V());
         }
         // скорость выхода
         if (mRc2Zam.contains(otcep->RCF)){
             m_Zam *zam=mRc2Zam[otcep->RCF];
             int n=zam->NTP();
-            if ((otcep->STATE_V_INOUT(1,n)==_undefV_)) otcep->setSTATE_V_INOUT(1,n,zam->ris()->STATE_V());
+            if ((zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(1,n,zam->ris()->STATE_V());
 
         }
         qreal Vars=_undefV_;
@@ -221,10 +229,10 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
 
         otcep->setSTATE_LOCATION(locat);
 
-        // финализируем скорость отцепов
-        if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk){
-            o->updateV_RC(T);
-        }
+//        // финализируем скорость отцепов
+//        if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk){
+//            o->updateV_RC(T);
+//        }
         otcep->setSTATE_V(o->STATE_V());
 
         // порядковый на рц

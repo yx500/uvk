@@ -18,8 +18,8 @@ HEADERS += \
 #    $$PWD/tos_rctracking.h \
 #    $$PWD/tos_kzptracking.h \
     $$PWD/tos_otcepdata.h \
-    $$PWD/tos_dsotracking.h \
-    $$PWD/dynamicotcepsystem.h
+    $$PWD/tos_dsotracking.h
+#    $$PWD/dynamicotcepsystem.h
     
 
 SOURCES += \
@@ -36,5 +36,5 @@ SOURCES += \
 #    $$PWD/tos_rctracking.cpp \
 #    $$PWD/tos_kzptracking.cpp \
     $$PWD/tos_otcepdata.cpp \
-    $$PWD/tos_dsotracking.cpp \
-    $$PWD/dynamicotcepsystem.cpp
+    $$PWD/tos_dsotracking.cpp
+#    $$PWD/dynamicotcepsystem.cpp

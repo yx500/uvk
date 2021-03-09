@@ -20,7 +20,9 @@ class IGetNewOtcep
     public:
     virtual int getNewOtcep(m_RC*rc,int drobl)=0;
     virtual int resetOtcep2prib(int num)=0;
+    virtual int nerascep(int num)=0;
 };
+
 
 
 class tos_System : public BaseWorker
@@ -33,6 +35,7 @@ public:
     void setIGetNewOtcep(IGetNewOtcep *i){iGetNewOtcep=i;}
     tos_OtcepData *getNewOtcep(tos_Rc *trc, int drobl);
     int resetOtcep2prib(int num);
+    int nerascep(int num);
 
     virtual void makeWorkers(ModelGroupGorka *modelGorka);
 

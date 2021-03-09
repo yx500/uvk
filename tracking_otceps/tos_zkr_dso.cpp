@@ -18,6 +18,7 @@ tos_Zkr_DSO::tos_Zkr_DSO(tos_System_DSO *parent, tos_Rc *rc) : BaseWorker(parent
     // [1][0] [1][1] - датчики определенияя заезда
     //
 
+    rc->tdso[1]=TOS->mDSO2TDSO[rc_zkr->dso[1][0]];
 
     for (int i=0;i<2;i++){
         for (int j=0;j<2;j++){
@@ -57,7 +58,7 @@ QList<SignalDescription> tos_Zkr_DSO::acceptOutputSignals()
         rc_zkr->SIGNAL_STATE_OTCEP_FREE()<<
         rc_zkr->SIGNAL_STATE_OTCEP_IN()<<
         rc_zkr->SIGNAL_STATE_OTCEP_VAGADD()<<
-    rc_zkr->SIGNAL_STATE_OTCEP_BEVAGADD();
+        rc_zkr->SIGNAL_STATE_OTCEP_BEVAGADD();
     return l;
 }
 void tos_Zkr_DSO::state2buffer()
@@ -260,7 +261,12 @@ void tos_Zkr_DSO::endOtcep(const QDateTime &T)
                 if ((o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()<o->otcep->STATE_SL_VAGON_CNT())){
                     rc_zkr->setSTATE_OTCEP_BEVAGADD(true);
                     TOS->getNewOtcep(trc,o->otcep->STATE_SL_VAGON_CNT()-o->otcep->STATE_ZKR_VAGON_CNT());
+                } else {
+                    if ((o->otcep->STATE_SL_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>o->otcep->STATE_SL_VAGON_CNT())){
+                        TOS->nerascep(o->otcep->NUM());
+                    }
                 }
+
             }
         }
     }

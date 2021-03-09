@@ -10,6 +10,8 @@ tos_DsoTracking::tos_DsoTracking(tos_System_DSO *parent, tos_DSO *dso) : BaseWor
 
     rc_next[0]=TOS->mRc2TRC[tdso->dso->rc_next[0]];
     rc_next[1]=TOS->mRc2TRC[tdso->dso->rc_next[1]];
+    rc_next[0]->tdso[1]=dso;
+    rc_next[1]->tdso[0]=dso;
     tdso2=nullptr;
 }
 

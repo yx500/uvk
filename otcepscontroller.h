@@ -33,7 +33,8 @@ public:
     void setNewID_ROSP(quint32 ID_ROSP);
 
     void updateVagons();
-    m_Otcep *inc_otcep(int N, int mar, int kv);
+    m_Otcep *inc_otcep(int N, int mar);
+    m_Otcep *inc_otcep_drobl(int N, int kv);
     QList<SignalDescription> l_chanelVag;
     QMap<m_Otcep*,SignalDescription> mO29;
     QMap<m_Otcep*,SignalDescription> mO2109;

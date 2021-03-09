@@ -6,7 +6,7 @@
 #include "baseobjecttools.h"
 #include "mvp_system.h"
 
-#include "tos_speedcalc.h"
+//#include "tos_speedcalc.h"
 #include "m_otceps.h"
 #include "m_zam.h"
 
@@ -351,7 +351,7 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
                 if (trc_rcf!=nullptr){
                     TOtcepDataOs f_os;
                     for (TOtcepDataOs &os :trc_rcf->l_os){
-                        if ((os.num==o->otcep->NUM())&&(os.os_otcep<f_os.os_otcep)) f_os=os;
+                        if ((os.num==o->otcep->NUM())&&(os.os_otcep>f_os.os_otcep)) f_os=os;
                     }
                     int os_cnt=0;
                     int vag_cnt=0;
@@ -411,6 +411,16 @@ void tos_System_DSO::resetTracking(int num)
 void tos_System_DSO::resetTracking()
 {
     tos_System::resetTracking();
+    // сотрем оси на концевиках
+    foreach (auto trc, l_trc_park) {
+        trc->l_os.clear();
+    }
+    foreach (auto trc, l_trc) {
+        if ((trc->tdso[0]==nullptr)||(trc->tdso[1]==nullptr)) {
+            trc->l_os.clear();
+        }
+    }
+
     //
     foreach (auto trc, l_trc) {
         trc->l_otceps.clear();
@@ -421,9 +431,7 @@ void tos_System_DSO::resetTracking()
         trc->rc->setSTATE_ERR_LS(false);
     }
 
-    foreach (auto trc, l_trc_park) {
-        trc->l_os.clear();
-    }
+
 
     //    foreach (auto w, l_dso) {
     //        w->resetStates();
