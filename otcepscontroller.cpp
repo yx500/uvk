@@ -236,6 +236,7 @@ m_Otcep* OtcepsController::inc_otcep(int N,int mar)
         // добавляем 1 пустой вагон
         //otcep->vVag.push_back(tSlVagon());
         otcep->setSTATE_ENABLED(true);
+        updateVagons();
     }
     return otcep;
 }
@@ -326,11 +327,13 @@ bool OtcepsController::cmd_SET_CUR_OTCEP(QMap<QString, QString> &m, QString &acc
                 if ((otcep->STATE_ENABLED())&&(otcep->STATE_LOCATION()==m_Otcep::locationOnPrib)){
                     otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
                     otcep->setSTATE_GAC_ACTIVE(0);
+                    otcep->setSTATE_ERROR(0);
                 }
             } else {
                 if (otcep->STATE_ENABLED()) {
                     otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
                     otcep->setSTATE_GAC_ACTIVE(0);
+                    otcep->setSTATE_ERROR(0);
                 }
 
             }
@@ -339,6 +342,7 @@ bool OtcepsController::cmd_SET_CUR_OTCEP(QMap<QString, QString> &m, QString &acc
         foreach (m_Otcep*otcep, otceps->l_otceps) {
             otcep->setSTATE_TICK(otcep->STATE_TICK()+1);
         }
+        updateVagons();
         return true;
     }
 
@@ -397,6 +401,7 @@ bool OtcepsController::cmd_SET_OTCEP_STATE(QMap<QString, QString> &m, QString &a
                 acceptStr=QString("Отцеп %1 свойства изменены.").arg(N);
                 otcep->inc_tick();
             }
+            updateVagons();
             return true;
         }
     }
@@ -491,6 +496,11 @@ void OtcepsController::setNewID_ROSP(quint32 ID_ROSP)
 
 void OtcepsController::updateVagons()
 {
-
+    // инкремент тика
+    foreach (auto otcep, otceps->otceps()) {
+        if (otcep->STATE_ENABLED()==1){
+            otcep->setSTATE_TICK(otcep->STATE_TICK()+1);
+        }
+    }
 }
 

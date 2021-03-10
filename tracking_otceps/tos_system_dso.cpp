@@ -701,13 +701,18 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
                             bw1=true;
 
                         }
-                        // негабаритность
+
                         m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
                         if (str!=nullptr){
+                             // негабаритность
                             if ((str->STATE_UVK_NGBDYN_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) bw2=true;
                             if ((str->STATE_UVK_NGBDYN_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  bw2=true;
                             if ((str->STATE_UVK_NGBSTAT_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) bw2=true;
                             if ((str->STATE_UVK_NGBSTAT_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  bw2=true;
+                            // АВ
+                            if (str->STATE_POL()!=mr.pol){
+                                if (str->STATE_UVK_AV()) bw2=true;
+                            }
                             if ((bw1)||(bw2)) warn2=1;
                             if (bw1) {
                                 if ((!ex_pred_busy)&&((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk) || (otcep->STATE_IS_CURRENT()==1)))

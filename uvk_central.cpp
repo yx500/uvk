@@ -782,6 +782,11 @@ int UVK_Central::resetOtcep2prib(int num)
         if (otcep!=nullptr){
             TOS->resetTracking(num);
             otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
+            otcep->setSTATE_ZKR_TLG(0);
+            otcep->setSTATE_ZKR_VES(0);
+            otcep->setSTATE_ZKR_OSY_CNT(0);
+            otcep->setSTATE_ZKR_VAGON_CNT(0);
+            otcep->setSTATE_ZKR_BAZA(0);
             return num;
         }
     }

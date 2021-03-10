@@ -264,6 +264,7 @@ void tos_Zkr_DSO::endOtcep(const QDateTime &T)
                 } else {
                     if ((o->otcep->STATE_SL_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>o->otcep->STATE_SL_VAGON_CNT())){
                         TOS->nerascep(o->otcep->NUM());
+                        rc_zkr->setSTATE_ERROR_NERASCEP(true);
                     }
                 }
 
@@ -280,7 +281,7 @@ void tos_Zkr_DSO::endOtcep(const QDateTime &T)
     TOS->updateOtcepsOnRc(T);
 
 
-    rc_zkr->setSTATE_ERROR_NERASCEP(false);
+
 
 }
 
@@ -298,7 +299,7 @@ void tos_Zkr_DSO::in_os(const QDateTime &T)
         if (o!=nullptr){
             o->otcep->setSTATE_ZKR_OSY_CNT(os.os_otcep);
             if ((o->otcep->STATE_SL_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>o->otcep->STATE_SL_VAGON_CNT())){
-                rc_zkr->setSTATE_ERROR_NERASCEP(true);
+
             }
         }
         os.p=_pOtcepMiddle;
