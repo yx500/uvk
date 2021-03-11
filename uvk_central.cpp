@@ -681,22 +681,27 @@ void UVK_Central::checkFinishRospusk(const QDateTime &T)
 {
     bool STATE_GAC_FINISH=false;
     if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk){
-        bool noendex=false;
+        bool finish=true;
         // ищем все конченые отцепы
         foreach (auto otcep, otcepsController->otceps->otceps()) {
             if (otcep->STATE_ENABLED()){
                 if ((otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) ||(otcep->STATE_GAC_ACTIVE()==1)){
-                    noendex=true;
+                    finish=false;
                     break;
                 }
-                if ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk) && (otcep->STATE_V()==0) && (otcep->STATE_GAC_ACTIVE()!=1)){
-                    noendex=true;
+                if ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk) &&(otcep->STATE_MAR()!=otcep->STATE_MAR_F())){
+                    finish=false;
+                    break;
+                }
+                if ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk) &&
+                        (otcep->STATE_V()!=0) && (otcep->STATE_V()!=_undefV_)){
+                    finish=false;
                     break;
                 }
             }
         }
 
-        if (!noendex) STATE_GAC_FINISH=true;
+        if (finish) STATE_GAC_FINISH=true;
 
     } else {
         if (t_STATE_GAC_FINISH.isValid()) t_STATE_GAC_FINISH=QDateTime();

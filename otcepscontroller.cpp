@@ -401,7 +401,7 @@ bool OtcepsController::cmd_SET_OTCEP_STATE(QMap<QString, QString> &m, QString &a
                 acceptStr=QString("Отцеп %1 свойства изменены.").arg(N);
                 otcep->inc_tick();
             }
-            updateVagons();
+//            updateVagons();
             return true;
         }
     }

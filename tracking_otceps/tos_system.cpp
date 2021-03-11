@@ -169,19 +169,21 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
         }
 
 
-        // скорость входа
-        if (mRc2Zam.contains(otcep->RCS)){
-            m_Zam *zam=mRc2Zam[otcep->RCS];
-            int n=zam->NTP();
-            if ((zam->TIPZM()==1) &&(otcep->STATE_V_INOUT(0,n)==_undefV_)&&(zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(0,n,zam->ris()->STATE_V());
-        }
-        // скорость выхода
-        if (mRc2Zam.contains(otcep->RCF)){
-            m_Zam *zam=mRc2Zam[otcep->RCF];
-            int n=zam->NTP();
-            if ((zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(1,n,zam->ris()->STATE_V());
+//        // скорость входа
+//        if (mRc2Zam.contains(otcep->RCS)){
+//            m_Zam *zam=mRc2Zam[otcep->RCS];
+//            int n=zam->NTP()-1;
+//            auto v=otcep->STATE_V_INOUT(0,n);
+//            auto v2=zam->ris()->STATE_V();
+//            if ((zam->TIPZM()==1) &&(otcep->STATE_V_INOUT(0,n)==_undefV_)&&(zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(0,n,zam->ris()->STATE_V());
+//        }
+//        // скорость выхода
+//        if (mRc2Zam.contains(otcep->RCF)){
+//            m_Zam *zam=mRc2Zam[otcep->RCF];
+//            int n=zam->NTP()-1;
+//            if ((zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(1,n,zam->ris()->STATE_V());
 
-        }
+//        }
         qreal Vars=_undefV_;
         foreach (auto rc, otcep->vBusyRc) {
             if (!mRc2Zam.contains(rc)) continue;

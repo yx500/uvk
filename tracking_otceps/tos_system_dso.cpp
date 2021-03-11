@@ -316,12 +316,14 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
                     }
                     if (((!lstOs.t.isValid())||(lstOs.t<os.t))&&(os.v!=_undefV_)){
                         lstOs=os;
+                        if (trc->rc->STATE_BUSY_DSO_STOP()) lstOs.v=0;
                     }
                 }
             }
         }
 
         o->otcep->setSTATE_V_DISO(lstOs.v);
+
 
         if ((rcs==nullptr)&&(o->otcep->RCS!=nullptr)){
             resetTracking(o->otcep->NUM());
@@ -593,6 +595,7 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,qreal os_v,c
             moved_os=rc1->l_os.first();
             rc1->l_os.pop_front();
 
+
         }
         moved_os.t=T;
         moved_os.d=d;
@@ -603,7 +606,12 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,qreal os_v,c
                 if (!rc0->l_otceps.contains(moved_os.num))
                     rc0->l_otceps.push_back(moved_os.num);
             }
+
         }
+        // скорость выхода
+       if (rc1!=nullptr) setOtcepVIO(1,rc1, moved_os);
+       // скорость входа
+       if (rc0!=nullptr) setOtcepVIO(0,rc0, moved_os);
     }
     //  0 --> 1  <<D0
     if (d==_back){
@@ -704,7 +712,7 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
 
                         m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(mr.rc) ;
                         if (str!=nullptr){
-                             // негабаритность
+                            // негабаритность
                             if ((str->STATE_UVK_NGBDYN_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) bw2=true;
                             if ((str->STATE_UVK_NGBDYN_MN()==1) && (mr.pol==MVP_Enums::pol_plus))  bw2=true;
                             if ((str->STATE_UVK_NGBSTAT_PL()==1) && (mr.pol==MVP_Enums::pol_minus)) bw2=true;
@@ -732,5 +740,29 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
         }
         otcep->setSTATE_GAC_W_STRA(warn1);
         otcep->setSTATE_GAC_W_STRB(warn2);
+    }
+}
+
+void tos_System_DSO::setOtcepVIO(int io,tos_Rc *trc, TOtcepDataOs os)
+{
+    if (os.v==_undefV_) return;
+    auto o=otcep_by_num(os.num);
+    if (o!=nullptr){
+        // скорость входа
+        if ((io==0)&&(os.os_otcep==2)){
+            if (mRc2Zam.contains(trc->rc)){
+                m_Zam *zam=mRc2Zam[trc->rc];
+                int n=zam->NTP()-1;
+                if ((zam->TIPZM()!=2)) o->otcep->setSTATE_V_INOUT(0,n,os.v);
+            }
+        }
+        // скорость выхода
+        if ((io==1)&&(os.os_otcep>=2)){
+            if (mRc2Zam.contains(trc->rc)){
+                m_Zam *zam=mRc2Zam[trc->rc];
+                int n=zam->NTP()-1;
+                if ((zam->TIPZM()>0)) o->otcep->setSTATE_V_INOUT(1,n,os.v);
+            }
+        }
     }
 }

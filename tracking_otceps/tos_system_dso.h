@@ -45,6 +45,8 @@ public:
 
     void set_otcep_STATE_WARN(const QDateTime &T);
 
+    void setOtcepVIO(int io, tos_Rc *rc, TOtcepDataOs os);
+
     TOtcepDataOs moveOs(tos_Rc *rc0, tos_Rc *rc1, int d, qreal os_v, const QDateTime &T);
 
 
