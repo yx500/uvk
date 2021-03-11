@@ -25,27 +25,7 @@ void tos_OtcepData::resetTracking()
 {
     //снимаем только параметры TOS
 
-    if (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib){
-        otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
-    }
-    otcep->setSTATE_MAR_F(0);
-    otcep->setSTATE_ZKR_PROGRESS(0);
-    otcep->setSTATE_ZKR_S_IN(0);
-
-    //otcep->setSTATE_GAC_ACTIVE(0);
-    otcep->setSTATE_GAC_W_STRA(0);
-    otcep->setSTATE_GAC_W_STRB(0);
-
-    otcep->setSTATE_KZP_OS(m_Otcep::kzpUnknow);
-    otcep->setSTATE_V(_undefV_);
-    otcep->setSTATE_V_RC(_undefV_);
-    otcep->setSTATE_V_ARS(_undefV_);
-    otcep->setSTATE_V_KZP(_undefV_);
-    otcep->setSTATE_V_DISO(_undefV_);
-
-    otcep->RCS=nullptr;
-    otcep->RCF=nullptr;
-    otcep->vBusyRc.clear();
+    otcep->resetTracking();
 
     dos_RCS=nullptr;
     dos_RCF=nullptr;

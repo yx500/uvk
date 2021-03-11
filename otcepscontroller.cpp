@@ -265,7 +265,7 @@ m_Otcep *OtcepsController::inc_otcep_drobl(int N,int kv)
             part++;
             new_otcep->setSTATE_EXTNUMPART(part);
             new_otcep->setSTATE_EXTNUM(otcep->STATE_EXTNUM());
-            otcep->setSTATE_SL_VAGON_CNT(kv);
+            new_otcep->setSTATE_SL_VAGON_CNT(kv);
             if (otcep->STATE_SL_OSY_CNT()>otcep->STATE_ZKR_OSY_CNT()) new_otcep->setSTATE_SL_OSY_CNT(otcep->STATE_SL_OSY_CNT()-otcep->STATE_ZKR_OSY_CNT());
 
             return new_otcep;
@@ -328,20 +328,20 @@ bool OtcepsController::cmd_SET_CUR_OTCEP(QMap<QString, QString> &m, QString &acc
                     otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
                     otcep->setSTATE_GAC_ACTIVE(0);
                     otcep->setSTATE_ERROR(0);
+                    otcep->resetTracking();
                 }
             } else {
                 if (otcep->STATE_ENABLED()) {
                     otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
                     otcep->setSTATE_GAC_ACTIVE(0);
+                    otcep->setSTATE_MAR_F(0);
                     otcep->setSTATE_ERROR(0);
+                    otcep->resetTracking();
                 }
 
             }
         }
         acceptStr=QString("Отцеп %1 стал текущим.").arg(N);
-        foreach (m_Otcep*otcep, otceps->l_otceps) {
-            otcep->setSTATE_TICK(otcep->STATE_TICK()+1);
-        }
         updateVagons();
         return true;
     }
