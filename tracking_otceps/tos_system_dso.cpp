@@ -475,10 +475,14 @@ void tos_System_DSO::reset_1_os(const QDateTime &T)
             for (int d=0;d<2;d++){
                 auto rc1=trc->next_rc[d];
                 if ((rc1==nullptr)||(!rc1->l_os.isEmpty())) {nesnimat=true;break;}
+                if (rc1!=nullptr){
+                    auto rc2=rc1->next_rc[d];
+                    if ((rc2==nullptr)||(!rc2->l_os.isEmpty())) {nesnimat=true;break;}
+                }
             }
             if (nesnimat) continue;
             auto os=trc->l_os.first();
-            if (os.t.msecsTo(T)>1000){
+            if (os.t.msecsTo(T)>5000){
                 trc->l_os.clear();
                 trc->rc->setSTATE_ERR_LZ(true);
             }
@@ -609,9 +613,9 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,qreal os_v,c
 
         }
         // скорость выхода
-       if (rc1!=nullptr) setOtcepVIO(1,rc1, moved_os);
-       // скорость входа
-       if (rc0!=nullptr) setOtcepVIO(0,rc0, moved_os);
+        if (rc1!=nullptr) setOtcepVIO(1,rc1, moved_os);
+        // скорость входа
+        if (rc0!=nullptr) setOtcepVIO(0,rc0, moved_os);
     }
     //  0 --> 1  <<D0
     if (d==_back){
