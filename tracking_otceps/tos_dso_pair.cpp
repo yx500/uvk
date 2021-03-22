@@ -1,137 +1,46 @@
 #include "tos_dso_pair.h"
+#include "tos_system_dso.h"
+
 #include "m_strel_gor_y.h"
-tos_DsoPair::tos_DsoPair(tos_System_DSO *parent, tos_DSO *dso1, tos_DSO *dso2) : tos_DsoTracking(parent,dso2)
+
+tos_DsoPair::tos_DsoPair(tos_System_DSO *parent, tos_DSO *tdso1, tos_DSO *tdso0)
 {
     //    l_tlg.reserve(64);
-    setObjectName(dso1->objectName()+" "+dso2->objectName());
-    this->dso1=dso1;
-    this->dso2=dso2;
-    strel=qobject_cast<m_Strel_Gor_Y*>(dso1->dso->rc);
+//    setObjectName(tdso1->objectName()+" "+tdso0->objectName());
+    TOS=parent;
+    this->tdso0=tdso0;
+    this->tdso1=tdso1;
+    strel=qobject_cast<m_Strel_Gor_Y*>(tdso0->dso->rc_next[0]);
+    // tdso1 DSO0  <===D0
+
+    rc=TOS->mRc2TRC[tdso0->dso->rc_next[0]];
+    rc_next[_back]=TOS->mRc2TRC[tdso0->dso->rc_next[1]];
+    rc_next[_forw]=TOS->mRc2TRC[tdso1->dso->rc_next[0]];
 }
 
-//void tos_DsoPair::updateStates_n(int os1, int os2)
-//{
-//    os1=abs(os1);
-//    os2=abs(os2);
-//    if ((os1==0)&&(os2==0)) {
-//        if (sost!=tlg_0){
-//            c.os_start=0;
-//            c.tlg_os=0;
-//            tlg_cnt=0;
-//            sost=tlg_0;
-//            l_tlg.clear();
-//        }
-//        sost=tlg_0;
-//    }
-
-//    if (sost!=tlg_0){
-//        if (d==1){
-//            int os=os1;
-//            os1=os2;
-//            os2=os;
-//        }
-//    }
-
-//    switch (sost) {
-//    case tlg_error:
-//        break;
-//    case tlg_0:{
-//        if ((os1==0)&&(os2==1)){
-//            d=0;
-//            sost=tlg_wait1;
-//        }
-//        if ((os1==1)&&(os2==0)){
-//            d=1;
-//            sost=tlg_wait1;
-//        }
-//    }
-//        break;
-//    case tlg_wait1:{
-//        if ((os1>c.os_start) && (os1==os2)) {
-//            if (l_tlg.size()>4096){
-//                sost=tlg_error;
-//            } else {
-//                c.tlg_os=os1-c.os_start;
-//                tlg_cnt++;
-//                l_tlg.push_back(c);
-//                c.os_start=os1;
-//                sost=tlg_wait2;
-//            }
-//        } else {
-//            if ((os1<c.os_start)) {
-//                if ((os1==c.os_start-1)&&(!l_tlg.isEmpty())){
-//                    c=l_tlg.last();
-//                    tlg_cnt--;
-//                    l_tlg.pop_back();
-//                    sost=tlg_wait2;
-//                } else {
-//                    sost=tlg_error;
-//                }
-//            }
-//        }
-//    }
-//        break;
-//    case tlg_wait2:
-//    {
-//        if (os1<c.os_start){
-//            if ((os1==c.os_start-1)&&(!l_tlg.isEmpty())){
-//                c=l_tlg.last();
-//                tlg_cnt--;
-//                l_tlg.pop_back();
-//                sost=tlg_wait1;
-//            } else {
-//                sost=tlg_error;
-//            }
-//        } else if (os1==c.os_start+c.tlg_os){
-//            tlg_cnt++;
-//            l_tlg.push_back(c);
-//            c.os_start=os1;
-//            c.tlg_os=0;
-//            sost=tlg_wait1;
-//        } else if (os1>c.os_start+c.tlg_os){
-//            sost=tlg_error;
-//        }
-//    }
-//        break;
-//    } //switch
-//}
 
 void tos_DsoPair::resetStates()
 {
-    //    c.os_start=0;
-    //    c.tlg_os=0;
-    //    tlg_cnt=0;
-    //    sost=tlg_0;
-    //    l_tlg.clear();
+
     sost=_sost_unknow;
     l_os.clear();
 }
-void tos_DsoPair::work(const QDateTime &)
-{
-    // DSO1 DSO2  <===D0
 
-    // сброс при свободности
-    if ((dso1->dso->rc!=nullptr)&&(dso1->dso->rc->STATE_BUSY_DSO()==0)&&
-            (dso1->dso->rc->next_rc[0]!=nullptr)&&(dso1->dso->rc->next_rc[0]->STATE_BUSY_DSO()==0)&&
-            (dso1->dso->rc->next_rc[1]!=nullptr)&&(dso1->dso->rc->next_rc[1]->STATE_BUSY_DSO()==0)
-            ){
-        sost=_sost_wait1t;
-        d_wait=-1;
-        os_count=0;
-        os_n=0;
-        l_os.clear();
-    }
+void tos_DsoPair::work_os(int dso0_os_moved,int dso1_os_moved,TOtcepDataOs os)
+{
+    // tdso1 tdso0  <===D0
+
 
     sost_teleg=_tlg_unknow;
 
 
-    if ((dso1->os_moved==_os2forw)||(dso2->os_moved==_os2back)){
+    if ((dso1_os_moved==_os2forw)||(dso0_os_moved==_os2back)){
         if (l_os.isEmpty()) sost=_sost_unknow;
     }
     if  (sost==_sost_unknow) return;
 
     if  (sost==_sost_wait1t){
-        if (dso1->os_moved==_os2forw){
+        if (dso1_os_moved==_os2forw){
             // вышла
             if (l_os.first().d==_forw) {
                 sost=_sost_wait2t;
@@ -141,13 +50,13 @@ void tos_DsoPair::work(const QDateTime &)
             }
             l_os.removeFirst();
         }
-        if (dso1->os_moved==_os2back){
-            add_os(_back);
+        if (dso1_os_moved==_os2back){
+            l_os.push_front(os);
         }
-        if (dso2->os_moved==_os2forw){
-            add_os(_forw);
+        if (dso0_os_moved==_os2forw){
+            l_os.push_back(os);
         }
-        if (dso2->os_moved==_os2back){
+        if (dso0_os_moved==_os2back){
             // вышла
             if (l_os.last().d==_back) {
                 sost=_sost_wait2t;
@@ -160,7 +69,7 @@ void tos_DsoPair::work(const QDateTime &)
         return;
     }
     if  (sost==_sost_wait2t){
-        if (dso1->os_moved==_os2forw){
+        if (dso1_os_moved==_os2forw){
             // вышла
             if (d_wait==_forw){
                 os_n++;
@@ -177,8 +86,8 @@ void tos_DsoPair::work(const QDateTime &)
             }
             l_os.removeFirst();
         }
-        if (dso1->os_moved==_os2back){
-            add_os(_back);
+        if (dso1_os_moved==_os2back){
+            l_os.push_front(os);
             if (d_wait==_forw){
                 if (os_n>0){
                     l_os.front().d=_forw;
@@ -189,8 +98,8 @@ void tos_DsoPair::work(const QDateTime &)
                 }
             }
         }
-        if (dso2->os_moved==_os2forw){
-            add_os(_forw);
+        if (dso0_os_moved==_os2forw){
+            l_os.push_back(os);
             if (d_wait==_back){
                 if (os_n>0){
                     l_os.last().d=_back;
@@ -202,7 +111,7 @@ void tos_DsoPair::work(const QDateTime &)
             }
 
         }
-        if (dso2->os_moved==_os2back){
+        if (dso0_os_moved==_os2back){
             // вышла
             if (d_wait==_back){
                 os_n++;
@@ -221,19 +130,53 @@ void tos_DsoPair::work(const QDateTime &)
         }
     }
 
-
 }
 
-void tos_DsoPair::add_os(int d)
+void tos_DsoPair::work(const QDateTime &)
 {
-    TOtcepDataOs od;od.d=d;
-    if (d==_forw)  {
-        if ((rc_next[1]!=nullptr) &&  (!rc_next[1]->l_os.isEmpty())){
-            od=rc_next[1]->l_os.first();
-            od.d=d;
-        }
-        l_os.push_back(od);
+    // tdso1 tdso0  <===D0
+
+    // сброс при свободности
+    if ((rc!=nullptr)&&(rc->rc->STATE_BUSY_DSO()==0)&&
+            (rc_next[0]!=nullptr)&&(rc_next[0]->rc->STATE_BUSY_DSO()==0)&&
+            (rc_next[1]!=nullptr)&&(rc_next[1]->rc->STATE_BUSY_DSO()==0)
+            ){
+        sost=_sost_wait1t;
+        d_wait=-1;
+        os_count=0;
+        os_n=0;
+        l_os.clear();
     }
-    if (d==_back)  l_os.push_front(od);
+
+    TOtcepDataOs od;
+    if (tdso0->os_moved==_os2forw){
+        od.d=_forw;
+        if ((rc_next[1]!=nullptr) &&  (!rc_next[1]->l_os.isEmpty())) od=rc_next[1]->l_os.first();
+        work_os(tdso0->os_moved,_os_none,od);
+    }
+    if (tdso0->os_moved==_os2back){
+        od.d=_back;
+        work_os(tdso0->os_moved,_os_none,od);
+    }
+    if (tdso1->os_moved==_os2forw){
+        od.d=_forw;
+        work_os(_os_none,tdso1->os_moved,od);
+    }
+    if (tdso1->os_moved==_os2back){
+        od.d=_back;
+        if ((rc_next[0]!=nullptr) &&  (!rc_next[0]->l_os.isEmpty())) od=rc_next[0]->l_os.last();
+        work_os(_os_none,tdso1->os_moved,od);
+    }
+
 
 }
+
+void tos_DsoPair::free_state()
+{
+    sost=_sost_wait1t;
+    d_wait=-1;
+    os_count=0;
+    os_n=0;
+    l_os.clear();
+}
+

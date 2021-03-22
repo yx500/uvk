@@ -36,6 +36,8 @@ public:
 
     m_DSO_RD_21 *dso;
 
+    m_DSO_RD_21 *alive_dso();
+
     int os_moved;
     qreal os_v;
 signals:

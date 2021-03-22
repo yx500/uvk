@@ -14,9 +14,9 @@ class IUVKGetNewOtcep :public IGetNewOtcep
 {
 public:
     IUVKGetNewOtcep(UVK_Central *uvk){this->uvk=uvk;}
-    virtual int getNewOtcep(m_RC*rc,int drobl){return uvk->getNewOtcep(rc,drobl);}
-    virtual int resetOtcep2prib(int num){return uvk->resetOtcep2prib(num);}
-    virtual int nerascep(int num){return uvk->nerascep(num);}
+    virtual int getNewOtcep(m_RC_Gor_ZKR*rc_zkr){return uvk->getNewOtcep(rc_zkr);}
+    virtual int resetOtcep2prib(m_RC_Gor_ZKR*rc_zkr,int num){return uvk->resetOtcep2prib(rc_zkr,num);}
+    virtual int exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num){return uvk->exitOtcep(rc_zkr,num);}
     UVK_Central *uvk;
 };
 
@@ -722,44 +722,23 @@ void UVK_Central::checkFinishRospusk(const QDateTime &T)
 }
 
 
-int UVK_Central::getNewOtcep(m_RC*rc,int drobl)
+int UVK_Central::getNewOtcep(m_RC_Gor_ZKR*rc_zkr)
 {
     if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk){
         if (maxOtcepCurrenRospusk+1>otcepsController->otceps->l_otceps.size()) return 0;
         // проверим что едем с нужной зкр
         foreach (auto zkr, l_zkr) {
-            if ((rc==zkr) && (zkr->STATE_ROSPUSK()==1)){
+            if ((rc_zkr==zkr) && (zkr->STATE_ROSPUSK()==1)){
                 auto otcep_first=otcepsController->otceps->l_otceps.first();
                 ID_ROSP=otcep_first->STATE_ID_ROSP();
-                if (drobl>0){
-                    // ищем пред отцеп
-                    if (maxOtcepCurrenRospusk>=1){
-                        auto pred_otcep=otcepsController->otceps->otcepByNum(maxOtcepCurrenRospusk);
-                        if ((pred_otcep!=nullptr)&&(pred_otcep->STATE_SL_VAGON_CNT()>1)){
-                            if ((pred_otcep->STATE_ZKR_VAGON_CNT()>0)&&(pred_otcep->STATE_ZKR_VAGON_CNT()<pred_otcep->STATE_SL_VAGON_CNT())){
-                                auto new_otcep=otcepsController->inc_otcep_drobl(maxOtcepCurrenRospusk,
-                                                                                 pred_otcep->STATE_SL_VAGON_CNT()-pred_otcep->STATE_ZKR_VAGON_CNT());
-                                if (new_otcep!=nullptr) {
-                                    zkr->setSTATE_OTCEP_VAGADD(true);
-                                    new_otcep->setSTATE_ENABLED(true);
-                                    new_otcep->setSTATE_ID_ROSP(ID_ROSP);
-                                    new_otcep->setSTATE_GAC_ACTIVE(1);
-                                    maxOtcepCurrenRospusk=new_otcep->NUM();
-                                    auto next_otcep=otcepsController->otceps->otcepByNum(maxOtcepCurrenRospusk+1);
-                                    if (next_otcep!=nullptr) next_otcep->setSTATE_GAC_ACTIVE(0);
-                                    return new_otcep->NUM();
-                                }
-                            }
-
-                        }
-                    }
-                }
 
                 m_Otcep *otcep=otcepsController->otceps->topOtcep();
                 if (otcep!=nullptr)  {
                     if (otcep->NUM()>maxOtcepCurrenRospusk) maxOtcepCurrenRospusk=otcep->NUM();
                     if (otcep->STATE_MAR()>0) otcep->setSTATE_GAC_ACTIVE(1);
                     if (otcep->STATE_ID_ROSP()==0) otcep->setSTATE_ID_ROSP(ID_ROSP);
+                    if (otcep->STATE_EXTNUMPART()>0)
+                        zkr->setSTATE_OTCEP_VAGADD(true);
                     return otcep->NUM();
                 }
                 otcep=otcepsController->otceps->otcepByNum(maxOtcepCurrenRospusk+1);
@@ -780,47 +759,120 @@ int UVK_Central::getNewOtcep(m_RC*rc,int drobl)
     return 0;
 }
 
-int UVK_Central::resetOtcep2prib(int num)
+int UVK_Central::exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num)
 {
+    auto exit_otcep=otcepsController->otceps->otcepByNum(num);
+    if (exit_otcep==nullptr) return 0;
+    if (num!=maxOtcepCurrenRospusk) return 0;
+    // проверим что едем с нужной зкр
+    foreach (auto zkr, l_zkr) {
+        if ((rc_zkr==zkr) && (zkr->STATE_ROSPUSK()==1)){
+
+            if ((exit_otcep->STATE_SL_VAGON_CNT()>0)&&(exit_otcep->STATE_ZKR_VAGON_CNT()>0)){
+                // дробление
+                if (exit_otcep->STATE_ZKR_VAGON_CNT()<exit_otcep->STATE_SL_VAGON_CNT()){
+
+                    auto otcep_first=otcepsController->otceps->l_otceps.first();
+                    ID_ROSP=otcep_first->STATE_ID_ROSP();
+                    int cnt_vagon_exit=exit_otcep->STATE_ZKR_VAGON_CNT();
+                    auto new_otcep=otcepsController->inc_otcep_drobl(num,cnt_vagon_exit);
+                    if (new_otcep!=nullptr) {
+                        new_otcep->resetZKRStates();
+                        rc_zkr->setSTATE_OTCEP_BEVAGADD(true);
+                        //                        zkr->setSTATE_OTCEP_VAGADD(true);
+                        new_otcep->setSTATE_ENABLED(true);
+                        new_otcep->setSTATE_ID_ROSP(ID_ROSP);
+                        new_otcep->setSTATE_GAC_ACTIVE(1);
+                        maxOtcepCurrenRospusk=new_otcep->NUM();
+                        auto next_otcep=otcepsController->otceps->otcepByNum(maxOtcepCurrenRospusk+1);
+                        if (next_otcep!=nullptr) next_otcep->setSTATE_GAC_ACTIVE(0);
+                        return new_otcep->NUM();
+                    }
+                }
+                // нерасцеп
+                if (exit_otcep->STATE_ZKR_VAGON_CNT()>exit_otcep->STATE_SL_VAGON_CNT()){
+                    // осаживание?
+                    int sum_all_vag=0;
+                    for (int i=num-1;i<otcepsController->otceps->l_otceps.size();i++){
+                        auto otcep=otcepsController->otceps->l_otceps[i];
+                        if (otcep->STATE_ENABLED()) sum_all_vag+=otcep->STATE_SL_VAGON_CNT();
+
+                    }
+                    if (exit_otcep->STATE_ZKR_VAGON_CNT()>=sum_all_vag) return 0;
+                    // тасуем вагоны
+                    rc_zkr->setSTATE_ERROR_NERASCEP(true);
+                    exit_otcep->setSTATE_SL_VAGON_CNT_PRED(exit_otcep->STATE_SL_VAGON_CNT());
+                    int cnt_vagon_perebor=exit_otcep->STATE_ZKR_VAGON_CNT()-exit_otcep->STATE_SL_VAGON_CNT();
+                    for (int i=num;i<otcepsController->otceps->l_otceps.size();i++){
+                        auto next_otcep=otcepsController->otceps->l_otceps[i];
+                        if ((next_otcep->STATE_ENABLED()==0)||(next_otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) return 0;
+                        int cnt_vagon_delete=cnt_vagon_perebor;
+                        if (cnt_vagon_delete>next_otcep->STATE_SL_VAGON_CNT()) cnt_vagon_delete=next_otcep->STATE_SL_VAGON_CNT();
+
+                        // добавляем к ушедшему
+                        int n=exit_otcep->vVag.size()+1;
+                        exit_otcep->setSTATE_SL_VAGON_CNT(exit_otcep->vVag.size()+cnt_vagon_delete);
+
+                        for (int i=0;i<cnt_vagon_delete;i++){
+                            if (i<next_otcep->vVag.size()){
+                                auto v=next_otcep->vVag[i];
+                                v.setSTATE_N_IN_OTCEP(n);n++;
+                                exit_otcep->setVagon(&v);
+                            }
+                        }
+                        // удаляем оцеп
+                        if (cnt_vagon_delete>=next_otcep->vVag.size()){
+                            next_otcep->setSTATE_SL_VAGON_CNT_PRED(next_otcep->STATE_SL_VAGON_CNT());
+                            next_otcep->setSTATE_SL_VAGON_CNT(0);
+                            next_otcep->resetTrackingStates();
+                            next_otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+                            maxOtcepCurrenRospusk=next_otcep->NUM()+1;
+                        } else {
+                            // удаляем удаленные
+                            n=1;
+                            for (int i=0;i<next_otcep->vVag.size()-cnt_vagon_delete-1;i++){
+                                auto &v0=next_otcep->vVag[i];
+                                auto &v1=next_otcep->vVag[i+1];
+                                v0.assign(&v1);
+                                v0.setSTATE_N_IN_OTCEP(n);n++;
+                            }
+                            next_otcep->setSTATE_SL_VAGON_CNT_PRED(next_otcep->STATE_SL_VAGON_CNT());
+                            next_otcep->setSTATE_SL_VAGON_CNT(next_otcep->vVag.size()-cnt_vagon_delete);
+                            break;
+                        }
+                        cnt_vagon_perebor=cnt_vagon_perebor-cnt_vagon_delete;
+                        if (cnt_vagon_perebor<0) break;
+                    }//  for (int i=num;i<otcepsController->otceps->l_otceps.size();i++){
+                    otcepsController->updateVagons();
+                    return maxOtcepCurrenRospusk;
+                }
+            }
+            break;
+        } //if ((rc_zkr==zkr) && (zkr->STATE_ROSPUSK()==1)){
+
+    }
+    return 0;
+
+}
+
+
+int UVK_Central::resetOtcep2prib(m_RC_Gor_ZKR*,int num)
+{
+    auto otcep=otcepsController->otceps->otcepByNum(num);
+    if (otcep!=nullptr){
+        TOS->resetTracking(num);
+        otcep->resetZKRStates();
+    }
     if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk)) {
-        auto otcep=otcepsController->otceps->otcepByNum(num);
         if (otcep!=nullptr){
-            TOS->resetTracking(num);
             otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
-            otcep->setSTATE_ZKR_TLG(0);
-            otcep->setSTATE_ZKR_VES(0);
-            otcep->setSTATE_ZKR_OSY_CNT(0);
-            otcep->setSTATE_ZKR_VAGON_CNT(0);
-            otcep->setSTATE_ZKR_BAZA(0);
             return num;
         }
     }
+    if (otcep!=nullptr) return num;
     return 0;
 }
 
-int UVK_Central::nerascep(int num)
-{
-    if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk)) {
-        auto otcep=otcepsController->otceps->otcepByNum(num);
-        auto otcep_next=otcepsController->otceps->otcepByNum(num+1);
-        if ((otcep!=nullptr)&&(otcep_next!=nullptr)){
-            if ((otcep_next->STATE_ENABLED()==1)&&
-                    (otcep_next->STATE_LOCATION()==m_Otcep::locationOnPrib)&&
-                    (otcep->STATE_SL_VAGON_CNT()>0)&&
-                    (otcep_next->STATE_SL_VAGON_CNT()>0)){
-                if ((otcep->STATE_ZKR_VAGON_CNT()==otcep->STATE_SL_VAGON_CNT()+otcep_next->STATE_SL_VAGON_CNT())){
-
-                    TOS->resetTracking(otcep_next->NUM());
-                    otcep_next->setSTATE_LOCATION(m_Otcep::locationUnknow);
-                    otcep_next->setSTATE_ERROR(1);
-                    maxOtcepCurrenRospusk=otcep_next->NUM();
-                    return num;
-                }
-            }
-        }
-    }
-    return 0;
-}
 
 QList<SignalDescription> UVK_Central::acceptOutputSignals()
 {

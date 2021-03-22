@@ -40,6 +40,8 @@ public:
 
     void work(const QDateTime &T) override;
     void work_dso_tlg(const QDateTime &T);
+    void work_dso_tlg2(const QDateTime &T);
+    void work_dso_db(const QDateTime &T);
 
     tos_Rc *trc;
     m_RC_Gor_ZKR * rc_zkr;
@@ -77,20 +79,23 @@ signals:
 
 public slots:
 protected:
-    tos_DSO *tdso[2][2];
+//    tos_DSO *tdso[2][2];
+    tos_DSO *tdso_osy;
+    tos_DSO *tdso_tlg[2];
+    tos_DSO *tdso_db[2];
     tos_System_DSO *TOS;
-    tos_DSO * alive_dso();
 
     TOtcepDataOs cur_os;
 
     t_zkr_state curr_state_zkr;
     t_zkr_state prev_state_zkr;
 
+     QList<TOtcepDataOs> l_os_db;
+
     void newOtcep(const QDateTime &T);
     void endOtcep(const QDateTime &T);
     void in_os(const QDateTime &T);
     void out_os(const QDateTime &T);
-    void setOtcepBaza();
     void check_end_in(const QDateTime &T);
 
 

@@ -16,10 +16,8 @@ public:
     virtual ~tos_DsoTracking(){}
     void resetStates() override;
     void work(const QDateTime &T) override;
-    void add2DSO(tos_DSO *dso);
 
     tos_DSO *tdso;
-    tos_DSO *tdso2;
     tos_Rc *rc_next[2];
 
 

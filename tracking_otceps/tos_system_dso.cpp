@@ -53,12 +53,10 @@ void tos_System_DSO::makeWorkers(ModelGroupGorka *modelGorka)
         l_tdso.push_back(tdso);
         mDSO2TDSO[dso]=tdso;
         if ((dso->rc_next[0]!=nullptr)&&(dso->rc_next[1]!=nullptr)){
-            // проверяем на повтор
+            // проверяем на дубль
             bool ex=false;
             foreach (auto trdso1, l_trdso) {
-                if ((trdso1->tdso->dso->rc_next[0]==dso->rc_next[0])&&
-                        (trdso1->tdso->dso->rc_next[1]==dso->rc_next[1])){
-                    trdso1->add2DSO(tdso);
+                if (trdso1->tdso->dso->dso_dubl==dso){
                     mDSO2TRDSO[dso]=trdso1;
                     ex=true;
                     break;
@@ -294,12 +292,19 @@ void tos_System_DSO::work(const QDateTime &T)
 void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
 {
     // проставялем начало и конец по номеру оси
+    // сбросим начало конец в осях
+    foreach (auto trc, l_trc) {
+        for (TOtcepDataOs &os :trc->l_os){
+            os.p=_pOtcepPartUnknow;
+        }
+    }
 
+    TOtcepDataOs null_os;
     foreach (auto o, lo) {
         m_RC *rcs=nullptr;
         m_RC *rcf=nullptr;
-        TOtcepDataOs s_os;
-        TOtcepDataOs f_os;
+        TOtcepDataOs *s_os=nullptr;
+        TOtcepDataOs *f_os=nullptr;
         if (o->otcep->STATE_LOCATION()==m_Otcep::locationUnknow) continue;
         if (o->otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) continue;
         TOtcepDataOs lstOs;
@@ -308,11 +313,11 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
             for (TOtcepDataOs &os :trc->l_os){
                 if (os.num==o->otcep->NUM()){
 
-                    if ((!rcs)||(os.os_otcep<s_os.os_otcep)){
-                        rcs=trc->rc;s_os=os;
+                    if ((!rcs)||(os.os_otcep<s_os->os_otcep)){
+                        rcs=trc->rc;s_os=&os;
                     }
-                    if ((!rcf)||(os.os_otcep>f_os.os_otcep)){
-                        rcf=trc->rc;f_os=os;
+                    if ((!rcf)||(os.os_otcep>f_os->os_otcep)){
+                        rcf=trc->rc;f_os=&os;
                     }
                     if (((!lstOs.t.isValid())||(lstOs.t<os.t))&&(os.v!=_undefV_)){
                         lstOs=os;
@@ -324,17 +329,21 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
 
         o->otcep->setSTATE_V_DISO(lstOs.v);
 
-
         if ((rcs==nullptr)&&(o->otcep->RCS!=nullptr)){
             resetTracking(o->otcep->NUM());
         } else {
             if ((rcs!=o->otcep->RCS) || (rcf!=o->otcep->RCF)){
                 o->otcep->RCS=rcs;
                 o->otcep->RCF=rcf;
-                if (s_os.t>f_os.t) o->otcep->setSTATE_DIRECTION(s_os.d); else
-                    o->otcep->setSTATE_DIRECTION(f_os.d);
+                if (s_os->t>f_os->t) o->otcep->setSTATE_DIRECTION(s_os->d); else
+                    o->otcep->setSTATE_DIRECTION(f_os->d);
+                o->otcep->setBusyRC();
+                s_os->p=_pOtcepStart;
+                f_os->p=_pOtcepEnd;
+                if (s_os==f_os){
+                    s_os->p=_pOtcepStartEnd;//f_os.p=_pOtcepStartEnd;
+                }
             }
-            o->otcep->setBusyRC();
         }
 
     }
@@ -371,10 +380,14 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
     }
     // обезличмваем оставшиеся оси
     foreach (auto o, lo) {
-        auto num=o->otcep->NUM();
-        foreach (auto trc, l_trc) {
-            if (!o->otcep->vBusyRc.contains(trc->rc)){
-                trc->reset_num(num);
+        if (!o->otcep->vBusyRc.isEmpty()){
+            auto num=o->otcep->NUM();
+            foreach (auto trc, l_trc) {
+                if (!trc->l_os.isEmpty()){
+                    if (!o->otcep->vBusyRc.contains(trc->rc)){
+                        trc->reset_num(num);
+                    }
+                }
             }
         }
     }
@@ -613,9 +626,13 @@ TOtcepDataOs tos_System_DSO::moveOs(tos_Rc *rc0, tos_Rc *rc1, int d,qreal os_v,c
 
         }
         // скорость выхода
-        if (rc1!=nullptr) setOtcepVIO(1,rc1, moved_os);
+        if ((moved_os.p==_pOtcepEnd)||(moved_os.p==_pOtcepStartEnd)){
+            if (rc1!=nullptr) setOtcepVIO(1,rc1, moved_os);
+        }
         // скорость входа
-        if (rc0!=nullptr) setOtcepVIO(0,rc0, moved_os);
+        if ((moved_os.p==_pOtcepStart)||(moved_os.p==_pOtcepStartEnd)){
+            if (rc0!=nullptr) setOtcepVIO(0,rc0, moved_os);
+        }
     }
     //  0 --> 1  <<D0
     if (d==_back){

@@ -24,6 +24,7 @@ public:
     bool cmd_DEL_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_INC_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_SET_OTCEP_STATE(QMap<QString, QString> &m,QString &acceptStr);
+    bool cmd_SET_VAGON_STATE(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m,QString &acceptStr);
     bool cmd_SET_CUR_OTCEP(QMap<QString, QString> &m,QString &acceptStr);
 
@@ -34,10 +35,10 @@ public:
 
     void updateVagons();
     m_Otcep *inc_otcep(int N, int mar);
-    m_Otcep *inc_otcep_drobl(int N, int kv);
+    m_Otcep *inc_otcep_drobl(int N, int cnt_vagon_exit);
     QList<SignalDescription> l_chanelVag;
-    QMap<m_Otcep*,SignalDescription> mO29;
-    QMap<m_Otcep*,SignalDescription> mO2109;
+//    QMap<m_Otcep*,SignalDescription> mO29;
+//    QMap<m_Otcep*,SignalDescription> mO2109;
 signals:
 
 };

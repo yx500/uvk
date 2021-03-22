@@ -44,9 +44,9 @@ public:
 
 
 
-    int getNewOtcep(m_RC *rc, int drobl);
-    int resetOtcep2prib(int num);
-    int nerascep(int num);
+    int getNewOtcep(m_RC_Gor_ZKR*rc_zkr);
+    int resetOtcep2prib(m_RC_Gor_ZKR*rc_zkr,int num);
+    int exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num);
 
     virtual QList<SignalDescription> acceptOutputSignals() ;
 

@@ -53,7 +53,7 @@ void tos_DSO::work(const QDateTime &T)
         T_DSO_sost next_sost;
         T_DSO_cmd cmd;
     };
-
+    auto wdso=alive_dso();
     static t_osc21_state_step steps[]=
     {  // sost0    ,    B0, B1 , -> sost2         ,cmd,
 
@@ -105,15 +105,15 @@ void tos_DSO::work(const QDateTime &T)
     };
 
     os_moved=_os_none;
-    if (!dso->is33()){
-        int B0=dso->SIGNAL_B0().value_1bit();
-        int B1=dso->SIGNAL_B1().value_1bit();
+    if (!wdso->is33()){
+        int B0=wdso->SIGNAL_B0().value_1bit();
+        int B1=wdso->SIGNAL_B1().value_1bit();
         if (B0==0) B0=1; else B0=0;
         if (B1==0) B1=1; else B1=0;
-        int K= dso->SIGNAL_K().value_1bit();
+        int K= wdso->SIGNAL_K().value_1bit();
         if (K!=1) {
-//            dso->setSTATE_ERROR(1);
-//            current_sost=sost0;
+            //            dso->setSTATE_ERROR(1);
+            //            current_sost=sost0;
         }
         {
 
@@ -129,27 +129,27 @@ void tos_DSO::work(const QDateTime &T)
                         current_sost=steps[i].next_sost;
                         switch (steps[i].cmd) {
                         case _inc_os:
-                            dso->setSTATE_ERROR_TRACK(0);
+                            wdso->setSTATE_ERROR_TRACK(0);
                             inc_os(1,T);
                             break;
                         case _dec_os:
-                            dso->setSTATE_ERROR_TRACK(0);
+                            wdso->setSTATE_ERROR_TRACK(0);
                             inc_os(-1,T);
                             break;
                         case _inc_os_sboy:
-                            dso->setSTATE_ERROR_TRACK(1);
-                            dso->setSTATE_ERROR_CNT(dso->STATE_ERROR_CNT()+1);
+                            wdso->setSTATE_ERROR_TRACK(1);
+                            wdso->setSTATE_ERROR_CNT(wdso->STATE_ERROR_CNT()+1);
                             inc_os(1,T);
                             break;
                         case _dec_os_sboy:
-                            dso->setSTATE_ERROR_TRACK(1);
-                            dso->setSTATE_ERROR_CNT(dso->STATE_ERROR_CNT()+1);
+                            wdso->setSTATE_ERROR_TRACK(1);
+                            wdso->setSTATE_ERROR_CNT(wdso->STATE_ERROR_CNT()+1);
                             inc_os(-1,T);
                             break;
                         case _sboy_last_d:
-                            dso->setSTATE_ERROR_TRACK(1);
-                            dso->setSTATE_ERROR_CNT(dso->STATE_ERROR_CNT()+1);
-                            if (dso->STATE_DIRECT()==0) inc_os( 1,T); else
+                            wdso->setSTATE_ERROR_TRACK(1);
+                            wdso->setSTATE_ERROR_CNT(wdso->STATE_ERROR_CNT()+1);
+                            if (wdso->STATE_DIRECT()==0) inc_os( 1,T); else
                                 inc_os(-1,T);
                             break;
                         default:
@@ -163,18 +163,6 @@ void tos_DSO::work(const QDateTime &T)
             if (!ex) current_sost=sost0;
         }
     }
-    //    //     запишем результат
-    //    qint32 S=0;
-    //    qint8 *A=(qint8 *)&S;
-    //    A[0]=(qint8) FSTATE_SRAB;
-    //    A[1]=(qint8) FSTATE_ERROR;
-    //    qint32 OS=FSTATE_OSY_COUNT;
-
-    //    FSIGNAL_STATE_DSO.setData(&S,sizeof(S));
-    //    FSIGNAL_STATE_OSY_COUNT.setData(&OS,sizeof(OS));
-
-
-
 
 }
 
@@ -194,6 +182,15 @@ tos_DSO::TDSO_statistic tos_DSO::getStatistic(qlonglong n)
     res.DIRECT=0;
     res.T=QDateTime();
     return res;
+}
+
+m_DSO_RD_21 *tos_DSO::alive_dso()
+{
+
+    if (dso->STATE_ERROR()){
+        if ((dso->dso_dubl!=nullptr) && (!dso->dso_dubl->STATE_ERROR())) return qobject_cast<m_DSO_RD_21 *>(dso->dso_dubl);
+    }
+    return dso;
 }
 
 

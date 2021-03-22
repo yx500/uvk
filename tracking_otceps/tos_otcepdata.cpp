@@ -25,7 +25,7 @@ void tos_OtcepData::resetTracking()
 {
     //снимаем только параметры TOS
 
-    otcep->resetTracking();
+    otcep->resetTrackingStates();
 
     dos_RCS=nullptr;
     dos_RCF=nullptr;

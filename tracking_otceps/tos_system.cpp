@@ -91,32 +91,31 @@ void tos_System::state2buffer()
     //    }
 }
 
-tos_OtcepData *tos_System::getNewOtcep(tos_Rc *trc,int drobl)
+int tos_System::getNewOtcep(m_RC_Gor_ZKR*rc_zkr)
 {
     if (iGetNewOtcep!=nullptr){
-        int num=iGetNewOtcep->getNewOtcep(trc->rc,drobl);
-        if (num>0){
-            return mNUM2OD[num];
-        }
+        return  iGetNewOtcep->getNewOtcep(rc_zkr);
     }
-    return nullptr;
+    return 0;
 }
 
-int tos_System::resetOtcep2prib(int num)
+int tos_System::resetOtcep2prib(m_RC_Gor_ZKR*rc_zkr, int num )
 {
     if (iGetNewOtcep!=nullptr){
-        num=iGetNewOtcep->resetOtcep2prib(num);
+        num=iGetNewOtcep->resetOtcep2prib(rc_zkr,num);
     }
-    return num;
+    return 0;
 }
 
-int tos_System::nerascep(int num)
+int tos_System::exitOtcep(m_RC_Gor_ZKR *rc_zkr, int num)
 {
     if (iGetNewOtcep!=nullptr){
-        num=iGetNewOtcep->nerascep(num);
+        num=iGetNewOtcep->exitOtcep(rc_zkr,num);
     }
-    return num;
+    return 0;
 }
+
+
 
 void tos_System::work(const QDateTime &)
 {
@@ -144,6 +143,27 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
 
         }
         otcep->setSTATE_ZKR_PROGRESS(inzkr);
+        for (int i=0;i<otcep->vVag.size();i++){
+            auto &v=otcep->vVag[i];
+            v.setSTATE_ZKR_PROGRESS(0);
+        }
+        if (inzkr){
+            int vagon_inzkr=0;
+            if (otcep->STATE_ZKR_TLG()%2==0){
+                vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT()+1;
+            } else{
+                vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT();
+            }
+            for (int i=0;i<otcep->vVag.size();i++){
+                auto &v=otcep->vVag[i];
+                if (i+1<=vagon_inzkr){
+                    v.setSTATE_LOCATION(m_Otcep::locationOnSpusk);
+                    if (i+1==vagon_inzkr) v.setSTATE_ZKR_PROGRESS(1);
+                } else {
+                    v.setSTATE_LOCATION(m_Otcep::locationOnPrib);
+                }
+            }
+        }
     }
     if (otcep_on_zkr!=nullptr) otcep_on_zkr->setSTATE_ZKR_S_IN(1);
 
@@ -169,21 +189,21 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
         }
 
 
-//        // скорость входа
-//        if (mRc2Zam.contains(otcep->RCS)){
-//            m_Zam *zam=mRc2Zam[otcep->RCS];
-//            int n=zam->NTP()-1;
-//            auto v=otcep->STATE_V_INOUT(0,n);
-//            auto v2=zam->ris()->STATE_V();
-//            if ((zam->TIPZM()==1) &&(otcep->STATE_V_INOUT(0,n)==_undefV_)&&(zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(0,n,zam->ris()->STATE_V());
-//        }
-//        // скорость выхода
-//        if (mRc2Zam.contains(otcep->RCF)){
-//            m_Zam *zam=mRc2Zam[otcep->RCF];
-//            int n=zam->NTP()-1;
-//            if ((zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(1,n,zam->ris()->STATE_V());
+        //        // скорость входа
+        //        if (mRc2Zam.contains(otcep->RCS)){
+        //            m_Zam *zam=mRc2Zam[otcep->RCS];
+        //            int n=zam->NTP()-1;
+        //            auto v=otcep->STATE_V_INOUT(0,n);
+        //            auto v2=zam->ris()->STATE_V();
+        //            if ((zam->TIPZM()==1) &&(otcep->STATE_V_INOUT(0,n)==_undefV_)&&(zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(0,n,zam->ris()->STATE_V());
+        //        }
+        //        // скорость выхода
+        //        if (mRc2Zam.contains(otcep->RCF)){
+        //            m_Zam *zam=mRc2Zam[otcep->RCF];
+        //            int n=zam->NTP()-1;
+        //            if ((zam->ris()!=nullptr)&&(zam->ris()->STATE_V()!=_undefV_)) otcep->setSTATE_V_INOUT(1,n,zam->ris()->STATE_V());
 
-//        }
+        //        }
         qreal Vars=_undefV_;
         foreach (auto rc, otcep->vBusyRc) {
             if (!mRc2Zam.contains(rc)) continue;
@@ -231,10 +251,10 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
 
         otcep->setSTATE_LOCATION(locat);
 
-//        // финализируем скорость отцепов
-//        if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk){
-//            o->updateV_RC(T);
-//        }
+        //        // финализируем скорость отцепов
+        //        if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk){
+        //            o->updateV_RC(T);
+        //        }
         otcep->setSTATE_V(o->STATE_V());
 
         // порядковый на рц

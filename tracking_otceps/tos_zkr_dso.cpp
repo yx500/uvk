@@ -18,24 +18,34 @@ tos_Zkr_DSO::tos_Zkr_DSO(tos_System_DSO *parent, tos_Rc *rc) : BaseWorker(parent
     // [1][0] [1][1] - датчики определенияя заезда
     //
 
-    rc->tdso[1]=TOS->mDSO2TDSO[rc_zkr->dso[1][0]];
+
+    // 1  0  << D0
+
+    tdso_osy=TOS->mDSO2TDSO[rc_zkr->dso_osy];
 
     for (int i=0;i<2;i++){
-        for (int j=0;j<2;j++){
-            if (TOS->mDSO2TDSO.contains(rc_zkr->dso[i][j])){
-                tdso[i][j]=TOS->mDSO2TDSO[rc_zkr->dso[i][j]];
-            } else {
-                qCritical() << objectName() << "Нет dsot[][]" << i <<j<<endl ;
-            }
+        if (TOS->mDSO2TDSO.contains(rc_zkr->dso_vag[i])){
+            tdso_tlg[i]=TOS->mDSO2TDSO[rc_zkr->dso_vag[i]];
+        } else {
+            qCritical() << objectName() << "Нет dso_vag[]" << i <<endl ;
+        }
+        if (TOS->mDSO2TDSO.contains(rc_zkr->dso_db[i])){
+            tdso_db[i]=TOS->mDSO2TDSO[rc_zkr->dso_db[i]];
+        } else {
+            qCritical() << objectName() << "Нет dso_db[]" << i <<endl ;
         }
     }
-    for (int j=0;j<2;j++){
-        if (TOS->mDSO2TRDSO.contains(tdso[1][j]->dso)) {
-            TOS->mDSO2TRDSO[tdso[1][j]->dso]->setSTATE_ENABLED(false);
-        }
+    if (TOS ->mDSO2TRDSO.contains(rc_zkr->dso_osy)) {
+        TOS->mDSO2TRDSO[rc_zkr->dso_osy]->setSTATE_ENABLED(false);
     }
 
-    dsp_pair=new tos_DsoPair(parent,tdso[0][0],tdso[0][1]);
+    //    for (int j=0;j<2;j++){
+    //        if (TOS->mDSO2TRDSO.contains(tdso[1][j]->dso)) {
+    //            TOS->mDSO2TRDSO[tdso[1][j]->dso]->setSTATE_ENABLED(false);
+    //        }
+    //    }
+
+    dsp_pair=new tos_DsoPair(parent,tdso_tlg[0],tdso_tlg[1]);
     curr_state_zkr.sost=_otcep_unknow;
 
 }
@@ -99,7 +109,7 @@ void tos_Zkr_DSO::work(const QDateTime &T)
     }
     if ((rc_zkr->rtds_1()->STATE_SRAB()==0) && (rc_zkr->rtds_2()->STATE_SRAB()==0)) rtds=0;
     curr_state_zkr.rtds=rtds;
-    curr_state_zkr.dso=alive_dso()->os_moved;
+    curr_state_zkr.dso=tdso_osy->os_moved;
     if (trc->l_os.isEmpty())  curr_state_zkr.os_in=0; else curr_state_zkr.os_in=1;
     // ошибка ртдс
     //    if ((rtds==1)&&
@@ -109,6 +119,19 @@ void tos_Zkr_DSO::work(const QDateTime &T)
     //        rc_zkr->setSTATE_ERROR_RTDS(true);
     //    }
     //    if (rtds==0) rc_zkr->setSTATE_ERROR_RTDS(false);
+
+    // сброс при свободности
+    m_RC* _rc=rc_zkr;
+    bool free_rc=true;
+    for (int i=0;i<3;i++){
+        if ((_rc==nullptr)||(_rc->STATE_BUSY_DSO()!=0)){free_rc=false;break;}
+        _rc=_rc->next_rc[_forw];
+    }
+    if (free_rc){
+        dsp_pair->free_state();
+        l_os_db.clear();
+    }
+
 
     static t_zkr_pairs tos_zkr_steps[]={
         //sost;rtds;dso;os_in
@@ -160,7 +183,7 @@ void tos_Zkr_DSO::work(const QDateTime &T)
         break;
     case _os_plus_baza:
         in_os(T);
-        setOtcepBaza();
+        //setOtcepBaza();
         break;
     case _check_end_in:
         check_end_in(T);
@@ -176,12 +199,45 @@ void tos_Zkr_DSO::work(const QDateTime &T)
     }
 
     work_dso_tlg(T);
+    work_dso_db(T);
 
 }
 
 void tos_Zkr_DSO::work_dso_tlg(const QDateTime &T)
 {
-    dsp_pair->work(T);
+    //dsp_pair->work(T);
+    // tdso1 tdso0  <===D0
+    TOtcepDataOs od;
+    if (tdso_tlg[0]->os_moved==_os2forw){
+        od.d=_forw;
+        if (!trc->l_os.isEmpty()) od=trc->l_os.last();
+        dsp_pair->work_os(tdso_tlg[0]->os_moved,_os_none,od);
+        work_dso_tlg2(T);
+    }
+    if (tdso_tlg[0]->os_moved==_os2back){
+        od.d=_back;
+        dsp_pair->work_os(tdso_tlg[0]->os_moved,_os_none,od);
+        work_dso_tlg2(T);
+    }
+    if (tdso_tlg[1]->os_moved==_os2forw){
+        od.d=_forw;
+        dsp_pair->work_os(_os_none,tdso_tlg[1]->os_moved,od);
+        work_dso_tlg2(T);
+    }
+    if (tdso_tlg[1]->os_moved==_os2back){
+        od.d=_back;
+        if (TOS ->mDSO2TRDSO.contains(tdso_tlg[1]->dso)) {
+            auto trdso_tlg1=TOS ->mDSO2TRDSO[tdso_tlg[1]->dso];
+            if (trdso_tlg1->rc_next[_forw]!=nullptr){
+                if (!trdso_tlg1->rc_next[_forw]->l_os.isEmpty()) od=trdso_tlg1->rc_next[_forw]->l_os.first();
+            }
+        }
+        dsp_pair->work_os(_os_none,tdso_tlg[1]->os_moved,od);
+        work_dso_tlg2(T);
+    }
+}
+void tos_Zkr_DSO::work_dso_tlg2(const QDateTime &)
+{
     if (dsp_pair->sost_teleg==tos_DsoPair::_tlg_forw){
         if (dsp_pair->teleg_os.num>0){
             auto o=TOS->otcep_by_num(dsp_pair->teleg_os.num);
@@ -206,25 +262,60 @@ void tos_Zkr_DSO::work_dso_tlg(const QDateTime &T)
     }
 }
 
-tos_DSO *tos_Zkr_DSO::alive_dso()
+void tos_Zkr_DSO::work_dso_db(const QDateTime &)
 {
-    if (!tdso[1][0]->dso->STATE_ERROR()) return tdso[1][0];
-    return tdso[1][1];
+    //  1 0 << D0
+    if ((tdso_db[0]==nullptr)||(tdso_db[1]==nullptr)){l_os_db.clear();return;}
+
+    TOtcepDataOs od;
+    if (tdso_db[0]->os_moved==_os2forw){
+        od.d=_forw;
+        if (!trc->l_os.isEmpty()) od=trc->l_os.first();
+        l_os_db.push_back(od);
+    }
+    if (tdso_db[0]->os_moved==_os2back){
+        if (!l_os_db.isEmpty()) l_os_db.removeLast();
+    }
+
+    if (tdso_db[1]->os_moved==_os2back){
+        od.d=_back;
+        if (!trc->l_os.isEmpty()) od=trc->l_os.last();
+        l_os_db.push_front(od);
+    }
+    if (tdso_db[1]->os_moved==_os2forw){
+        if (!l_os_db.isEmpty()) {
+            od=l_os_db.first();
+            l_os_db.removeFirst();
+            if (curr_state_zkr.rtds==1){
+                if (l_os_db.isEmpty()) {
+                    auto o=TOS->otcep_by_num(od.num);
+                    if (o!=nullptr){
+                        o->otcep->setSTATE_ZKR_BAZA(1);
+                    }
+                }
+            }
+        }
+
+    }
+
 }
 
 void tos_Zkr_DSO::newOtcep(const QDateTime &T)
 {
     rc_zkr->setSTATE_OTCEP_BEVAGADD(false);
+    rc_zkr->setSTATE_ERROR_NERASCEP(false);
+    rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
+
     curr_state_zkr.sost=_otcep_in;
 
     TOtcepDataOs os;
     os.zkr_num=TOS->zkr_id++;
     os.d=_forw;
+    os.t=T;
 
-    rc_zkr->setSTATE_ERROR_NERASCEP(false);
-    rc_zkr->setSTATE_ERROR_OSYCOUNT(false);
 
-    auto *otcep=TOS->getNewOtcep(trc,0);
+    auto num=TOS->getNewOtcep(rc_zkr);
+    auto otcep=TOS->otcep_by_num(num);
     if (otcep!=nullptr){
         otcep->resetTracking();
         os.num=otcep->otcep->NUM();
@@ -233,12 +324,13 @@ void tos_Zkr_DSO::newOtcep(const QDateTime &T)
 
         trc->l_otceps.push_back(os.num);
 
+        otcep->otcep->resetZKRStates();
         otcep->otcep->setSTATE_DIRECTION(0);
         otcep->otcep->setSTATE_LOCATION(m_Otcep::locationOnSpusk);
         otcep->otcep->setSTATE_ZKR_BAZA(false);
         otcep->otcep->setSTATE_ZKR_PROGRESS(true);
         otcep->otcep->setSTATE_ZKR_OSY_CNT(1);
-        otcep->otcep->setSTATE_ZKR_VAGON_CNT(1);
+        otcep->otcep->setSTATE_ZKR_VAGON_CNT(0);
     } else {
         os.num=0;
         os.p=_pOtcepPartUnknow;
@@ -252,25 +344,27 @@ void tos_Zkr_DSO::newOtcep(const QDateTime &T)
 
 void tos_Zkr_DSO::endOtcep(const QDateTime &T)
 {
-
     rc_zkr->setSTATE_OTCEP_VAGADD(false);
-    if ((cur_os.num!=0)&&(cur_os.d==_forw)){
-        auto o=TOS->otcep_by_num(cur_os.num);
-        if (o!=nullptr){
-            if ((o->otcep->STATE_SL_VAGON_CNT()>1)){
-                if ((o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()<o->otcep->STATE_SL_VAGON_CNT())){
-                    rc_zkr->setSTATE_OTCEP_BEVAGADD(true);
-                    TOS->getNewOtcep(trc,o->otcep->STATE_SL_VAGON_CNT()-o->otcep->STATE_ZKR_VAGON_CNT());
-                } else {
-                    if ((o->otcep->STATE_SL_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>o->otcep->STATE_SL_VAGON_CNT())){
-                        TOS->nerascep(o->otcep->NUM());
-                        rc_zkr->setSTATE_ERROR_NERASCEP(true);
-                    }
-                }
+    TOS->exitOtcep(rc_zkr,cur_os.num);
 
-            }
-        }
-    }
+
+//    if ((cur_os.num!=0)&&(cur_os.d==_forw)){
+//        auto o=TOS->otcep_by_num(cur_os.num);
+//        if (o!=nullptr){
+//            if ((o->otcep->STATE_SL_VAGON_CNT()>1)){
+//                if ((o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()<o->otcep->STATE_SL_VAGON_CNT())){
+//                    rc_zkr->setSTATE_OTCEP_BEVAGADD(true);
+//                    TOS->getNewOtcep(trc,o->otcep->STATE_SL_VAGON_CNT()-o->otcep->STATE_ZKR_VAGON_CNT());
+//                } else {
+//                    if ((o->otcep->STATE_SL_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>0)&&(o->otcep->STATE_ZKR_VAGON_CNT()>o->otcep->STATE_SL_VAGON_CNT())){
+//                        TOS->nerascep(o->otcep->NUM());
+//                        rc_zkr->setSTATE_ERROR_NERASCEP(true);
+//                    }
+//                }
+
+//            }
+//        }
+//    }
 
     cur_os=TOtcepDataOs();
     curr_state_zkr.sost=_otcep_free;
@@ -279,10 +373,6 @@ void tos_Zkr_DSO::endOtcep(const QDateTime &T)
         os.p=_pOtcepStartEnd;
     }
     TOS->updateOtcepsOnRc(T);
-
-
-
-
 }
 
 void tos_Zkr_DSO::in_os(const QDateTime &T)
@@ -322,7 +412,7 @@ void tos_Zkr_DSO::out_os(const QDateTime &T)
             if (o!=nullptr){
                 if (rc_zkr->STATE_ROSPUSK()==1){
                     o->otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
-                    TOS->resetOtcep2prib(os.num);
+                    TOS->resetOtcep2prib(rc_zkr,os.num);
                 }
             }
             curr_state_zkr.sost=_otcep_unknow;
@@ -348,22 +438,6 @@ void tos_Zkr_DSO::check_end_in(const QDateTime &T)
 }
 
 
-void tos_Zkr_DSO::setOtcepBaza()
-{
-    // неудачно расположены датчики
-    // проверим что на первом точно ничего нет
-    if ((alive_dso()!=nullptr)&&(alive_dso()->dso->STATE_SRAB()!=0)) return;
-    if (!trc->l_os.isEmpty()){
-        TOtcepDataOs os=trc->l_os.last();
-        if ((os.num!=0)){
-            auto o=TOS->otcep_by_num(os.num);
-            if (o!=nullptr){
-                o->otcep->setSTATE_ZKR_BAZA(1);
-            }
-        }
-    }
-}
-
 
 
 void tos_Zkr_DSO::resetStates()
@@ -378,6 +452,8 @@ void tos_Zkr_DSO::resetStates()
     rc_zkr->setSTATE_OTCEP_FREE(false);
     rc_zkr->setSTATE_OTCEP_IN(false);
     rc_zkr->setSTATE_OTCEP_VAGADD(false);
+    dsp_pair->resetStates();
+    l_os_db.clear();
 
 }
 

@@ -54,7 +54,7 @@ public:
     tos_Rc(tos_System *TOS,m_RC *rc);
     ~tos_Rc(){}
     m_RC *rc;
-    tos_DSO* tdso[2];
+    tos_DSO* tdso[2]; // 0..1 по ходу
 
     void work(const QDateTime &T) ;
     void resetStates();
