@@ -533,11 +533,18 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
             CMD->accept_cmd(m,-1,acceptStr);
         //}
     }
-    if (m["CMD"]=="ADD_OTCEP_VAG"){
-        if (otcepsController->cmd_ADD_OTCEP_VAG(m,acceptStr))
+    if (m["CMD"]=="SET_VAGON_STATE"){
+        //if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
+        if (otcepsController->cmd_SET_VAGON_STATE(m,acceptStr))
             CMD->accept_cmd(m,1,acceptStr); else
             CMD->accept_cmd(m,-1,acceptStr);
+        //}
     }
+//    if (m["CMD"]=="ADD_OTCEP_VAG"){
+//        if (otcepsController->cmd_ADD_OTCEP_VAG(m,acceptStr))
+//            CMD->accept_cmd(m,1,acceptStr); else
+//            CMD->accept_cmd(m,-1,acceptStr);
+//    }
 
     if (m["CMD"]=="RESET_DSO_BUSY"){
         if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){

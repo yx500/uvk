@@ -107,7 +107,7 @@ void OtcepsController::state2buffer()
 
     //updateVagons();
 
-    foreach (auto *v, otceps->l_vagons) {
+    foreach (auto v, otceps->l_vagons) {
         tSlVagon stored_SlVagon;
         memset(&stored_SlVagon,0,sizeof(stored_SlVagon));
         stored_SlVagon=v->toSlVagon();
@@ -480,55 +480,55 @@ bool OtcepsController::cmd_SET_VAGON_STATE(QMap<QString, QString> &m, QString &a
     return false;
 }
 
-bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acceptStr)
-{
-    if (!m["N"].isEmpty()){
-        int N=m["N"].toInt();
-        auto otcep=otceps->otcepByNum(N);
-        if (otcep!=nullptr){
+//bool OtcepsController::cmd_ADD_OTCEP_VAG(QMap<QString, QString> &m, QString &acceptStr)
+//{
+//    if (!m["N"].isEmpty()){
+//        int N=m["N"].toInt();
+//        auto otcep=otceps->otcepByNum(N);
+//        if (otcep!=nullptr){
 
 
 
-            QVariantHash mv;
-            foreach (QString key, m.keys()) {
-                mv[key]=m[key];
-            }
-            tSlVagon v=Map2tSlVagon(mv);
-            if (v.Id!=otcep->STATE_ID_ROSP()) {
-                acceptStr=QString("Отцеп %1 ваг. %2 v.Id!=otcep->STATE_ID_ROSP().").arg(m["N"]).arg(m["IV"]);
-                return false;
-            }
-            if (v.NO!=otcep->NUM()) {
-                acceptStr=QString("Отцеп %1 ваг. %2 v.NO!=otcep->NUM().").arg(m["N"]).arg(m["IV"]);
-                return false;
-            };
-            if ((v.IV<=0)||(v.IV>MaxVagon)) {
-                acceptStr=QString("Отцеп %1 ваг. %2 (v.IV<=0)||(v.IV>MaxVagon).").arg(m["N"]).arg(m["IV"]);
-                return false;
-            };
+//            QVariantHash mv;
+//            foreach (QString key, m.keys()) {
+//                mv[key]=m[key];
+//            }
+//            tSlVagon v=Map2tSlVagon(mv);
+//            if (v.Id!=otcep->STATE_ID_ROSP()) {
+//                acceptStr=QString("Отцеп %1 ваг. %2 v.Id!=otcep->STATE_ID_ROSP().").arg(m["N"]).arg(m["IV"]);
+//                return false;
+//            }
+//            if (v.NO!=otcep->NUM()) {
+//                acceptStr=QString("Отцеп %1 ваг. %2 v.NO!=otcep->NUM().").arg(m["N"]).arg(m["IV"]);
+//                return false;
+//            };
+//            if ((v.IV<=0)||(v.IV>MaxVagon)) {
+//                acceptStr=QString("Отцеп %1 ваг. %2 (v.IV<=0)||(v.IV>MaxVagon).").arg(m["N"]).arg(m["IV"]);
+//                return false;
+//            };
 
 
 
-            int NV=m["NV"].toInt();
-            if (NV>otcep->vVag.size()){
-                acceptStr=QString("Ошибка добавления: Номер в отцепе %1 больше кол-ва по СЛ. %2 .").arg(NV).arg(otcep->vVag.size());
-                return false;
+//            int NV=m["NV"].toInt();
+//            if (NV>otcep->vVag.size()){
+//                acceptStr=QString("Ошибка добавления: Номер в отцепе %1 больше кол-ва по СЛ. %2 .").arg(NV).arg(otcep->vVag.size());
+//                return false;
 
-                //                int add_cnt=NV-otcep->vVag.size();
-                //                for (int i=0;i<add_cnt;i++){
-                //                    otcep->vVag.push_back(tSlVagon());
-                //                }
-            }
-            otcep->vVag[NV-1].fromSlVagon(v);
-            //otceps->vagons[v.IV-1]=v;
-            acceptStr=QString("Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
-            updateVagons();
-            return true;
-        }
-    }
-    acceptStr=QString("Ошибка добавления: Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
-    return false;
-}
+//                //                int add_cnt=NV-otcep->vVag.size();
+//                //                for (int i=0;i<add_cnt;i++){
+//                //                    otcep->vVag.push_back(tSlVagon());
+//                //                }
+//            }
+//            otcep->vVag[NV-1].fromSlVagon(v);
+//            //otceps->vagons[v.IV-1]=v;
+//            acceptStr=QString("Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
+//            updateVagons();
+//            return true;
+//        }
+//    }
+//    acceptStr=QString("Ошибка добавления: Отцеп %1 добавлен ваг. %2 .").arg(m["N"]).arg(m["IV"]);
+//    return false;
+//}
 
 void OtcepsController::resetLiveOtceps()
 {
@@ -570,7 +570,7 @@ void OtcepsController::updateVagons()
             if (otcep->vVag.size()>0){
                 for (int i=0;i<otcep->vVag.size();i++){
                     auto v=&otcep->vVag[i];
-                    if (otceps->l_vagons.size()<iall+1){
+                    if (iall<otceps->l_vagons.size()){
                         auto vall=otceps->l_vagons[iall];
                         vall->assign(v);
                         vall->setSTATE_SP(otcep->STATE_SP());
@@ -597,11 +597,11 @@ void OtcepsController::updateVagons()
 
 
 
-    // инкремент тика
-    foreach (auto otcep, otceps->otceps()) {
-        if (otcep->STATE_ENABLED()==1){
-            otcep->setSTATE_TICK(otcep->STATE_TICK()+1);
-        }
-    }
+//    // инкремент тика
+//    foreach (auto otcep, otceps->otceps()) {
+//        if (otcep->STATE_ENABLED()==1){
+//            otcep->setSTATE_TICK(otcep->STATE_TICK()+1);
+//        }
+//    }
 }
 
