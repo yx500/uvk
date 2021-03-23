@@ -764,6 +764,8 @@ int UVK_Central::exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num)
     auto exit_otcep=otcepsController->otceps->otcepByNum(num);
     if (exit_otcep==nullptr) return 0;
     if (num!=maxOtcepCurrenRospusk) return 0;
+    // все манипуляции только в роспуске
+    if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk) return 0;
     // проверим что едем с нужной зкр
     foreach (auto zkr, l_zkr) {
         if ((rc_zkr==zkr) && (zkr->STATE_ROSPUSK()==1)){
@@ -806,6 +808,7 @@ int UVK_Central::exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num)
                     for (int i=num;i<otcepsController->otceps->l_otceps.size();i++){
                         auto next_otcep=otcepsController->otceps->l_otceps[i];
                         if ((next_otcep->STATE_ENABLED()==0)||(next_otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) return 0;
+                        if ((next_otcep->STATE_SL_VAGON_CNT()==0)) return 0;
                         int cnt_vagon_delete=cnt_vagon_perebor;
                         if (cnt_vagon_delete>next_otcep->STATE_SL_VAGON_CNT()) cnt_vagon_delete=next_otcep->STATE_SL_VAGON_CNT();
 
@@ -862,14 +865,11 @@ int UVK_Central::resetOtcep2prib(m_RC_Gor_ZKR*,int num)
     if (otcep!=nullptr){
         TOS->resetTracking(num);
         otcep->resetZKRStates();
-    }
-    if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk)) {
-        if (otcep!=nullptr){
+        if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk)) {
             otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
             return num;
         }
     }
-    if (otcep!=nullptr) return num;
     return 0;
 }
 
