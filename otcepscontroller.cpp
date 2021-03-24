@@ -24,7 +24,13 @@ void OtcepsController::work(const QDateTime &)
     if (cur_otcep==nullptr){
         foreach (auto *otcep, otceps->l_otceps) {
             if (!otcep->STATE_ENABLED()) continue;
-            if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) {cur_otcep=otcep;break;}
+            if (otcep->STATE_ZKR_PROGRESS()==1) {cur_otcep=otcep;break;}
+        }
+        if (cur_otcep==nullptr){
+            foreach (auto *otcep, otceps->l_otceps) {
+                if (!otcep->STATE_ENABLED()) continue;
+                if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) {cur_otcep=otcep;break;}
+            }
         }
     }
     foreach (auto *otcep, otceps->l_otceps) {
@@ -201,6 +207,7 @@ m_Otcep *OtcepsController::inc_otcep_drobl(int N,int cnt_vagon_exit)
             for (int i=cnt_vagon_exit;i<otcep->vVag.size();i++){
                 auto v=otcep->vVag[i];
                 v.setSTATE_N_IN_OTCEP(n);n++;
+                v.setSTATE_NUM_OTCEP(new_otcep->NUM());
                 new_otcep->setVagon(&v);
             }
             otcep->setSTATE_SL_VAGON_CNT_PRED(otcep->STATE_SL_VAGON_CNT());
@@ -359,14 +366,14 @@ bool OtcepsController::cmd_SET_VAGON_STATE(QMap<QString, QString> &m, QString &a
     if (!m["N"].isEmpty()){
 
         int N=m["N"].toInt();
-        auto otcep=otceps->otcepByNum(N);
-        if (otcep!=nullptr){
+        auto otcep1=otceps->otcepByNum(N);
+        if (otcep1!=nullptr){
             int N_IN_OTCEP=m["N_IN_OTCEP"].toInt();
-            if ((N_IN_OTCEP<=0)||(N_IN_OTCEP>otcep->vVag.size())){
-                acceptStr=QString("Ошибка: Номер в отцепе %1 больше кол-ва по СЛ. %2 .").arg(N_IN_OTCEP).arg(otcep->vVag.size());
+            if ((N_IN_OTCEP<=0)||(N_IN_OTCEP>otcep1->vVag.size())){
+                acceptStr=QString("Ошибка: Номер в отцепе %1 больше кол-ва по СЛ. %2 .").arg(N_IN_OTCEP).arg(otcep1->vVag.size());
                 return false;
             }
-            auto vagon=&otcep->vVag[N_IN_OTCEP-1];
+            auto vagon=&otcep1->vVag[N_IN_OTCEP-1];
             bool ex_change=false;
             foreach (QString key, m.keys()) {
                 if ((key=="CMD") || (key=="N")|| (key=="N_IN_OTCEP")) continue;
@@ -377,7 +384,7 @@ bool OtcepsController::cmd_SET_VAGON_STATE(QMap<QString, QString> &m, QString &a
                 for (int idx = 0; idx < vagon->metaObject()->propertyCount(); idx++) {
                     QMetaProperty metaProperty = vagon->metaObject()->property(idx);
                     if (metaProperty.name()!=stateName) continue;
-                    QVariant V1=otcep->property(qPrintable(stateName));
+                    QVariant V1=vagon->property(qPrintable(stateName));
                     if (V1!=V){
                         qDebug()<< stateName << V1.toString() << V.toString();
                         ex_change=true;
@@ -389,7 +396,7 @@ bool OtcepsController::cmd_SET_VAGON_STATE(QMap<QString, QString> &m, QString &a
 
             if (ex_change){
                 acceptStr=QString("Отцеп %1 вагон %2 свойства изменены.").arg(N).arg(N_IN_OTCEP);
-                otcep->inc_tick();
+                otcep1->inc_tick();
             }
             return true;
         }

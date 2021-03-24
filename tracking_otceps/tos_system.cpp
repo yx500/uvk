@@ -143,26 +143,28 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
 
         }
         otcep->setSTATE_ZKR_PROGRESS(inzkr);
-        for (int i=0;i<otcep->vVag.size();i++){
-            auto &v=otcep->vVag[i];
-            v.setSTATE_ZKR_PROGRESS(0);
-        }
+        int vagon_inzkr=0;
         if (inzkr){
-            int vagon_inzkr=0;
             if (otcep->STATE_ZKR_TLG()%2==0){
                 vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT()+1;
             } else{
                 vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT();
             }
-            for (int i=0;i<otcep->vVag.size();i++){
-                auto &v=otcep->vVag[i];
-                if (i+1<=vagon_inzkr){
-                    v.setSTATE_LOCATION(m_Otcep::locationOnSpusk);
-                    if (i+1==vagon_inzkr) v.setSTATE_ZKR_PROGRESS(1);
+        }
+        for (int i=0;i<otcep->vVag.size();i++){
+            auto &v=otcep->vVag[i];
+            auto l=otcep->STATE_LOCATION();
+            int zp=0;
+            if (inzkr){
+                if (i+1<=vagon_inzkr) {
+                    l=m_Otcep::locationOnSpusk;
                 } else {
-                    v.setSTATE_LOCATION(m_Otcep::locationOnPrib);
+                    l=m_Otcep::locationOnPrib;
                 }
+                if (i+1==vagon_inzkr) zp=1;
             }
+            v.setSTATE_ZKR_PROGRESS(zp);
+            v.setSTATE_LOCATION(l);
         }
     }
     if (otcep_on_zkr!=nullptr) otcep_on_zkr->setSTATE_ZKR_S_IN(1);
