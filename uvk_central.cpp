@@ -827,6 +827,7 @@ int UVK_Central::exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num)
                             if (i<next_otcep->vVag.size()){
                                 auto v=next_otcep->vVag[i];
                                 v.setSTATE_N_IN_OTCEP(n);n++;
+                                v.setSTATE_NUM_OTCEP(exit_otcep->NUM());
                                 exit_otcep->setVagon(&v);
                             }
                         }
