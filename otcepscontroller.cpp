@@ -43,31 +43,20 @@ void OtcepsController::validation(ListObjStr *l) const
 QList<SignalDescription> OtcepsController::acceptOutputSignals()
 {
     QList<SignalDescription> l;
-    // рассыка в обоих форматах
-    foreach (auto *otcep, otceps->l_otceps) {
+    // рассыка в обратном порядке
+
+    for (int i=otceps->l_otceps.size()-1;i>=0;i--){
+        auto *otcep=otceps->l_otceps[i];
         otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
         l<<otcep->SIGNAL_DATA();
-        //        auto s1=otcep->SIGNAL_DATA();
-        //        s1.getBuffer()->setSizeData(sizeof(t_NewDescr));
-
-        //        s1.setChanelType(9);
-        //        mO29[otcep]=s1;
-        //        l<< s1;
-
     }
     // 14 сортир 15 от увк
-    foreach (auto *v, otceps->l_vagons) {
+
+    for (int i=otceps->l_vagons.size()-1;i>=0;i--){
+        auto *v=otceps->l_vagons[i];
         v->setSIGNAL_DATA( v->SIGNAL_DATA().innerUse());
         l<<v->SIGNAL_DATA();
     }
-    //    otceps->setSIGNAL_DATA_VAGON_0(otceps->SIGNAL_DATA_VAGON_0().innerUse());
-    //    for (int i=0;i<MaxVagon;i++){
-    //        SignalDescription p=SignalDescription(15,QString("vag%1").arg(i+1),0);
-    //        p.acceptGtBuffer();
-    //        p.getBuffer()->setSizeData(sizeof(tSlVagon));
-    //        l_chanelVag.push_back(p);
-    //        l<<p;
-    //    }
     return l;
 }
 char __STATE_[]="STATE_";
@@ -81,32 +70,12 @@ void OtcepsController::state2buffer()
             otcep->states2descr_ext(stored_Descr);
             if (otcep->RCS!=nullptr) stored_Descr.D.start  =otcep->RCS->SIGNAL_BUSY_DSO().chanelOffset()+1; else stored_Descr.D.start  =0;
             if (otcep->RCF!=nullptr) stored_Descr.D.end    =otcep->RCF->SIGNAL_BUSY_DSO().chanelOffset()+1; else stored_Descr.D.end  =0;
-            //            auto &s=mO29[otcep];
-            //            s.setBufferData(&stored_Descr,sizeof(stored_Descr));
             otcep->SIGNAL_DATA().setBufferData(&stored_Descr,sizeof(stored_Descr));
         }
-
-        //        {  Исключаю вариант - жутко тормозит с QString
-        //            QString S;
-        //            QVariantHash m;
-        //            m["NUM"]=otcep->NUM();
-        //            for (int idx = 0; idx < otcep->metaObject()->propertyCount(); idx++) {
-        //                const QMetaProperty &metaProperty = otcep->metaObject()->property(idx);
-        //                auto stateName=metaProperty.name();
-        //                if (strncmp(stateName,__STATE_,sizeof(__STATE_)-1)!=0) continue;
-        //                QString ss;
-        //                ss=QString::fromLocal8Bit(&stateName[sizeof(__STATE_)-1]);
-        //                QVariant V=metaProperty.read(otcep);
-        //                m[ss]=V;
-        //            }
-        //            S=MVP_System::QVariantHashToQString_str(m);
-        //            auto &s=mO2109[otcep];
-        //            s.getBuffer()->A=S.toUtf8();
-        //        }
     }
 
-    //updateVagons();
-
+    // перестроим модель
+    otceps->otceps2Vagons();
     foreach (auto v, otceps->l_vagons) {
         tSlVagon stored_SlVagon;
         memset(&stored_SlVagon,0,sizeof(stored_SlVagon));
@@ -114,64 +83,16 @@ void OtcepsController::state2buffer()
         v->SIGNAL_DATA().setBufferData(&stored_SlVagon,sizeof(stored_SlVagon));
     }
 
-    //    tSlVagon vagons0;
-    //    memset(&vagons0,0,sizeof(vagons0));
-    //    foreach (auto &s, l_chanelVag) {
-    //        s.setValue_data(&vagons0,sizeof(vagons0));
-    //    }
-    //    int i=0;
-    //    tSlVagon v;
-    //    foreach (auto otcep, otceps->otceps()) {
-    //        int kv=otcep->STATE_SL_VAGON_CNT();
-    //        if (kv>0){
-    //            for (int iv=0;iv<kv;iv++){
-    //                if (iv<otcep->vVag.size()){
-    //                    v=otcep->vVag[iv];
-    //                } else {
-    //                    memset(&v,0,sizeof(v));
-    //                }
 
-    //                if (i>=l_chanelVag.size()) break;
-    //                v.NO=otcep->NUM();
-    //                v.Id=otcep->STATE_ID_ROSP();
-    //                v.SP=otcep->STATE_SP();
-    //                v._tick=otcep->STATE_TICK();
-    //                auto &s=l_chanelVag[i];
-    //                s.setBufferData(&v,sizeof(v));
-    //                //s.setValue_data(&v,sizeof(v));
-    //                i++;
-    //            }
-    //        } else {
-    //            if (i>=l_chanelVag.size()) break;
-    //            memset(&v,0,sizeof(v));
-    //            v.NO=otcep->NUM();
-    //            v.Id=otcep->STATE_ID_ROSP();
-    //            v.SP=otcep->STATE_SP();
-    //            v._tick=otcep->STATE_TICK();
-    //            auto &s=l_chanelVag[i];
-    //            s.setBufferData(&v,sizeof(v));
-    //            i++;
-    //        }
-    //    }
-
-    //    for (int i=0;i<MaxVagon;i++){
-    //        // рассылаем в старом
-    //        //if (otceps->TYPE_DESCR()==0){
-    //        otceps->chanelVag[i].getBuffer()->A.resize(sizeof(otceps->vagons[i]));
-    //        memcpy(otceps->chanelVag[i].getBuffer()->A.data(),&otceps->vagons[i],sizeof(otceps->vagons[i]));
-    //        //        if (otceps->TYPE_DESCR()==1){
-    //        //            QVariantHash m=tSlVagon2Map(otceps->vagons[i]);
-    //        //            QString S=MVP_System::QVariantHashToQString_str(m);
-    //        //            otceps->chanelVag[i]->A=S.toUtf8();
-    //        //        }
-    //    }
 }
 
 bool OtcepsController::cmd_CLEAR_ALL(QString &acceptStr)
 {
 
     otceps->resetStates();
-    updateVagons();
+    foreach (m_Otcep*otcep, otceps->l_otceps) {
+        otcep->setSTATE_TICK(otcep->STATE_TICK()+1);
+    }
     acceptStr="Сброс списка отцепов.";
     return true;
 }
@@ -240,12 +161,10 @@ m_Otcep* OtcepsController::inc_otcep(int N,int mar)
             otcep_1->inc_tick();
         }
         otcep->resetStates();
-        //if (n<otceps->l_otceps.size()-1) otceps->l_otceps[n]->acceptSLStates(otceps->l_otceps[n+1]);
         otcep->setSTATE_MAR(mar);
         otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
 
-        // добавляем 1 пустой вагон
-        //otcep->vVag.push_back(tSlVagon());
+        otcep->inc_tick();
         otcep->setSTATE_ENABLED(true);
         updateVagons();
     }
@@ -471,7 +390,6 @@ bool OtcepsController::cmd_SET_VAGON_STATE(QMap<QString, QString> &m, QString &a
             if (ex_change){
                 acceptStr=QString("Отцеп %1 вагон %2 свойства изменены.").arg(N).arg(N_IN_OTCEP);
                 otcep->inc_tick();
-                updateVagons();
             }
             return true;
         }
@@ -560,48 +478,6 @@ void OtcepsController::setNewID_ROSP(quint32 ID_ROSP)
 
 void OtcepsController::updateVagons()
 {
-    // перестроим модель вагонов
-    foreach (auto v, otceps->l_vagons) {
-        v->resetStates();
-    }
-    int iall=0;
-    foreach (auto otcep, otceps->otceps()) {
-        if (otcep->STATE_ENABLED()) {
-            if (otcep->vVag.size()>0){
-                for (int i=0;i<otcep->vVag.size();i++){
-                    auto v=&otcep->vVag[i];
-                    if (iall<otceps->l_vagons.size()){
-                        auto vall=otceps->l_vagons[iall];
-                        vall->assign(v);
-                        vall->setSTATE_SP(otcep->STATE_SP());
-                        vall->setSTATE_ENABLED(otcep->STATE_ENABLED());
-                        vall->setSTATE_ID_ROSPUSK(otcep->STATE_ID_ROSP());
-                        vall->setSTATE_N_IN_OTCEP(i+1);
-                    }
-                    iall++;
-                }
-            }  else {
-                // добавляем пустой вагон
-                if (otceps->l_vagons.size()<iall+1){
-                    auto vall=otceps->l_vagons[iall];
-                    vall->resetStates();
-                    vall->setSTATE_SP(otcep->STATE_SP());
-                    vall->setSTATE_ENABLED(otcep->STATE_ENABLED());
-                    vall->setSTATE_ID_ROSPUSK(otcep->STATE_ID_ROSP());
-                    vall->setSTATE_LOCATION(otcep->STATE_LOCATION());
-                    vall->setSTATE_N_IN_OTCEP(0);
-                }
-            }
-        }
-    }
-
-
-
-//    // инкремент тика
-//    foreach (auto otcep, otceps->otceps()) {
-//        if (otcep->STATE_ENABLED()==1){
-//            otcep->setSTATE_TICK(otcep->STATE_TICK()+1);
-//        }
-//    }
+    otceps->l_otceps.first()->inc_tick();
 }
 
