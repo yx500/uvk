@@ -174,10 +174,10 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
     foreach (auto o, lo) {
         auto otcep=o->otcep;
         if (!otcep->STATE_ENABLED()) return;
-        if ((otcep->RCS==nullptr)&&(otcep->RCF==nullptr)&&(otcep->STATE_LOCATION()==m_Otcep::locationOnPrib)) return;
+        if ((otcep->RCS==nullptr)&&(otcep->RCF==nullptr)&&(otcep->STATE_LOCATION()==m_Otcep::locationOnPrib)) break;
         if ((otcep->RCS==nullptr)&&(otcep->RCF==nullptr)){
             otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
-            return;
+            continue;
         }
         int locat=m_Otcep::locationOnSpusk;
 

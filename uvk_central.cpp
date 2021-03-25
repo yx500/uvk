@@ -493,6 +493,10 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
             otcepsController->cmd_UPDATE_ALL(acceptStr);
             CMD->accept_cmd(m,1,acceptStr);
         }
+        if (m["CHECK_LIST"]=="1"){
+            otcepsController->cmd_CHECK_LIST(m,acceptStr);
+            CMD->accept_cmd(m,1,acceptStr);
+        }
         if (!m["DEL_OTCEP"].isEmpty()){
             if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
                 if (otcepsController->cmd_DEL_OTCEP(m,acceptStr)){
@@ -780,87 +784,29 @@ int UVK_Central::exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num)
             if ((exit_otcep->STATE_SL_VAGON_CNT()>0)&&(exit_otcep->STATE_ZKR_VAGON_CNT()>0)){
                 // дробление
                 if (exit_otcep->STATE_ZKR_VAGON_CNT()<exit_otcep->STATE_SL_VAGON_CNT()){
-
-                    auto otcep_first=otcepsController->otceps->l_otceps.first();
-                    ID_ROSP=otcep_first->STATE_ID_ROSP();
-                    int cnt_vagon_exit=exit_otcep->STATE_ZKR_VAGON_CNT();
-                    auto new_otcep=otcepsController->inc_otcep_drobl(num,cnt_vagon_exit);
+                    auto new_otcep=otcepsController->inc_otcep_drobl(num);
                     if (new_otcep!=nullptr) {
-                        new_otcep->resetZKRStates();
                         rc_zkr->setSTATE_OTCEP_BEVAGADD(true);
-                        //                        zkr->setSTATE_OTCEP_VAGADD(true);
-                        new_otcep->setSTATE_ENABLED(true);
-                        new_otcep->setSTATE_ID_ROSP(ID_ROSP);
                         new_otcep->setSTATE_GAC_ACTIVE(1);
                         maxOtcepCurrenRospusk=new_otcep->NUM();
                         auto next_otcep=otcepsController->otceps->otcepByNum(maxOtcepCurrenRospusk+1);
                         if (next_otcep!=nullptr) next_otcep->setSTATE_GAC_ACTIVE(0);
-                        return new_otcep->NUM();
+                        return maxOtcepCurrenRospusk;
                     }
+                    return 0;
                 }
+
                 // нерасцеп
                 if (exit_otcep->STATE_ZKR_VAGON_CNT()>exit_otcep->STATE_SL_VAGON_CNT()){
-                    // осаживание?
-                    int sum_all_vag=0;
-                    for (int i=num-1;i<otcepsController->otceps->l_otceps.size();i++){
-                        auto otcep=otcepsController->otceps->l_otceps[i];
-                        if (otcep->STATE_ENABLED()) sum_all_vag+=otcep->STATE_SL_VAGON_CNT();
-
+                    auto new_otcep=otcepsController->nerascep(num);
+                    if (new_otcep!=nullptr) {
+                        rc_zkr->setSTATE_ERROR_NERASCEP(true);
+                        maxOtcepCurrenRospusk=new_otcep->NUM();
                     }
-                    if (exit_otcep->STATE_ZKR_VAGON_CNT()>=sum_all_vag) return 0;
-                    // тасуем вагоны
-                    rc_zkr->setSTATE_ERROR_NERASCEP(true);
-                    exit_otcep->setSTATE_SL_VAGON_CNT_PRED(exit_otcep->STATE_SL_VAGON_CNT());
-                    int cnt_vagon_perebor=exit_otcep->STATE_ZKR_VAGON_CNT()-exit_otcep->STATE_SL_VAGON_CNT();
-                    for (int i=num;i<otcepsController->otceps->l_otceps.size();i++){
-                        auto next_otcep=otcepsController->otceps->l_otceps[i];
-                        if ((next_otcep->STATE_ENABLED()==0)||(next_otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)) return 0;
-                        if ((next_otcep->STATE_SL_VAGON_CNT()==0)) return 0;
-                        int cnt_vagon_delete=cnt_vagon_perebor;
-                        if (cnt_vagon_delete>next_otcep->STATE_SL_VAGON_CNT()) cnt_vagon_delete=next_otcep->STATE_SL_VAGON_CNT();
-
-                        // добавляем к ушедшему
-                        int n=exit_otcep->vVag.size()+1;
-                        exit_otcep->setSTATE_SL_VAGON_CNT(exit_otcep->vVag.size()+cnt_vagon_delete);
-
-                        for (int i=0;i<cnt_vagon_delete;i++){
-                            if (i<next_otcep->vVag.size()){
-                                auto v=next_otcep->vVag[i];
-                                v.setSTATE_N_IN_OTCEP(n);n++;
-                                v.setSTATE_NUM_OTCEP(exit_otcep->NUM());
-                                exit_otcep->setVagon(&v);
-                            }
-                        }
-                        // удаляем оцеп
-                        if (cnt_vagon_delete>=next_otcep->vVag.size()){
-                            next_otcep->setSTATE_SL_VAGON_CNT_PRED(next_otcep->STATE_SL_VAGON_CNT());
-                            next_otcep->setSTATE_SL_VAGON_CNT(0);
-                            next_otcep->resetTrackingStates();
-                            next_otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
-                            maxOtcepCurrenRospusk=next_otcep->NUM()+1;
-                        } else {
-                            // удаляем удаленные
-                            n=1;
-                            for (int i=0;i<next_otcep->vVag.size()-cnt_vagon_delete-1;i++){
-                                auto &v0=next_otcep->vVag[i];
-                                auto &v1=next_otcep->vVag[i+1];
-                                v0.assign(&v1);
-                                v0.setSTATE_N_IN_OTCEP(n);n++;
-                            }
-                            next_otcep->setSTATE_SL_VAGON_CNT_PRED(next_otcep->STATE_SL_VAGON_CNT());
-                            next_otcep->setSTATE_SL_VAGON_CNT(next_otcep->vVag.size()-cnt_vagon_delete);
-                            break;
-                        }
-                        cnt_vagon_perebor=cnt_vagon_perebor-cnt_vagon_delete;
-                        if (cnt_vagon_perebor<0) break;
-                    }//  for (int i=num;i<otcepsController->otceps->l_otceps.size();i++){
-                    otcepsController->updateVagons();
                     return maxOtcepCurrenRospusk;
                 }
             }
-            break;
-        } //if ((rc_zkr==zkr) && (zkr->STATE_ROSPUSK()==1)){
-
+        }
     }
     return 0;
 
