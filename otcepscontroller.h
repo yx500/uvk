@@ -35,7 +35,7 @@ public:
     void setNewID_ROSP(quint32 ID_ROSP);
 
     void updateVagons();
-    m_Otcep *inc_otcep(int N, int mar);
+    m_Otcep *inc_otcep(int N, int sp);
     m_Otcep *inc_otcep_drobl(int N);
     m_Otcep *nerascep(int num);
     QList<SignalDescription> l_chanelVag;

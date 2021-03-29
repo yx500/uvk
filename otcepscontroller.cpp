@@ -151,7 +151,7 @@ bool OtcepsController::cmd_DEL_OTCEP(QMap<QString, QString> &m, QString &acceptS
     acceptStr=QString("Ошибка удаления отцепа %1.").arg(m["N"]);
     return false;
 }
-m_Otcep* OtcepsController::inc_otcep(int N,int mar)
+m_Otcep* OtcepsController::inc_otcep(int N,int sp)
 {
     auto otcep=otceps->otcepByNum(N);
     if (otcep!=nullptr){
@@ -168,7 +168,7 @@ m_Otcep* OtcepsController::inc_otcep(int N,int mar)
             otcep_1->inc_tick();
         }
         otcep->resetStates();
-        otcep->setSTATE_MAR(mar);
+        otcep->setSTATE_SP(sp);
         otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
 
         otcep->inc_tick();
@@ -199,7 +199,7 @@ m_Otcep *OtcepsController::inc_otcep_drobl(int N)
                 }
             }
         }
-        auto new_otcep=inc_otcep(N+1,otcep->STATE_MAR());
+        auto new_otcep=inc_otcep(N+1,otcep->STATE_SP());
         if (new_otcep!=nullptr){
             int kv=otcep->STATE_SL_VAGON_CNT()-cnt_vagon_exit;
             part++;
@@ -298,6 +298,7 @@ m_Otcep *OtcepsController::nerascep(int num)
 bool OtcepsController::cmd_INC_OTCEP(QMap<QString, QString> &m, QString &acceptStr)
 {
     int N=m["INC_OTCEP"].toInt();
+    int SP=m["SP"].toInt();
     auto otcep=otceps->otcepByNum(N);
     if (otcep!=nullptr){
         if ((otcep->STATE_ENABLED()) && (otcep->STATE_LOCATION()!=m_Otcep::locationOnPrib)){
@@ -313,7 +314,7 @@ bool OtcepsController::cmd_INC_OTCEP(QMap<QString, QString> &m, QString &acceptS
                 }
             }
         }
-        inc_otcep(N,1);
+        inc_otcep(N,SP);
 
         acceptStr=QString("Отцеп %1 добавлен.").arg(N);
         updateVagons();
