@@ -465,6 +465,13 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
                 CMD->accept_cmd(m,-1,acceptStr);
         }
     }
+    if (m["CMD"]=="SET_OSAGA"){
+        if (cmd_setOsaga(acceptStr))
+            CMD->accept_cmd(m,1,acceptStr); else
+            CMD->accept_cmd(m,-1,acceptStr);
+
+    }
+
     if (m["CMD"]=="SET_ACT_ZKR"){
         if (cmd_setPutNadvig(m["ACT_ZKR"].toInt(),acceptStr))
             CMD->accept_cmd(m,1,acceptStr); else
@@ -743,6 +750,9 @@ int UVK_Central::getNewOtcep(m_RC_Gor_ZKR*rc_zkr)
                 auto otcep_first=otcepsController->otceps->l_otceps.first();
                 ID_ROSP=otcep_first->STATE_ID_ROSP();
 
+                if (GORKA->STATE_OSAGA()) GORKA->setSTATE_REGIM(ModelGroupGorka::regimPausa);
+                GORKA->setSTATE_OSAGA(false);
+
                 m_Otcep *otcep=otcepsController->otceps->topOtcep();
                 if (otcep!=nullptr)  {
                     if (otcep->NUM()>maxOtcepCurrenRospusk) maxOtcepCurrenRospusk=otcep->NUM();
@@ -772,6 +782,7 @@ int UVK_Central::getNewOtcep(m_RC_Gor_ZKR*rc_zkr)
 
 int UVK_Central::exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num)
 {
+    GORKA->setSTATE_OSAGA(false);
     auto exit_otcep=otcepsController->otceps->otcepByNum(num);
     if (exit_otcep==nullptr) return 0;
     if (num!=maxOtcepCurrenRospusk) return 0;
@@ -815,6 +826,7 @@ int UVK_Central::exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num)
 
 int UVK_Central::resetOtcep2prib(m_RC_Gor_ZKR*,int num)
 {
+    GORKA->setSTATE_OSAGA(false);
     auto otcep=otcepsController->otceps->otcepByNum(num);
     if (otcep!=nullptr){
         TOS->resetTracking(num);
@@ -836,6 +848,7 @@ QList<SignalDescription> UVK_Central::acceptOutputSignals()
     GORKA->setSIGNAL_PAUSA(GORKA->SIGNAL_PAUSA().innerUse());       l << GORKA->SIGNAL_PAUSA();
     GORKA->setSIGNAL_STOP(GORKA->SIGNAL_STOP().innerUse());         l << GORKA->SIGNAL_STOP();
     GORKA->setSIGNAL_GAC_FINISH(GORKA->SIGNAL_GAC_FINISH().innerUse());   l << GORKA->SIGNAL_GAC_FINISH();
+    GORKA->setSIGNAL_OSAGA(GORKA->SIGNAL_OSAGA().innerUse());   l << GORKA->SIGNAL_OSAGA();
 
     foreach (auto zkr, l_zkr) {
         zkr->setSIGNAL_ROSPUSK(zkr->SIGNAL_ROSPUSK().innerUse());   l<<zkr->SIGNAL_ROSPUSK();
@@ -857,6 +870,7 @@ void UVK_Central::state2buffer()
     case ModelGroupGorka::regimStop:    GORKA->SIGNAL_STOP().setValue_1bit(1); break;
     }
     GORKA->SIGNAL_GAC_FINISH().setValue_1bit(GORKA->STATE_GAC_FINISH());
+    GORKA->SIGNAL_OSAGA().setValue_1bit(GORKA->STATE_OSAGA());
     // выставляем напрямую в модели
     foreach (auto zkr, l_zkr) {
         zkr->SIGNAL_ROSPUSK().setValue_1bit(zkr->STATE_ROSPUSK());
@@ -957,6 +971,23 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
     return false;
 }
 
+bool UVK_Central::cmd_setOsaga(QString &acceptStr)
+{
+    if (GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk){
+        if (GORKA->STATE_OSAGA()==false){
+            GORKA->setSTATE_OSAGA(true);
+            acceptStr="Режим ОСАЖИВАНИЕ установлен.";
+        } else {
+            GORKA->setSTATE_OSAGA(false);
+            acceptStr="Режим ОСАЖИВАНИЕ снят.";
+        }
+        return true;
+    } else {
+        acceptStr="Установка ОСАЖИВАНИЕ только в режиме РОСПУСК.";
+        return false;
+    }
+}
+
 
 
 
@@ -982,6 +1013,7 @@ void UVK_Central::setRegimRospusk()
     GAC->resetStates();
     TOS->setSTATE_ENABLED(true);
     GAC->setSTATE_ENABLED(true);
+    GORKA->setSTATE_OSAGA(false);
 
 }
 
@@ -993,8 +1025,10 @@ void UVK_Central::setRegimStop()
     // финишируем отцепы
     foreach (auto otcep, otcepsController->otceps->otceps()) {
         otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
-        otcep->RCS=nullptr;otcep->RCF=nullptr;otcep->vBusyRc.clear();        otcep->setSTATE_GAC_ACTIVE(false);
+        otcep->RCS=nullptr;otcep->RCF=nullptr;otcep->vBusyRc.clear();
+        otcep->setSTATE_GAC_ACTIVE(false);
     }
+    GORKA->setSTATE_OSAGA(false);
 
 }
 

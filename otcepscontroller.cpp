@@ -50,12 +50,6 @@ QList<SignalDescription> OtcepsController::acceptOutputSignals()
 {
     QList<SignalDescription> l;
     // рассыка в обратном порядке
-
-    for (int i=otceps->l_otceps.size()-1;i>=0;i--){
-        auto *otcep=otceps->l_otceps[i];
-        otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
-        l<<otcep->SIGNAL_DATA();
-    }
     // 14 сортир 15 от увк
 
     for (int i=otceps->l_vagons.size()-1;i>=0;i--){
@@ -63,6 +57,13 @@ QList<SignalDescription> OtcepsController::acceptOutputSignals()
         v->setSIGNAL_DATA( v->SIGNAL_DATA().innerUse());
         l<<v->SIGNAL_DATA();
     }
+
+    for (int i=otceps->l_otceps.size()-1;i>=0;i--){
+        auto *otcep=otceps->l_otceps[i];
+        otcep->setSIGNAL_DATA( otcep->SIGNAL_DATA().innerUse());
+        l<<otcep->SIGNAL_DATA();
+    }
+
     return l;
 }
 char __STATE_[]="STATE_";

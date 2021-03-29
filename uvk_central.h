@@ -35,6 +35,7 @@ public:
     bool acceptBuffers();
     bool cmd_setPutNadvig(int p,QString &acceptStr);
     bool cmd_setRegim(int p,QString &acceptStr);
+    bool cmd_setOsaga(QString &acceptStr);
 
 
     QList<GtBuffer*> l_out_buffers;
