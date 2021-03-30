@@ -145,11 +145,12 @@ void tos_System::updateOtcepsParams(const QDateTime &T)
         otcep->setSTATE_ZKR_PROGRESS(inzkr);
         int vagon_inzkr=0;
         if (inzkr){
-            if (otcep->STATE_ZKR_TLG()%2==0){
-                vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT()+1;
-            } else{
-                vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT();
-            }
+//            if (otcep->STATE_ZKR_TLG()%2==0){
+//                vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT()+1;
+//            } else{
+//                vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT();
+//            }
+            vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT();
         }
         for (int i=0;i<otcep->vVag.size();i++){
             auto &v=otcep->vVag[i];

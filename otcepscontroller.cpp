@@ -17,26 +17,52 @@ void OtcepsController::work(const QDateTime &)
 {
     // выставляем признак текущегог отцепа
     m_Otcep * cur_otcep=nullptr;
-    foreach (auto *otcep, otceps->l_otceps) {
-        if (!otcep->STATE_ENABLED()) continue;
-        if (otcep->STATE_ZKR_S_IN()) cur_otcep=otcep;
-    }
+    int i_cur_vag=-1;
+    //    foreach (auto *otcep, otceps->l_otceps) {
+    //        if (!otcep->STATE_ENABLED()) continue;
+    //        if (otcep->STATE_ZKR_S_IN()) cur_otcep=otcep;
+    //    }
     if (cur_otcep==nullptr){
         foreach (auto *otcep, otceps->l_otceps) {
             if (!otcep->STATE_ENABLED()) continue;
             if (otcep->STATE_ZKR_PROGRESS()==1) {cur_otcep=otcep;break;}
         }
-        if (cur_otcep==nullptr){
-            foreach (auto *otcep, otceps->l_otceps) {
-                if (!otcep->STATE_ENABLED()) continue;
-                if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) {cur_otcep=otcep;break;}
+    }
+    if (cur_otcep==nullptr){
+        foreach (auto *otcep, otceps->l_otceps) {
+            if (!otcep->STATE_ENABLED()) continue;
+            if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) {cur_otcep=otcep;break;}
+        }
+    }
+    // вагон
+    if (cur_otcep!=nullptr){
+        for (int i=0;i<cur_otcep->vVag.size();i++){
+            auto &v=cur_otcep->vVag[i];
+            if (v.STATE_ZKR_PROGRESS()==1) i_cur_vag=i;
+        }
+        if (i_cur_vag<0){
+            for (int i=0;i<cur_otcep->vVag.size();i++){
+                auto &v=cur_otcep->vVag[i];
+                if (v.STATE_LOCATION()==m_Otcep::locationOnPrib) {i_cur_vag=i;break;}
             }
         }
     }
     foreach (auto *otcep, otceps->l_otceps) {
-        if (otcep!=cur_otcep) otcep->setSTATE_IS_CURRENT(0);
+        if (otcep!=cur_otcep) {
+            otcep->setSTATE_IS_CURRENT(0);
+            for (int i=0;i<otcep->vVag.size();i++){
+                auto &v=otcep->vVag[i];
+                v.setSTATE_IS_CURRENT(0);
+            }
+        } else {
+            otcep->setSTATE_IS_CURRENT(1);
+            if ((i_cur_vag>=0)&&(i_cur_vag<otcep->vVag.size())){
+                auto &v=otcep->vVag[i_cur_vag];
+                v.setSTATE_IS_CURRENT(0);
+            }
+        }
     }
-    if (cur_otcep!=nullptr) cur_otcep->setSTATE_IS_CURRENT(1);
+
 
 }
 
@@ -388,7 +414,7 @@ bool OtcepsController::cmd_CHECK_LIST(QMap<QString, QString> &m, QString &accept
         }
     }
     if ((ID_ROSP!=otceps->l_otceps.first()->STATE_ID_ROSP())||
-        (OTCEP_CNT!=_OTCEP_CNT)||
+            (OTCEP_CNT!=_OTCEP_CNT)||
             (VAGON_CNT!=_VAGON_CNT)
             )
     {

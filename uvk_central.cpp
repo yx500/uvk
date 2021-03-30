@@ -902,6 +902,7 @@ bool UVK_Central::cmd_setPutNadvig(int p,QString &acceptStr)
 
 bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
 {
+    GORKA->setSTATE_OSAGA(false);
     switch (GORKA->STATE_REGIM()) {
     case ModelGroupGorka::regimUnknow:
         GORKA->setSTATE_REGIM(p);
