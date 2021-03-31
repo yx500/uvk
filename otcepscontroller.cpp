@@ -56,14 +56,14 @@ void OtcepsController::work(const QDateTime &)
             }
         } else {
             otcep->setSTATE_IS_CURRENT(1);
-            if ((i_cur_vag>=0)&&(i_cur_vag<otcep->vVag.size())){
-                auto &v=otcep->vVag[i_cur_vag];
-                v.setSTATE_IS_CURRENT(0);
+            for (int i=0;i<otcep->vVag.size();i++){
+                auto &v=otcep->vVag[i];
+                if (i==i_cur_vag)
+                    v.setSTATE_IS_CURRENT(1); else
+                    v.setSTATE_IS_CURRENT(0);
             }
         }
     }
-
-
 }
 
 void OtcepsController::validation(ListObjStr *l) const

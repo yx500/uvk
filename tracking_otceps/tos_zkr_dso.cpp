@@ -143,6 +143,9 @@ void tos_Zkr_DSO::work(const QDateTime &T)
           {_otcep_free , 0 ,_os2forw,   0  } ,_in},
         { {_otcep_free , 0 ,_os_none   ,0 } ,
           {_otcep_free , 1 ,_os2forw,   0  } ,_in},
+        // ненормальное выявление
+        { {_otcep_free , 1 ,_os_none   ,_xx } ,
+          {_otcep_free , 1 ,_os2forw,   _xx  } ,_in},
         // выявление хвоста
         { {_otcep_in , 1 ,_os_none   ,_xx } ,
           {_otcep_in , 0 ,_os_none,   _xx } ,_otcep_end},
