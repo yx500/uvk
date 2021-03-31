@@ -101,6 +101,18 @@ void tos_Rc::state2buffer()
 
 }
 
+bool tos_Rc::buffer2state()
+{
+    rc->updateStates();
+    if (rc->SIGNAL_INFO_DSO().getBuffer()==nullptr) return false;
+    if (rc->SIGNAL_INFO_DSO().getBuffer()->tick==0) return false;
+    t_OsyCell_21 *d=(t_OsyCell_21 *)rc->SIGNAL_INFO_DSO().value_data(sizeof(t_OsyCell_21));
+    if (d==nullptr) return false;
+    l_os.clear();
+    for (int i=0;i<d->V;i++) l_os.push_back(TOtcepDataOs());
+    return true;
+}
+
 //TOtcepData tos_Rc::od(int sf) const
 //{
 //    TOtcepData d;

@@ -384,6 +384,7 @@ void tos_Zkr_DSO::in_os(const QDateTime &T)
     os.p=_pOtcepPartUnknow;
     os.d=_forw;
     os.t=T;
+    os.v=tdso_osy->os_v;
 
     if (cur_os.num!=0){
         os.p=_pOtcepMiddle;

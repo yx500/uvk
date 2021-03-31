@@ -32,6 +32,7 @@ SOURCES += \
         main.cpp \
     gtgac.cpp \
     otcepscontroller.cpp \
+    ukvagcontroller.cpp \
     uvk_central.cpp
 
 # Default rules for deployment.
@@ -45,4 +46,5 @@ HEADERS += \
     gtapp_watchdog.h \
     gtgac.h \
     otcepscontroller.h \
+    ukvagcontroller.h \
     uvk_central.h

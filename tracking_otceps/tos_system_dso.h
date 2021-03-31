@@ -26,8 +26,10 @@ public:
     void makeWorkers(ModelGroupGorka *modelGorka) override;
     QList<SignalDescription> acceptOutputSignals() override;
     void state2buffer() override;
+    bool buffer2state();
     void work(const QDateTime &T)override;
     void resetStates()override;
+
 
     void updateOtcepsOnRc(const QDateTime &T);
     void resetTracking(int num)override;
@@ -37,6 +39,7 @@ public:
     void reset_1_os(const QDateTime &T);
 
     void setDSOBUSY(const QDateTime &T);
+    void setSTATE_BUSY_DSO_ERR();
     void resetNGB();
     void setNGBDYN(const QDateTime &T);
     void setNGBSTAT(const QDateTime &T);

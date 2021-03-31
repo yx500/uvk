@@ -92,6 +92,13 @@ bool UVK_Central::init(QString fileNameIni)
 
     otcepsController=new OtcepsController(this,l_otceps.first());
 
+    ukvag=nullptr;
+    QList<m_UkVag *> l_ukv=GORKA->findChildren<m_UkVag*>();
+    if (!l_ukv.isEmpty()){
+        ukvag=new UkVagController(this,GORKA);
+    }
+
+
     trackingType=_tos_dso;
     TOS=new tos_System_DSO(this);
     IUVKGetNewOtcep *uvkGetNewOtcep=new IUVKGetNewOtcep(this);
@@ -102,6 +109,26 @@ bool UVK_Central::init(QString fileNameIni)
 
     CMD=new GtCommandInterface(this,udp);
     CMD->setSRC_ID("UVK");
+
+    TOS->resetStates();
+    TOS->resetTracking();
+    if (testMode==0){
+        QElapsedTimer timerWaitInfo;
+        timerWaitInfo.start();
+        bool inforest=false;
+        qDebug() << "Probe restore rc busy...";
+        while (timerWaitInfo.elapsed()<2000){
+            inforest=TOS->buffer2state();
+            if (inforest) break;
+            QCoreApplication::processEvents();
+        }
+        if (inforest){
+            qDebug() << "Rc busy restored.";
+        } else {
+            qDebug() << "Rc busy not restored. Use TUVK to reset busy.";
+            TOS->setSTATE_BUSY_DSO_ERR();
+        }
+    }
 
     if (!acceptBuffers())
     {
@@ -126,8 +153,6 @@ bool UVK_Central::init(QString fileNameIni)
 
 
     GORKA->resetStates();
-    TOS->resetStates();
-    TOS->resetTracking();
     GAC->resetStates();
     otcepsController->resetStates();
 
@@ -236,6 +261,7 @@ bool UVK_Central::acceptBuffers()
     l+=otcepsController->acceptOutputSignals();
     l+=TOS->acceptOutputSignals();
     l+=GAC->acceptOutputSignals();
+    if (ukvag!=nullptr) l+=ukvag->acceptOutputSignals();
 
 
 
@@ -394,6 +420,8 @@ void UVK_Central::work()
     TOS->work(T);
     GAC->work(T);
     otcepsController->work(T);
+    if (ukvag!=nullptr) ukvag->work(T);
+
     checkFinishRospusk(T);
     //    QDateTime T2w=QDateTime::currentDateTime();
 
@@ -551,11 +579,11 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
             CMD->accept_cmd(m,-1,acceptStr);
         //}
     }
-//    if (m["CMD"]=="ADD_OTCEP_VAG"){
-//        if (otcepsController->cmd_ADD_OTCEP_VAG(m,acceptStr))
-//            CMD->accept_cmd(m,1,acceptStr); else
-//            CMD->accept_cmd(m,-1,acceptStr);
-//    }
+    //    if (m["CMD"]=="ADD_OTCEP_VAG"){
+    //        if (otcepsController->cmd_ADD_OTCEP_VAG(m,acceptStr))
+    //            CMD->accept_cmd(m,1,acceptStr); else
+    //            CMD->accept_cmd(m,-1,acceptStr);
+    //    }
 
     if (m["CMD"]=="RESET_DSO_BUSY"){
         if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
@@ -879,6 +907,7 @@ void UVK_Central::state2buffer()
     TOS->state2buffer();
     GAC->state2buffer();
     otcepsController->state2buffer();
+    if (ukvag!=nullptr) ukvag->state2buffer();
 
 }
 bool UVK_Central::cmd_setPutNadvig(int p,QString &acceptStr)

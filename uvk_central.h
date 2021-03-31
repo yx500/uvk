@@ -1,9 +1,10 @@
 #ifndef UVK_CENTRAL_H
 #define UVK_CENTRAL_H
 #include <QTimer>
-#include "tos_system.h"
+#include "tos_system_dso.h"
 #include "gtgac.h"
 #include "otcepscontroller.h"
+#include "ukvagcontroller.h"
 #include "gtcommandinterface.h"
 #include "modelgroupgorka.h"
 #include "gtbuffers_udp_d2.h"
@@ -21,9 +22,10 @@ public:
     bool init(QString fileNameIni);
     void start();
     ModelGroupGorka *GORKA;
-    tos_System*TOS;
+    tos_System_DSO*TOS;
     GtGac *GAC;
     OtcepsController *otcepsController;
+    UkVagController *ukvag;
     GtCommandInterface *CMD;
     GtBuffers_UDP_D2 *udp;
 

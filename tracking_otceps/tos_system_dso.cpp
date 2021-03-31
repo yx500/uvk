@@ -130,11 +130,7 @@ void tos_System_DSO::resetStates()
         }
     }
 
-    if (testMode==0){
-        foreach (auto w, l_trc) {
-            w->rc->setSTATE_BUSY_DSO_ERR(true);
-        }
-    }
+
 
 
 
@@ -217,6 +213,15 @@ void tos_System_DSO::state2buffer()
         strel->SIGNAL_UVK_ANTVZ_PL().setValue_1bit(strel->STATE_UVK_ANTVZ_PL());
         strel->SIGNAL_UVK_ANTVZ_MN().setValue_1bit(strel->STATE_UVK_ANTVZ_MN());
     }
+}
+
+bool tos_System_DSO::buffer2state()
+{
+    bool allex=true;
+    foreach (auto trc, l_trc) {
+        if (!trc->buffer2state()) allex=false;
+    }
+    return allex;
 }
 
 
@@ -514,6 +519,14 @@ void tos_System_DSO::setDSOBUSY(const QDateTime &)
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::free); else
             trc->rc->setSTATE_BUSY_DSO(MVP_Enums::TRCBusy::busy);
     }
+}
+
+void tos_System_DSO::setSTATE_BUSY_DSO_ERR()
+{
+
+        foreach (auto w, l_trc) {
+            w->rc->setSTATE_BUSY_DSO_ERR(true);
+        }
 }
 
 void tos_System_DSO::resetNGB()

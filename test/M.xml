@@ -114,6 +114,7 @@
         <m_Svet_Gor_1 objectName="ПЧС2" ID="18446743882252051464" IDSTR="#СВТ_ПЧС2" OLD_ID="2822" EXTFLAGSRC="" SIGNAL_OPEN="uvk_ts1,1,333,0,0" SIGNAL_OPEN_BLINK=""/>
         <m_Svet_Gor_1 objectName="ПЧС3" ID="18446743882252051466" IDSTR="#СВТ_ПЧС3" OLD_ID="2834" EXTFLAGSRC="" SIGNAL_OPEN="uvk_ts1,1,334,0,0" SIGNAL_OPEN_BLINK=""/>
         <m_Svet_Gor_4N objectName="ГА" ID="18446743882252051472" IDSTR="#СВТ_Г" OLD_ID="2567" EXTFLAGSRC="" SIGNAL_K="uvk_ts1,1,324,0,0" SIGNAL_J="uvk_ts1,1,325,0,0" SIGNAL_Z="uvk_ts1,1,326,0,0" SIGNAL_B="uvk_ts1,1,327,0,0" SIGNAL_NAZAD=""/>
+        <m_UkVag objectName="УКВ" ID="18446743876592155670" IDSTR="#УКВ" OLD_ID="0" EXTFLAGSRC="" SIGNAL_DATA="fromukvag,6,0,0," SIGNAL_SET="toukvag,6,0,0,"/>
     </ModelGroup>
     <ModelGroup objectName="АРС" ID="0" IDSTR="" OLD_ID="0" EXTFLAGSRC="">
         <m_ControllerARS objectName="1-1" ID="18446743882252051478" IDSTR="#АРСКОНТР_1-1" OLD_ID="2567" EXTFLAGSRC="" ADDR_SLOT="1" SIGNAL_ADDR="ARS1,4,0,0," ADDR="1"/>

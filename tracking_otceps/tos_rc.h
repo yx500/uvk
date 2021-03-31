@@ -61,6 +61,7 @@ public:
 
     QList<SignalDescription> acceptOutputSignals() ;
     void state2buffer() ;
+    bool buffer2state() ;
 
 //    TOtcepData od(int sf) const;
 //    QList<TOtcepData> l_od;
