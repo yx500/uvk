@@ -89,6 +89,8 @@ protected:
      gtapp_watchdog *watchdog;
      QStringList sl_memshared_buffers;
      QDateTime t_STATE_GAC_FINISH;
+     QString status1;
+     QByteArray bufStatus;
 };
 
 #endif // UVK_CENTRAL_H

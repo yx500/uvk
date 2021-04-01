@@ -70,6 +70,16 @@ bool UVK_Central::init(QString fileNameIni)
         qFatal("file not found %s",QFileInfo(fileNameModel).absoluteFilePath().toStdString().c_str());
         return false;
     }
+
+    // статус
+    status1="";
+    status1="app "+QFileInfo(QCoreApplication::applicationFilePath()).fileTime(QFileDevice::FileModificationTime).toString("dd.MM.yyyy hh:mm:ss");
+    status1=status1+";ini "+QFileInfo(fileNameIni).fileTime(QFileDevice::FileModificationTime).toString("dd.MM.yyyy hh:mm:ss");
+    status1=status1+";mod "+QFileInfo(fileNameModel).fileTime(QFileDevice::FileModificationTime).toString("dd.MM.yyyy hh:mm:ss");
+    status1=status1+";run "+QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss");
+    QString status=status1+";slv="+QString::number(slaveMode);
+    bufStatus=status.toLocal8Bit();
+
     udp=new GtBuffers_UDP_D2();
     MVP.setGetGtBufferInterface(udp);
     if (testMode_no_send==1) udp->no_send=true;
@@ -398,6 +408,8 @@ void UVK_Central::work()
     if (udp->slaveMode!=slaveMode){
         udp->slaveMode=slaveMode;
         qDebug()<< "slaveMode=" <<slaveMode;
+        QString status=status1+";slv="+QString::number(slaveMode);
+        bufStatus=status.toLocal8Bit();
     }
 
     GORKA->updateStates();
@@ -615,19 +627,20 @@ void UVK_Central::gac_command(const SignalDescription &s, int state)
 
 void UVK_Central::sendStatus()
 {
-    struct UVK_Status{
+//    struct UVK_Status{
 
-        quint8 slaveMode;
-        time_t start_time;
+//        quint8 slaveMode;
+//        time_t start_time;
 
-    };
-    static UVK_Status c;
-    c.start_time=start_time;
-    c.slaveMode=slaveMode;
+//    };
+//    static UVK_Status c;
+//    c.start_time=start_time;
+//    c.slaveMode=slaveMode;
 
-    udp->sendData(3,uvkStatusName,QByteArray((const char *)&c,sizeof(c)));
+//    udp->sendData(3,uvkStatusName,QByteArray((const char *)&c,sizeof(c)));
+    udp->sendData(3,uvkStatusName,bufStatus);
 
-    // контролим свой статус
+    // контролим свой стату
     if (!signal_Control.isEmpty()){
         cmd_DO c;
         c.flag=0;

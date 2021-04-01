@@ -47,8 +47,8 @@ void UkVagController::work(const QDateTime &)
         }
     }
     for (int i=0;i<3;i++) {
-        if (D[i]>19) D[i]=20;
-            else if (D[i]<0) D[i]=21;
+        if (D[i]>19) D[i]=62;
+            else if (D[i]<0) D[i]=45;
                  else if (D[i]==0) D[i]=32;
     }
     ukvag->setSTATE_D1(D[0]);
