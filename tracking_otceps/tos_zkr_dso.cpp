@@ -258,8 +258,11 @@ void tos_Zkr_DSO::work_dso_tlg2(const QDateTime &)
             if (o!=nullptr){
                 int tlg=o->otcep->STATE_ZKR_TLG();
                 tlg--;
+                if (tlg<0) tlg=0;
                 o->otcep->setSTATE_ZKR_TLG(tlg);
-                if (tlg%2==0) o->otcep->setSTATE_ZKR_VAGON_CNT(tlg/2); else o->otcep->setSTATE_ZKR_VAGON_CNT(tlg/2+1);
+                if (tlg>0){
+                    if (tlg%2==0) o->otcep->setSTATE_ZKR_VAGON_CNT(tlg/2); else o->otcep->setSTATE_ZKR_VAGON_CNT(tlg/2+1);
+                } else o->otcep->setSTATE_ZKR_VAGON_CNT(0);
             }
         }
     }
@@ -348,7 +351,9 @@ void tos_Zkr_DSO::newOtcep(const QDateTime &T)
 void tos_Zkr_DSO::endOtcep(const QDateTime &T)
 {
     rc_zkr->setSTATE_OTCEP_VAGADD(false);
-    TOS->exitOtcep(rc_zkr,cur_os.num);
+    if ((cur_os.num!=0)&&(cur_os.d==_forw)){
+        TOS->exitOtcep(rc_zkr,cur_os.num);
+    }
 
 
 //    if ((cur_os.num!=0)&&(cur_os.d==_forw)){
@@ -415,7 +420,6 @@ void tos_Zkr_DSO::out_os(const QDateTime &T)
             auto o=TOS->otcep_by_num(os.num);
             if (o!=nullptr){
                 if (rc_zkr->STATE_ROSPUSK()==1){
-                    o->otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
                     TOS->resetOtcep2prib(rc_zkr,os.num);
                 }
             }
@@ -456,6 +460,7 @@ void tos_Zkr_DSO::resetStates()
     rc_zkr->setSTATE_OTCEP_FREE(false);
     rc_zkr->setSTATE_OTCEP_IN(false);
     rc_zkr->setSTATE_OTCEP_VAGADD(false);
+    rc_zkr->setSTATE_OTCEP_BEVAGADD(false);
     dsp_pair->resetStates();
     l_os_db.clear();
 

@@ -377,14 +377,17 @@ bool OtcepsController::cmd_SET_CUR_OTCEP(QMap<QString, QString> &m, QString &acc
                     otcep->setSTATE_GAC_ACTIVE(0);
                     otcep->setSTATE_ERROR(0);
                     otcep->resetTrackingStates();
+                    otcep->inc_tick();
                 }
             } else {
                 if (otcep->STATE_ENABLED()) {
                     otcep->resetTrackingStates();
+                    otcep->resetZKRStates();
                     otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
                     otcep->setSTATE_GAC_ACTIVE(0);
                     otcep->setSTATE_MAR_F(0);
                     otcep->setSTATE_ERROR(0);
+                    otcep->inc_tick();
 
                 }
 

@@ -448,7 +448,7 @@ void GtGac::work(const QDateTime &T)
                 if (gs->strel->STATE_POL()!=MVP_Enums::pol_w){
                     if (gs->pol_cmd!=gs->strel->STATE_POL()){
                         qint64 ms=gs->pol_cmd_w_time.msecsTo(T);
-                        if ((ms>100) &&(ms<2800)) {
+                        if ((ms>100) &&(ms<2800)&&(gs->strel->STATE_A())) {
                             gs->strel->setSTATE_UVK_AV(true);
                             gs->pol_av=gs->strel->STATE_POL();
                         }

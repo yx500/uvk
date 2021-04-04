@@ -874,6 +874,7 @@ int UVK_Central::resetOtcep2prib(m_RC_Gor_ZKR*,int num)
         otcep->resetZKRStates();
         if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk)) {
             otcep->setSTATE_LOCATION(m_Otcep::locationOnPrib);
+            otcep->inc_tick();
             return num;
         }
     }
@@ -960,6 +961,7 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
             // выявления нет
             acceptStr=QString("Режим ПАУЗА установлен.");
             GORKA->setSTATE_REGIM(p);
+            GAC->setSTATE_ENABLED(false);
             return true;
         case ModelGroupGorka::regimStop:
             // продолжаем следить
@@ -977,6 +979,7 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
         case ModelGroupGorka::regimRospusk:
             acceptStr=QString("Режим РОСПУСК установлен.");
             GORKA->setSTATE_REGIM(p);
+            GAC->setSTATE_ENABLED(true);
             return true;
         case ModelGroupGorka::regimPausa:
             acceptStr=QString("Режим ПАУЗА уже установлен.");
@@ -1066,6 +1069,7 @@ void UVK_Central::setRegimStop()
     GAC->setSTATE_ENABLED(false);
     ID_ROSP=0;
     // финишируем отцепы
+    TOS->resetTracking();
     foreach (auto otcep, otcepsController->otceps->otceps()) {
         otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
         otcep->RCS=nullptr;otcep->RCF=nullptr;otcep->vBusyRc.clear();

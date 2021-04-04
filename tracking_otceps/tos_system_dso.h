@@ -32,6 +32,7 @@ public:
 
 
     void updateOtcepsOnRc(const QDateTime &T);
+    void updateOtcepsParams(const QDateTime &T) override;
     void resetTracking(int num)override;
     void resetTracking()override;
     bool resetDSOBUSY(QString idtsr, QString &acceptStr)override;

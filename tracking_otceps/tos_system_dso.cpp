@@ -417,6 +417,151 @@ void tos_System_DSO::updateOtcepsOnRc(const QDateTime &)
     }
 }
 
+void tos_System_DSO::updateOtcepsParams(const QDateTime &)
+{
+
+    // признак на зкр
+    m_Otcep *otcep_on_zkr=nullptr;
+    auto azkr=modelGorka->active_zkr();
+    foreach (auto o, lo) {
+        auto otcep=o->otcep;
+        bool inzkr=false;
+        otcep->setSTATE_ZKR_S_IN(0);
+        if (azkr!=nullptr){
+            if (otcep->RCS==azkr){
+                inzkr=true;
+                otcep_on_zkr=otcep;
+                otcep->setSTATE_PUT_NADVIG(azkr->PUT_NADVIG());
+                otcep->setSTATE_ZKR_S_IN(1);
+            }
+            if (otcep->RCF==azkr){
+                inzkr=true;
+                otcep->setSTATE_PUT_NADVIG(azkr->PUT_NADVIG());
+
+            }
+            //дб
+            if ((!inzkr)&&(otcep->STATE_ZKR_TLG()>0)&&(otcep->STATE_ZKR_TLG()%2!=0)&&
+                    (otcep->RCF!=nullptr)&&(azkr!=nullptr)&&(azkr->next_rc[_forw]==otcep->RCF))
+            {
+                auto trc=mRc2TRC[azkr];
+                if (trc->l_os.isEmpty()) inzkr=true;
+            }
+        }
+        otcep->setSTATE_ZKR_PROGRESS(inzkr);
+        int vagon_inzkr=0;
+        if (inzkr){
+            //            if (otcep->STATE_ZKR_TLG()%2==0){
+            //                vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT()+1;
+            //            } else{
+            //                vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT();
+            //            }
+            vagon_inzkr=otcep->STATE_ZKR_VAGON_CNT();
+        }
+        for (int i=0;i<otcep->vVag.size();i++){
+            auto &v=otcep->vVag[i];
+            auto l=otcep->STATE_LOCATION();
+            int zp=0;
+            if (inzkr){
+                if (i+1<=vagon_inzkr) {
+                    l=m_Otcep::locationOnSpusk;
+                } else {
+                    l=m_Otcep::locationOnPrib;
+                }
+                if (i+1==vagon_inzkr) zp=1;
+            }
+            v.setSTATE_ZKR_PROGRESS(zp);
+            v.setSTATE_LOCATION(l);
+        }
+    }
+    if (otcep_on_zkr!=nullptr) otcep_on_zkr->setSTATE_ZKR_S_IN(1);
+
+
+    foreach (auto o, lo) {
+        auto otcep=o->otcep;
+        if (!otcep->STATE_ENABLED()) return;
+        if ((otcep->RCS==nullptr)&&(otcep->RCF==nullptr)&&(otcep->STATE_LOCATION()==m_Otcep::locationOnPrib)) break;
+        if ((otcep->RCS==nullptr)&&(otcep->RCF==nullptr)){
+            otcep->setSTATE_LOCATION(m_Otcep::locationUnknow);
+            continue;
+        }
+        int locat=m_Otcep::locationOnSpusk;
+
+        // признак на зкр
+
+
+        // KZP
+        m_RC_Gor_Park * rc_park=qobject_cast<m_RC_Gor_Park *>(otcep->RCF);
+        if (rc_park!=nullptr){
+            locat=m_Otcep::locationOnPark;
+        }
+
+
+        qreal Vars=_undefV_;
+        foreach (auto rc, otcep->vBusyRc) {
+            if (!mRc2Zam.contains(rc)) continue;
+            m_Zam *zam=mRc2Zam[rc];
+            int n=zam->NTP();
+            // режим торм
+            if (zam->STATE_STUPEN()>0){
+                if (zam->STATE_STUPEN()>otcep->STATE_OT_RA(0,n)) otcep->setSTATE_OT_RA(0,n,zam->STATE_STUPEN());
+            }
+            if (zam->STATE_A()!=0){
+                otcep->setSTATE_OT_RA(1,n,zam->STATE_A());
+            }
+            if (mRc2Ris.contains(rc)){
+                m_RIS *ris=mRc2Ris[rc];
+                if (ris->controllerARS()->isValidState()){
+                    Vars=ris->STATE_V();
+                    if (Vars<1.3) Vars=0;
+                }
+            }
+
+        }
+        if ((qFabs(otcep->STATE_V_ARS()-Vars)>=0.4)) {
+            otcep->setSTATE_V_ARS(Vars);
+        }
+        // маршрут
+        m_RC_Gor*rc=qobject_cast<m_RC_Gor*>(otcep->RCS);
+        if ((rc==nullptr)||
+                (((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)||(otcep->STATE_LOCATION()==m_Otcep::locationOnPark))&&
+                 (otcep->STATE_MAR()!=0)&&
+                 ((otcep->STATE_MAR()<rc->MINWAY())||(otcep->STATE_MAR()>rc->MAXWAY()))
+                 )
+                )otcep->setSTATE_ERROR(true); else otcep->setSTATE_ERROR(false);
+        if ((rc==nullptr)&&(rc->MINWAY()==rc->MAXWAY())&&(rc->MINWAY()!=0)) otcep->setSTATE_MAR_R(1);else otcep->setSTATE_MAR_R(0);
+        int marf=0;
+        while (rc!=nullptr){
+            if (rc->MINWAY()==rc->MAXWAY()){
+                marf=rc->MINWAY();
+                break;
+            }
+            rc=qobject_cast<m_RC_Gor*>(rc->next_rc[_forw]);
+        }
+        otcep->setSTATE_MAR_F(marf);
+
+
+
+        otcep->setSTATE_LOCATION(locat);
+
+        //        // финализируем скорость отцепов
+        //        if (otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk){
+        //            o->updateV_RC(T);
+        //        }
+        otcep->setSTATE_V(o->STATE_V());
+
+        // порядковый на рц
+        int nn=0;
+        foreach (auto o2, lo) {
+            auto otcep2=o2->otcep;
+            if ((otcep2->RCS!=nullptr)&&(otcep2->RCS==otcep->RCS)){
+                if (otcep2->NUM()>otcep->NUM()) nn++;
+            }
+        }
+        otcep->setSTATE_D_ORDER_RC(nn);
+
+    }
+
+}
 void tos_System_DSO::resetTracking(int num)
 {
     tos_System::resetTracking(num);
@@ -524,9 +669,9 @@ void tos_System_DSO::setDSOBUSY(const QDateTime &)
 void tos_System_DSO::setSTATE_BUSY_DSO_ERR()
 {
 
-        foreach (auto w, l_trc) {
-            w->rc->setSTATE_BUSY_DSO_ERR(true);
-        }
+    foreach (auto w, l_trc) {
+        w->rc->setSTATE_BUSY_DSO_ERR(true);
+    }
 }
 
 void tos_System_DSO::resetNGB()
@@ -697,10 +842,13 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
         int warn1=0;
         int warn2=0;
         if (!otcep->STATE_ENABLED()) continue;
-
+        if c continue;
         if (act_zkr!=nullptr){
-            if ((otcep->STATE_MAR()>0)&&((otcep->STATE_GAC_ACTIVE())||(otcep->STATE_LOCATION()==m_Otcep::locationOnPrib))) {
+            if ((otcep->STATE_DIRECTION()==_forw)&&
+                    (otcep->STATE_MAR()>0)&&
+                    ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)||(otcep->STATE_LOCATION()==m_Otcep::locationOnPrib))) {
                 auto m=modelGorka->getMarshrut(act_zkr->PUT_NADVIG(),otcep->STATE_MAR());
+                if (m==nullptr) continue;
                 // идем по маршруту
                 bool begin_found=false;
                 bool ex_busy=false;
@@ -723,7 +871,13 @@ void tos_System_DSO::set_otcep_STATE_WARN(const QDateTime &)
                                 // стрелки в среднем положении
                                 m_Strel_Gor_Y* str=qobject_cast<m_Strel_Gor_Y*>(str1) ;
                                 if (str!=nullptr){
-                                    if (str->STATE_A()==1) bw=false;
+                                    if (str->STATE_A()==1){
+                                        bw=false;
+                                        if ((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk)&&
+                                             ((otcep->STATE_GAC_ACTIVE()==0)||(modelGorka->STATE_REGIM()!=ModelGroupGorka::regimRospusk))){
+                                            bw=true;
+                                        }
+                                    }
                                     if (bw) {
                                         if ((!ex_busy)&&((otcep->STATE_LOCATION()==m_Otcep::locationOnSpusk) || (otcep->STATE_IS_CURRENT()==1)))
                                             str->setSTATE_UVK_WSTRA(true);
