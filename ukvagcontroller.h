@@ -1,6 +1,7 @@
 #ifndef UKVAGCONTROLLER_H
 #define UKVAGCONTROLLER_H
 
+#include <QElapsedTimer>
 #include "baseworker.h"
 #include "m_ukvag.h"
 
@@ -17,9 +18,13 @@ public:
     QList<SignalDescription> acceptOutputSignals() override;
     void state2buffer()override;
 
+    void setLight(int d);
+    int light=7;
+
     ModelGroupGorka *GORKA;
     m_Otceps *otceps;
     m_UkVag * ukvag;
+    QElapsedTimer setLightTimer;
 
 signals:
 

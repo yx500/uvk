@@ -35,6 +35,8 @@ public:
     virtual ~tos_Zkr_DSO(){}
     void resetStates() override;
 
+    void resetTracking(int num);
+
     QList<SignalDescription> acceptOutputSignals() override;
     void state2buffer() override;
 
@@ -46,6 +48,7 @@ public:
     tos_Rc *trc;
     m_RC_Gor_ZKR * rc_zkr;
     tos_DsoPair *dsp_pair;
+    TOtcepDataOs cur_os;
 
     struct t_zkr_state {
         int sost;
@@ -85,7 +88,7 @@ protected:
     tos_DSO *tdso_db[2];
     tos_System_DSO *TOS;
 
-    TOtcepDataOs cur_os;
+
 
     t_zkr_state curr_state_zkr;
     t_zkr_state prev_state_zkr;

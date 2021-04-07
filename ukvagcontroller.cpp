@@ -20,37 +20,45 @@ void UkVagController::work(const QDateTime &)
     int M[3];
     for (int i=0;i<3;i++) D[i]=0;
     for (int i=0;i<3;i++) M[i]=0;
-    for(int i=0;i<otceps->l_otceps.size();i++){
-        auto otcep=otceps->l_otceps[i];
-        if (!otcep->STATE_ENABLED()) continue;
-        if (otcep->STATE_ZKR_PROGRESS()==1) {
-            D[0]=otcep->STATE_SL_VAGON_CNT();
-            if (D[0]==0) {
-                D[0]=-1;
-            } else {
-                if (otcep->STATE_ZKR_VAGON_CNT()>otcep->STATE_SL_VAGON_CNT()) M[0]=1;
+    if ((GORKA->STATE_REGIM()==ModelGroupGorka::regimRospusk)||(GORKA->STATE_REGIM()==ModelGroupGorka::regimPausa)) {
+        int ib=-1;
+        for(int i=0;i<otceps->l_otceps.size();i++){
+            auto otcep=otceps->l_otceps[i];
+            if (!otcep->STATE_ENABLED()) continue;
+            if (otcep->STATE_ZKR_PROGRESS()==1) ib=i;
+        }
+        if (ib<0){
+            for(int i=0;i<otceps->l_otceps.size();i++){
+                auto otcep=otceps->l_otceps[i];
+                if (!otcep->STATE_ENABLED()) continue;
+                if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib) {ib=i;break;}
             }
         }
-        if (otcep->STATE_LOCATION()==m_Otcep::locationOnPrib){
-            D[1]=otcep->STATE_SL_VAGON_CNT();
-            if (D[1]==0) D[1]=-1;
-            if (otcep->STATE_SL_VAGON_CNT_PRED()!=0) M[1]=1;
-            if (i+1<otceps->l_otceps.size()){
-                auto otcep2=otceps->l_otceps[i+1];
-                if ((otcep2->STATE_ENABLED())&&(otcep2->STATE_LOCATION()==m_Otcep::locationOnPrib)){
-                    D[2]=otcep2->STATE_SL_VAGON_CNT();
-                    if (D[2]==0) D[2]=-1;
-                    if (otcep2->STATE_SL_VAGON_CNT_PRED()!=0) M[2]=1;
+        if (ib>=0){
+            for (int i=0;i<3;i++){
+                if (ib+i<otceps->l_otceps.size()){
+                    auto otcep=otceps->l_otceps[ib+i];
+                    if (!otcep->STATE_ENABLED()) break;
+                    D[i]=otcep->STATE_SL_VAGON_CNT();
+                    if (D[i]==0) {
+                        D[i]=-1;
+                    } else {
+                        if (otcep->STATE_ZKR_VAGON_CNT()>otcep->STATE_SL_VAGON_CNT()) M[i]=1;
+                        if (otcep->STATE_SL_VAGON_CNT_PRED()!=0) M[i]=1;
+                    }
                 }
             }
-            break;
         }
-    }
-    for (int i=0;i<3;i++) {
-        if (D[i]>19) D[i]=62;
+
+        for (int i=0;i<3;i++) {
+            if (D[i]>19) D[i]=62;
             else if (D[i]<0) D[i]=45;
-                 else if (D[i]==0) D[i]=32;
+            else if (D[i]==0) D[i]=32;
+        }
+    } else {
+        for (int i=0;i<3;i++) D[i]=45;
     }
+
     ukvag->setSTATE_D1(D[0]);
     ukvag->setSTATE_D2(D[1]);
     ukvag->setSTATE_D3(D[2]);
@@ -72,11 +80,26 @@ void UkVagController::state2buffer()
 {
     UkVag ukv;
     memset(&ukv,0,sizeof(ukv));
-    ukv.data[0].D=ukvag->STATE_D1();
-    ukv.data[1].D=ukvag->STATE_D2();
-    ukv.data[2].D=ukvag->STATE_D3();
-    ukv.data[0].M=ukvag->STATE_M1();
-    ukv.data[1].M=ukvag->STATE_M2();
-    ukv.data[2].M=ukvag->STATE_M3();
+    if ((setLightTimer.isValid()) &&(setLightTimer.elapsed()<3000)){
+        for (int i=0;i<3;i++){
+            ukv.data[i].D=255;
+            ukv.data[i].D8[0]=0x81;
+            ukv.data[i].D8[1]=1;
+            ukv.data[i].D8[2]=light;
+        }
+    } else {
+        ukv.data[0].D=ukvag->STATE_D1();
+        ukv.data[1].D=ukvag->STATE_D2();
+        ukv.data[2].D=ukvag->STATE_D3();
+        ukv.data[0].M=ukvag->STATE_M1();
+        ukv.data[1].M=ukvag->STATE_M2();
+        ukv.data[2].M=ukvag->STATE_M3();
+    }
     ukvag->SIGNAL_SET().setBufferData(&ukv,sizeof(ukv));
+}
+
+void UkVagController::setLight(int d)
+{
+    light=d;
+    setLightTimer.start();
 }

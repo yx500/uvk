@@ -509,7 +509,6 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
         if (cmd_setOsaga(acceptStr))
             CMD->accept_cmd(m,1,acceptStr); else
             CMD->accept_cmd(m,-1,acceptStr);
-
     }
 
     if (m["CMD"]=="SET_ACT_ZKR"){
@@ -567,12 +566,12 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
             }
         }
         if (!m["SET_CUR_OTCEP"].isEmpty()){
-            if (GORKA->STATE_REGIM()!=ModelGroupGorka::regimRospusk){
+            if (GORKA->STATE_REGIM()==ModelGroupGorka::regimPausa){
                 if (otcepsController->cmd_SET_CUR_OTCEP(m,acceptStr))
                     CMD->accept_cmd(m,1,acceptStr); else
                     CMD->accept_cmd(m,-1,acceptStr);
             } else {
-                CMD->accept_cmd(m,-1,"Попытка добавить отцеп в режиме РОСПУСК");
+                CMD->accept_cmd(m,-1,"Установка текущего отцепа только в режиме ПАУЗА");
 
             }
         }
@@ -606,6 +605,15 @@ void UVK_Central::recv_cmd(QMap<QString, QString> m)
             CMD->accept_cmd(m,-1,"Попытка снять занятость в режиме РОСПУСК");
         }
     }
+
+    if (m["CMD"]=="SET_UKVAG_LIGHT"){
+        if (ukvag!=nullptr){
+            ukvag->setLight(m["LIGHT"].toInt());
+            acceptStr=QString("Установка яркости УКВ %1").arg(ukvag->light);
+            CMD->accept_cmd(m,1,acceptStr);
+        }
+    }
+
     state2buffer();
     sendBuffers(_changed);
     qDebug()<< acceptStr;
@@ -627,17 +635,17 @@ void UVK_Central::gac_command(const SignalDescription &s, int state)
 
 void UVK_Central::sendStatus()
 {
-//    struct UVK_Status{
+    //    struct UVK_Status{
 
-//        quint8 slaveMode;
-//        time_t start_time;
+    //        quint8 slaveMode;
+    //        time_t start_time;
 
-//    };
-//    static UVK_Status c;
-//    c.start_time=start_time;
-//    c.slaveMode=slaveMode;
+    //    };
+    //    static UVK_Status c;
+    //    c.start_time=start_time;
+    //    c.slaveMode=slaveMode;
 
-//    udp->sendData(3,uvkStatusName,QByteArray((const char *)&c,sizeof(c)));
+    //    udp->sendData(3,uvkStatusName,QByteArray((const char *)&c,sizeof(c)));
     udp->sendData(3,uvkStatusName,bufStatus);
 
     // контролим свой стату
@@ -731,7 +739,10 @@ void UVK_Central::sendBuffers(int p)
     foreach (GtBuffer*B, l_buffers4send) {
         B->timeDataRecived=T;
         mB2A[B]=B->A;
-        udp->sendGtBuffer(B);
+        if (slaveMode){
+            if ((B->type!=9) && (B->type!=15)) udp->sendGtBuffer(B);
+        } else
+            udp->sendGtBuffer(B);
     }
 
 }
@@ -791,8 +802,7 @@ int UVK_Central::getNewOtcep(m_RC_Gor_ZKR*rc_zkr)
                 auto otcep_first=otcepsController->otceps->l_otceps.first();
                 ID_ROSP=otcep_first->STATE_ID_ROSP();
 
-                if (GORKA->STATE_OSAGA()) GORKA->setSTATE_REGIM(ModelGroupGorka::regimPausa);
-                GORKA->setSTATE_OSAGA(false);
+                if (GORKA->STATE_OSAGA()) setRegimPause();
 
                 m_Otcep *otcep=otcepsController->otceps->topOtcep();
                 if (otcep!=nullptr)  {
@@ -823,7 +833,6 @@ int UVK_Central::getNewOtcep(m_RC_Gor_ZKR*rc_zkr)
 
 int UVK_Central::exitOtcep(m_RC_Gor_ZKR*rc_zkr,int num)
 {
-    GORKA->setSTATE_OSAGA(false);
     auto exit_otcep=otcepsController->otceps->otcepByNum(num);
     if (exit_otcep==nullptr) return 0;
     if (num!=maxOtcepCurrenRospusk) return 0;
@@ -960,16 +969,11 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
         case ModelGroupGorka::regimPausa:
             // выявления нет
             acceptStr=QString("Режим ПАУЗА установлен.");
-            GORKA->setSTATE_REGIM(p);
-            GAC->setSTATE_ENABLED(false);
+            setRegimPause();
             return true;
         case ModelGroupGorka::regimStop:
-            // продолжаем следить
-            // стрелк не переводим
             acceptStr=QString("Режим КОНЕЦ РОСПУСКА установлен.");
             setRegimStop();
-            GORKA->setSTATE_REGIM(p);
-
             return true;
         }
     } break;
@@ -980,15 +984,14 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
             acceptStr=QString("Режим РОСПУСК установлен.");
             GORKA->setSTATE_REGIM(p);
             GAC->setSTATE_ENABLED(true);
+            GORKA->setSTATE_OSAGA(false);
             return true;
         case ModelGroupGorka::regimPausa:
             acceptStr=QString("Режим ПАУЗА уже установлен.");
             return true;
         case ModelGroupGorka::regimStop:
             acceptStr=QString("Режим КОНЕЦ РОСПУСКА установлен.");
-            GORKA->setSTATE_REGIM(p);
             setRegimStop();
-            GORKA->setSTATE_REGIM(p);
             return true;
         }
     } break;
@@ -998,17 +1001,13 @@ bool UVK_Central::cmd_setRegim(int p,QString &acceptStr)
         case ModelGroupGorka::regimRospusk:
 
             setRegimRospusk();
-            GORKA->setSTATE_REGIM(p);
             acceptStr=QString("Режим РОСПУСК установлен.");
             return true;
         case ModelGroupGorka::regimPausa:
             acceptStr="Нет перехода режим СТОП -> ПАУЗА";
             return false;
         case ModelGroupGorka::regimStop:
-            acceptStr=QString("Режим КОНЕЦ РОСПУСКА установлен.");
-            GORKA->setSTATE_REGIM(p);
-            GAC->resetStates();
-            GAC->setSTATE_ENABLED(false);
+            setRegimStop();
             return true;
         }
     } break;
@@ -1034,10 +1033,6 @@ bool UVK_Central::cmd_setOsaga(QString &acceptStr)
     }
 }
 
-
-
-
-
 int UVK_Central::testRegim()
 {
     auto zkr=GORKA->active_zkr();
@@ -1060,6 +1055,7 @@ void UVK_Central::setRegimRospusk()
     TOS->setSTATE_ENABLED(true);
     GAC->setSTATE_ENABLED(true);
     GORKA->setSTATE_OSAGA(false);
+    GORKA->setSTATE_REGIM(ModelGroupGorka::regimRospusk);
 
 }
 
@@ -1076,7 +1072,16 @@ void UVK_Central::setRegimStop()
         otcep->setSTATE_GAC_ACTIVE(false);
     }
     GORKA->setSTATE_OSAGA(false);
+    GORKA->setSTATE_REGIM(ModelGroupGorka::regimStop);
 
+}
+
+void UVK_Central::setRegimPause()
+{
+    // продолжаем следить
+    // стрелк не переводим
+    GAC->setSTATE_ENABLED(false);
+    GORKA->setSTATE_REGIM(ModelGroupGorka::regimPausa);
 }
 
 

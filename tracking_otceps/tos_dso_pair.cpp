@@ -92,6 +92,8 @@ void tos_DsoPair::work_os(int dso0_os_moved,int dso1_os_moved,TOtcepDataOs os)
                 if (os_n>0){
                     l_os.front().d=_forw;
                 }
+                if (os_n==os_count)  sost_teleg=_tlg_back;
+                if (os_n==os_count*2)sost_teleg=_tlg_back;
                 os_n--;
                 if (os_n==0){
                     sost=_sost_wait1t;
@@ -104,6 +106,8 @@ void tos_DsoPair::work_os(int dso0_os_moved,int dso1_os_moved,TOtcepDataOs os)
                 if (os_n>0){
                     l_os.last().d=_back;
                 }
+                if (os_n==os_count)  sost_teleg=_tlg_forw;
+                if (os_n==os_count*2)sost_teleg=_tlg_forw;
                 os_n--;
                 if (os_n==0){
                     sost=_sost_wait1t;

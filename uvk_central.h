@@ -86,6 +86,7 @@ protected:
      int testRegim();
      void setRegimRospusk();
      void setRegimStop();
+     void setRegimPause();
      gtapp_watchdog *watchdog;
      QStringList sl_memshared_buffers;
      QDateTime t_STATE_GAC_FINISH;
