@@ -100,6 +100,6 @@ void UkVagController::state2buffer()
 
 void UkVagController::setLight(int d)
 {
-    light=d;
+    if ((d>=1)&&(d<=7)) light=d;
     setLightTimer.start();
 }

@@ -10,7 +10,7 @@ GtGac::GtGac(QObject *parent, ModelGroupGorka *modelGorka):BaseWorker(parent)
     foreach (m_Strel_Gor_Y*strel, l_strel_Y) {
         GacStrel *gstr=new GacStrel;
         gstr->strel=strel;
-
+        gstr->pol_av=MVP_Enums::pol_unknow;
         auto s=strel->SIGNAL_UVK_AV();
         if (!s.isEmpty()){
             gstr->SIGNAL_UVK_ERR_PLATA=     SignalDescription(s.chanelType(),s.chanelName(),s.chanelOffset()+1).innerUse();
@@ -120,7 +120,7 @@ void GtGac::resetStates()
         gs->pol_cmd_w_time=QDateTime();
         gs->BL_PER_DONE=false;
         gs->pol_zad=MVP_Enums::pol_unknow;
-        gs->pol_av=MVP_Enums::pol_unknow;
+//        gs->pol_av=MVP_Enums::pol_unknow;
         sendCommand(gs,MVP_Enums::pol_unknow,true);
     }
 
@@ -280,6 +280,8 @@ void GtGac::work(const QDateTime &T)
                 gs->strel->setSTATE_UVK_AV(false);
                 gs->pol_av=MVP_Enums::pol_unknow;
             }
+        } else {
+            gs->strel->setSTATE_UVK_AV(false);
         }
         // снимаем признак отхлопывания
         if (gs->BL_PER_DONE) {
